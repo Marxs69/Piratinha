@@ -28,6 +28,7 @@ const GAMES = [                                  // aparecem na dock; adicione n
   { n: 'Smithing', file: 'Smithing.exe', u: './games/smithing/index.html', g: 'game', e: '⚒️', local: true, max: true },
   { n: 'Combate', file: 'Combate.exe', u: './games/combate/index.html', g: 'game', e: '⚔️', local: true, max: true },
   { n: 'Colônia', file: 'Colonia.exe', u: './games/colonia/index.html', g: 'game', e: '🏕️', local: true, max: true },
+  { n: 'Bastião', file: 'Bastiao.exe', u: './games/bastiao/index.html', g: 'game', e: '🏰', local: true, max: true },
 ];
 const APPITEMS = [   // apps e jogos: aparecem na área de trabalho, na taskbar ou na dock (botão direito: "Mover para…"); tag = grupo na Loja
   { id: 'sys:store', tag: 'sistema', n: 'Loja', e: '🛍️', cat: 'apps', d: 'Instale e remova apps e jogos.', fn: () => openStore(), p0: 'taskbar' },
@@ -47,6 +48,7 @@ const APPITEMS = [   // apps e jogos: aparecem na área de trabalho, na taskbar 
   { id: GAMES[1].u, n: 'Smithing', e: '⚒️', cat: 'jogos', d: 'Forje armas e armaduras no ritmo do martelo, entregue encomendas e venda no leilão.', fn: () => openApp(GAMES[1]), p0: 'dock' },
   { id: GAMES[2].u, n: 'Combate', e: '⚔️', cat: 'jogos', d: 'Arrume a mochila com armas e escudos, espie a mochila do inimigo e vença as lutas automáticas.', fn: () => openApp(GAMES[2]), p0: 'dock' },
   { id: GAMES[3].u, n: 'Colônia', e: '🏕️', cat: 'jogos', d: 'Escolha um lugar no mundo, monte o grupo e erga uma colônia: construa, escave, cace e defenda.', fn: () => openApp(GAMES[3]), p0: 'dock' },
+  { id: GAMES[4].u, n: 'Bastião', e: '🏰', cat: 'jogos', d: 'Comande aldeões e soldados, erga muros e torres e segure ondas infinitas de zumbis num mapa hexagonal sorteado.', fn: () => openApp(GAMES[4]), p0: 'dock' },
 ].map(a => Object.assign({ app: true, u: a.id, win: a.id, local: true, g: 'app' }, a));
 LINKS.push(...APPITEMS);
 const FOOTER_URL = 'https://desciclopedia.org/wiki/Especial:Aleat%C3%B3ria';
