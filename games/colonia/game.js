@@ -1090,7 +1090,7 @@ function drawEnt(g, e, ox, oy, ts, z) {
   if (!col) { if (e.hostile || e.hunt) { g.strokeStyle = e.hostile ? '#ff5d6c' : '#ffb347'; g.lineWidth = z; g.strokeRect(sx + z / 2, sy + z / 2, ts - z, ts - z); } return; }
   if (e.id === sel) { g.strokeStyle = '#ffd257'; g.lineWidth = z; g.strokeRect(sx - z / 2, sy - z / 2, ts + z, ts + z); }
   if (z >= 2 || asleep) {
-    g.font = `bold ${3 * z + 4}px ui-monospace, monospace`; g.textAlign = 'center'; g.lineWidth = 3; g.strokeStyle = '#000'; g.fillStyle = asleep ? '#7db4ff' : '#fff';
+    g.font = `bold ${3 * z + 5}px "Alegreya Sans", ui-monospace, monospace`; g.textAlign = 'center'; g.lineWidth = 3; g.strokeStyle = '#000'; g.fillStyle = asleep ? '#7db4ff' : '#fff';
     const txt = asleep ? 'zZ' : e.name, ty = asleep ? sy - z : sy + ts + 3 * z + 2;
     g.strokeText(txt, sx + ts / 2, ty); g.fillText(txt, sx + ts / 2, ty);
   }
@@ -1132,17 +1132,60 @@ function enterColony() {
 }
 function openMenu() {
   C = S.col; show('menu');
-  $('#m-continue').hidden = !C;
-  $('#m-info').textContent = C ? `${BIOMES[C.site.b].n} · dia ${Math.floor(C.t / 24) + 1} · ${C.cols.length} colono${C.cols.length > 1 ? 's' : ''}` : '';
-  const g = $('#menu-art').getContext('2d'); g.clearRect(0, 0, 96, 28);
-  g.drawImage(SPR.obj.pine, 0, 2); g.drawImage(SPR.obj.oak, 14, 4);
-  ['human', 'elf', 'orc'].forEach((r, i) => g.drawImage(charSprite(r, { s: 0, h: i, c: i })[i === 2 ? 'l' : 'r'], 32 + i * 12 + (i === 2 ? 6 : 0), 12));
-  g.drawImage(SPR.obj.fire, 54, 12); g.drawImage(SPR.obj.palm, 80, 4);
+  $('#m-cont').hidden = !C;
+  const info = $('#m-info'); info.innerHTML = '';                 // aba do save: aparece ao passar o mouse em Continuar
+  if (C) [['b', BIOMES[C.site.b].n], ['span', `Dia ${Math.floor(C.t / 24) + 1}`], ['span', `${C.cols.length} colono${C.cols.length > 1 ? 's' : ''}: ${C.cols.map(c => c.name).join(', ')}`]]
+    .forEach(([t, x]) => { const e = document.createElement(t); e.textContent = x; info.append(e); });
+  if (!menuRaf) menuRaf = requestAnimationFrame(menuLoop);
 }
-$('#m-continue').onclick = () => { C = S.col; loadMap(); enterColony(); };
+/* Saída do menu: toca a animação (#menu.go, em style.css) e só então troca de tela */
+function leaveMenu(fn) {
+  const m = $('#menu'); if (m.classList.contains('go')) return;
+  m.classList.add('go'); setTimeout(() => { m.classList.remove('go'); fn(); }, 520);
+}
+/* Cena do menu (128×40, sem fundo: o chão é o da tela): à esquerda um colono corta uma árvore; à direita dois se aquecem na fogueira */
+let menuRaf = 0;
+function menuLoop(now) {
+  if (!$('#menu').classList.contains('on')) { menuRaf = 0; return; }
+  drawMenuArt(now); menuRaf = requestAnimationFrame(menuLoop);
+}
+function drawMenuArt(now) {
+  const g = $('#menu-art').getContext('2d'), R = (x, y, w, h, c) => { g.fillStyle = c; g.fillRect(Math.round(x), Math.round(y), w, h); };
+  g.clearRect(0, 0, 128, 40);
+  const sw = now % 900 / 900, strike = sw > .62, fl = Math.floor(now / 180) % 2, breath = k => Math.floor(now / 700 + k) % 2;
+  // terra batida em volta da fogueira e sombras no chão
+  for (let i = 0; i < 70; i++) { const a = i * 2.399, r = 3 + (i * 37 % 17), x = 90 + Math.cos(a) * r * 1.5, y = 33 + Math.sin(a) * r * .32; R(x, y, i % 3 ? 2 : 1, 1, PAL.soil[i % 3]); }
+  g.globalAlpha = .28; [[6, 35, 12], [21, 35, 12], [36, 35, 10], [70, 35, 10], [100, 35, 10], [113, 35, 12]].forEach(([x, y, w]) => R(x, y, w, 2, '#10140d')); g.globalAlpha = 1;
+  // árvores (a do corte treme a cada golpe) e lascas de madeira
+  g.drawImage(SPR.obj.pine, 4, 11); g.drawImage(SPR.obj.oak, 19 - (strike && sw < .8 ? 1 : 0), 12); g.drawImage(SPR.obj.oak, 111, 12);
+  if (strike) { const k = (sw - .62) / .38; g.globalAlpha = 1 - k; [[-1, -1.4], [.6, -1.8], [1.4, -.7]].forEach(([dx, dy], i) => R(29 + dx * k * 7, 29 + dy * k * 7 + k * k * 5, 1, 1, PAL.wood[i % 2])); g.globalAlpha = 1; }
+  // lenhador: de frente para a árvore, inclina no golpe; machado erguido ou cravado no tronco
+  const cx = 35 - (strike ? 1 : 0), cy = 20;
+  g.drawImage(charSprite('human', { s: 0, h: 0, c: 0 }).l, cx, cy);
+  if (strike) { for (let i = 0; i < 6; i++) R(cx + 3 - i, cy + 10 - (i > 3 ? 1 : 0), 1, 1, PAL.wood[1]); R(cx - 4, cy + 7, 2, 4, '#e6edf5'); R(cx - 3, cy + 8, 1, 3, '#aab6c6'); }
+  else { for (let i = 0; i < 6; i++) R(cx + 4 + (i > 2 ? 1 : 0), cy + 9 - i, 1, 1, PAL.wood[1]); R(cx + 2, cy + 2, 4, 2, '#e6edf5'); R(cx + 2, cy + 3, 3, 1, '#aab6c6'); }
+  // fogueira: clarão que pulsa, chamas alternando, fagulhas e fumaça subindo
+  const gl = g.createRadialGradient(90, 24, 1, 90, 24, 13 + fl + Math.sin(now / 130));   // raio curto: some antes da borda do canvas
+  gl.addColorStop(0, 'rgba(255, 190, 90, .5)'); gl.addColorStop(.5, 'rgba(255, 140, 50, .2)'); gl.addColorStop(1, 'rgba(255, 120, 40, 0)');
+  g.fillStyle = gl; g.fillRect(60, 0, 62, 40);
+  g.drawImage(charSprite('elf', { s: 0, h: 1, c: 1 }).r, 68, 20 + breath(0));
+  g.drawImage(charSprite('orc', { s: 0, h: 2, c: 2 }).l, 97, 20 + breath(.5));
+  g.drawImage(SPR.obj[fl ? 'fire' : 'fire1'], 82, 20);
+  for (let i = 0; i < 6; i++) {                                // fagulhas (3) e fumaça (3), em laço
+    const k = (now / (i < 3 ? 1100 : 2200) + i * .37) % 1, x = 90 + Math.sin(k * 5 + i * 2) * (i < 3 ? 3 : 2) + (i - 2.5), y = 23 - k * (i < 3 ? 16 : 20);
+    g.globalAlpha = (1 - k) * (i < 3 ? 1 : .35); R(x, y, 1, 1, i < 3 ? PAL.fire[i % 2] : '#d8dccf');
+  }
+  g.globalAlpha = 1;
+}
+{ // chão do menu: 4×4 casas de grama (variações sorteadas com semente fixa), repetidas na tela inteira
+  const c = document.createElement('canvas'), g = c.getContext('2d'), r = rng32(41); c.width = c.height = 64;
+  for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) g.drawImage(SPR.ground.grass[Math.floor(r() * 4)], x * 16, y * 16);
+  document.documentElement.style.setProperty('--tex-ground', `url(${c.toDataURL()})`);
+}
+$('#m-continue').onclick = () => leaveMenu(() => { C = S.col; loadMap(); enterColony(); });
 $('#m-new').onclick = () => {
-  if (!S.col) return openWorld();
-  modal('Nova colônia', '<p>A colônia atual será apagada.</p>', [{ t: 'Apagar e começar', cls: 'primary', fn: () => { S.col = null; C = null; M = null; save(); openWorld(); } }, { t: 'Voltar' }]);
+  if (!S.col) return leaveMenu(openWorld);
+  modal('Nova colônia', '<p>A colônia atual será apagada.</p>', [{ t: 'Apagar e começar', cls: 'primary', fn: () => leaveMenu(() => { S.col = null; C = null; M = null; save(); openWorld(); }) }, { t: 'Voltar' }]);
 };
 window.addEventListener('pagehide', () => { if (running) save(); });
 openMenu();

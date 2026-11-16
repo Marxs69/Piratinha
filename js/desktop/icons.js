@@ -9,8 +9,11 @@ let frozen = false;
 const trashed = new Set(store.get('piratinha-trash', []));
 const OFF = new Set(store.get('piratinha-off', []));        // desinstalados (ids da loja); não vão para a lixeira
 OFF.delete('sys:trash');                                      // a lixeira saiu da Loja: quem a tinha removido volta a vê-la
-const PLACE = store.get('piratinha-place', {});              // onde cada item aparece: 'desktop' | 'taskbar' | 'dock' | 'none' (só na Loja)
-const idOf = l => l.app ? l.id : 'link:' + l.u, placeOf = l => { const p = PLACE[idOf(l)] || l.p0 || 'desktop'; return p === 'menu' ? 'none' : p; };   // 'none' = só na Loja (o menu Iniciar não guarda mais apps)
+const PLACE = store.get('piratinha-place', {});              // onde cada item aparece: 'desktop' | 'taskbar' | 'dock' | 'none' (só na Loja ou no app Jogos)
+if (!store.get('piratinha-mig', 0)) {                        // uma vez: Loja, Navegador e Terminal saíram da taskbar para a dock (o lugar salvo deles é esquecido)
+  ['sys:store', 'sys:browser', 'sys:term'].forEach(k => { delete PLACE[k]; }); store.set('piratinha-place', PLACE); store.set('piratinha-mig', 1);
+}
+const idOf = l => l.app ? l.id : 'link:' + l.u, placeOf = l => { const p = PLACE[idOf(l)] || l.p0 || 'desktop'; return p === 'menu' ? 'none' : p; };   // 'none' = só na Loja ou no app Jogos (o menu Iniciar não guarda mais apps)
 const cell = new Map();                                // posições efetivas
 const icons = new Map();
 let dockBox = null;                                  // retângulo da dock (em coordenadas da área de trabalho), quando ela fica embaixo ou em cima

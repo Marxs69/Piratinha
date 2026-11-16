@@ -1,4 +1,4 @@
-/* Apps embutidos: bloco de notas, calculadora, navegador, jogos, Paint, terminal, loja, configurações e customização */
+/* Apps embutidos: bloco de notas, calculadora, navegador, jogos, Paint, terminal, loja, biblioteca de jogos, configurações e customização */
 
 /* bloco de notas e calculadora */
 .note { width: 100%; height: 100%; resize: none; border: 0; outline: 0; background: transparent; color: var(--text); font: inherit; font-size: 15px; line-height: 1.5; }
@@ -146,3 +146,26 @@
 .view.sys .sh { margin: 18px 2px 6px; font-size: 22px; color: var(--text); text-transform: uppercase; letter-spacing: .06em; }
 .view.sys .sh:first-child, .stags + .sh { margin-top: 2px; }
 .car { display: flex; gap: 4px; } .car .pill:first-child { flex: 1; } .pinb { width: 32px; padding: 0; font-size: 14px; }
+
+/* Jogos (biblioteca): lista à esquerda; à direita capa, botão Jogar e descrição */
+.gl .sd { width: 220px; } .gl .sd .sbox { flex: none; margin-bottom: 8px; }
+.gll { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 2px; }
+.gl .cat { flex: none; display: flex; align-items: center; gap: 8px; padding: 6px 8px; }
+.gl .cat .tile { width: 28px; height: 28px; border-radius: 8px; } .gl .cat .tile i { font-size: 21px; }
+.gl .cat.off { opacity: .5; }
+.gl .gd { padding: 0; }
+.gh { height: 230px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 16px; overflow: hidden; text-align: center; background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 60%, #000), rgba(0,0,0,.45)); border-bottom: 1px solid var(--glass-line); }
+.gh > i { font-style: normal; font-size: 104px; line-height: 1; filter: drop-shadow(0 8px 18px rgba(0,0,0,.55)); }
+.gh h2 { margin: 0; font-size: 32px; font-weight: normal; letter-spacing: .06em; color: #fff; text-shadow: 0 2px 10px rgba(0,0,0,.7); }
+/* fundo de cada jogo (imagens em assets/games/): DOOM vermelho · Smithing parede de tijolos da forja · Combate a arena ao anoitecer · Colônia a grama do menu do jogo · Bastião a muralha com ameias */
+.gh[data-g="doom"] { background: radial-gradient(circle at 50% 42%, #c2281f, #5c0d0a 68%, #1e0403); }
+.gh[data-g="smithing"] { background: radial-gradient(circle at 50% 105%, rgba(234,112,22,.5), transparent 68%), linear-gradient(rgba(23,18,15,.25), rgba(12,8,6,.55)), url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Crect width='32' height='32' fill='%2314100c'/%3E%3Crect x='2' y='2' width='30' height='14' fill='%233a2c23'/%3E%3Crect x='-14' y='18' width='30' height='14' fill='%2343332a'/%3E%3Crect x='18' y='18' width='30' height='14' fill='%2334281f'/%3E%3Crect x='2' y='2' width='30' height='2' fill='%23ffffff' fill-opacity='.05'/%3E%3Crect x='-14' y='18' width='62' height='2' fill='%23ffffff' fill-opacity='.05'/%3E%3C/svg%3E") 0 0 / 48px 48px #2a201a; }
+.ga { display: flex; align-items: center; gap: 8px; padding: 14px 22px; background: rgba(0,0,0,.18); border-bottom: 1px solid var(--glass-line); }
+.gplay { height: 44px; min-width: 150px; padding: 0 26px; border: 0; border-radius: 12px; background: var(--accent); color: #fff; font: inherit; font-size: 17px; letter-spacing: .05em; cursor: pointer; transition: filter .15s ease, transform .1s ease; }
+.gplay:hover { filter: brightness(1.15); } .gplay:active { transform: scale(.97); } .gplay:disabled { opacity: .6; cursor: default; }
+.gst { flex: 1; min-width: 0; margin-left: 6px; font-size: 13px; color: var(--text-dim); }
+.gdesc { margin: 0; padding: 18px 22px; font-size: 15px; line-height: 1.5; }
+.gh[data-g="combate"] { background: linear-gradient(rgba(20,16,28,.15), rgba(20,16,28,.4)), url("../../assets/games/combate.svg") center bottom / cover no-repeat #2a1f4e; }
+.gh[data-g="colonia"] { background: radial-gradient(circle at 50% 45%, rgba(16,20,13,.1), rgba(16,20,13,.6)), url("../../assets/games/colonia-grama.png") center / 128px 128px #5fae48; image-rendering: pixelated; }
+.gh[data-g="adventure"] { background: linear-gradient(rgba(16,20,13,.1), rgba(16,20,13,.5)), url("../../assets/games/adventure.png") center / cover no-repeat #5f9e48; image-rendering: pixelated; }
+.gh[data-g="bastiao"] { background: linear-gradient(rgba(20,16,12,.15), rgba(20,16,12,.45)), url("../../assets/games/bastiao.svg") center bottom / cover no-repeat #2b2436; }

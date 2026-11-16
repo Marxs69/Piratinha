@@ -1,8 +1,12 @@
+/* Fontes (OFL, em fonts/): Grenze no texto, um meio-termo entre romana e gótica; Grenze Gotisch no título */
+@font-face { font-family: "Grenze"; src: url("fonts/Grenze.ttf") format("truetype"); font-weight: 100 900; font-display: swap; }
+@font-face { font-family: "Grenze Gotisch"; src: url("fonts/GrenzeGotisch.ttf") format("truetype"); font-weight: 100 900; font-display: swap; }
 :root {
   --bg: #15100d; --wall: #221a15; --panel: #2a201a; --panel-2: #382b22; --panel-3: #46362b; --line: #5a4636; --ink: #0e0a08;
   --text: #f3e9dc; --dim: #b9a896; --fire: #ff8a3d; --gold: #fcd34d; --red: #ef4444; --green: #4ade80;
   --r-comum: #a1a1aa; --r-incomum: #4ade80; --r-raro: #60a5fa; --r-epico: #c084fc; --r-lendario: #fbbf24; --r-unico: #ef4444;
-  font-family: ui-monospace, "Cascadia Mono", "DejaVu Sans Mono", monospace;
+  --font: "Grenze", ui-monospace, "Cascadia Mono", "DejaVu Sans Mono", monospace;   /* símbolos que a fonte não tem (▶ ☰ ✔…) caem na monoespaçada de antes */
+  font-family: var(--font);
 }
 * { box-sizing: border-box; scrollbar-color: var(--line) transparent; scrollbar-width: thin; }
 html, body { margin: 0; height: 100%; }
@@ -99,14 +103,31 @@ h2 .ico { margin-right: 4px; }
 .menu-box { position: relative; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 14px; }
 .menu-forge { position: relative; width: 320px; height: 200px; }
 #menu-anvil { position: absolute; left: 0; bottom: 0; width: 320px; filter: drop-shadow(0 8px 0 #0008) drop-shadow(0 0 30px #ff8a3d55); }
+/* lingote em brasa na bigorna, no ponto onde o martelo bate: acende a cada golpe */
+#menu-ore { position: absolute; left: 124px; top: 8px; width: 60px; animation: menu-ore 2.2s infinite; }
+@keyframes menu-ore { 0%, 81% { filter: drop-shadow(0 0 6px #ff8a3d88); transform: none; } 83% { filter: brightness(1.7) drop-shadow(0 0 16px #ffb347); transform: translateY(2px) scale(1.06, .9); } 100% { filter: drop-shadow(0 0 6px #ff8a3d88); transform: none; } }
 #menu-hammer { position: absolute; width: 96px; left: 204px; top: -52px; transform-origin: 50% 96%; animation: menu-hammer 2.2s cubic-bezier(.6, 0, .4, 1) infinite; }
 @keyframes menu-hammer { 0%, 62%, 100% { transform: translate(38px, 62px) rotate(38deg); } 76% { transform: translate(20px, 30px) rotate(60deg); } 82%, 86% { transform: rotate(-78deg); } }
 #menu-spark { position: absolute; left: 150px; top: 26px; width: 8px; height: 8px; background: #fff7d6; opacity: 0; animation: menu-spark 2.2s infinite;
   box-shadow: -28px -22px 0 #ffb347, 30px -30px 0 #fbbf24, -46px 4px 0 -1px #ff8a3d, 50px -8px 0 -1px #ffb347, 8px -46px 0 -1px #fff7d6, -14px -50px 0 -2px #fbbf24; }
 @keyframes menu-spark { 0%, 81% { opacity: 0; transform: scale(.2); } 83% { opacity: 1; transform: scale(.6); } 100% { opacity: 0; transform: scale(1.9) translateY(14px); } }
-#menu h1 { font-size: 60px; letter-spacing: 10px; padding-left: 10px; color: var(--fire); text-shadow: 0 4px 0 #9a3412, 0 8px 0 #5a1f06, 0 12px 0 #0008; animation: title-glow 3s ease-in-out infinite; }
+#menu h1 { font-family: "Grenze Gotisch", var(--font); font-weight: 700; font-size: 76px; line-height: 1; letter-spacing: 2px; color: var(--fire); text-shadow: 0 4px 0 #9a3412, 0 8px 0 #5a1f06, 0 12px 0 #0008; animation: title-glow 3s ease-in-out infinite; }
 @keyframes title-glow { 50% { color: #ffb072; filter: drop-shadow(0 0 18px #ff8a3d77); } }
 .sub { margin: 0 0 10px; color: var(--dim); }
+/* aba do save (ao passar o mouse em Continuar) e Reiniciar, com confirmação no próprio menu */
+#play-wrap { position: relative; margin-top: 8px; }
+#play-info { position: absolute; left: calc(100% + 14px); top: 50%; transform: translateY(-50%); width: 220px; padding: 8px 12px; display: flex; flex-direction: column; gap: 2px; text-align: left; background: #0f0b08; border: 2px solid #7a5c44; box-shadow: 0 4px 0 #0006; opacity: 0; pointer-events: none; transition: opacity .15s; z-index: 2; }
+#play-info b { color: var(--gold); font-size: 16px; } #play-info span { color: var(--dim); font-size: 13px; }
+#play-wrap:hover #play-info, #play:focus-visible + #play-info { opacity: 1; }
+#play-info[hidden], #reset[hidden], #reset-ask[hidden] { display: none; }
+#reset-ask { display: flex; align-items: center; gap: 8px; color: #fca5a5; }
+@media (max-width: 760px) { #play-info { left: 50%; top: calc(100% + 8px); transform: translateX(-50%); } }
+/* ao clicar em Jogar/Continuar: o menu avança e o clarão da forja toma a tela */
+#menu.go { pointer-events: none; }   /* nada de cliques durante a saída */
+#menu.go .menu-box { animation: go-box .52s ease-in forwards; }
+#menu.go::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(circle at 50% 58%, #fff7d6 0, #ffb347 22%, #e0571b 48%, #5a1f06 78%); opacity: 0; animation: go-flash .52s ease-in forwards; }
+@keyframes go-box { to { transform: scale(1.35); opacity: 0; } }
+@keyframes go-flash { 55% { opacity: .85; } 100% { opacity: 1; filter: brightness(.25); } }
 
 /* Brasas subindo (menu e forja) */
 .embers { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }

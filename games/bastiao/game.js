@@ -5,7 +5,7 @@
    Aldeões ociosos pegam obras e vagas sozinhos; uma ordem manual sempre vale mais. Feridos, abrigam-se no castelo.
    Quartel e oficina são ampliações do castelo: liberam tropas e deixam o próprio castelo mais forte.
    Os zumbis seguem um campo de fluxo até o castelo: contornam muros quando o desvio compensa, senão derrubam.
-   Só o recorde fica salvo no navegador (localStorage). O equilíbrio está nas tabelas abaixo; os modelos e o desenho 3D, em render3d.js.
+   No navegador (localStorage) ficam só o recorde e as teclas trocadas; a partida em andamento vive na memória até a página recarregar. O equilíbrio está nas tabelas abaixo; os modelos e o desenho 3D, em render3d.js.
    A simulação usa só coordenadas do mapa (x, z no chão e y de altura, 1 = uma casa); a tela entra apenas no desenho e no mouse. */
 
 const $ = s => document.querySelector(s);
@@ -100,7 +100,7 @@ const HELP = {
   wood: ['Madeira', 'Vem das serrarias. Paga quase toda construção.'], stone: ['Pedra', 'Vem das pedreiras. Paga torres, ampliações e muros de pedra.'], iron: ['Ferro', 'Vem das minas. Paga promoções, armas de cerco e pesquisas avançadas.'],
   food: ['Comida', 'Vem das fazendas (e um pouco do castelo). Cada pessoa come 1 por minuto; sem comida, alguém morre a cada ' + STARVE_T + ' s.'],
   gold: ['Ouro', 'Imposto de ' + TAX + ' por aldeão por minuto, prêmio por onda vencida e por adiantar ondas. Paga tropas e o mercado.'],
-  pop: ['População', 'Pessoas / moradia. Casas aumentam o limite. Clique para selecionar os aldeões ociosos (tecla .).'],
+  pop: ['População', 'Pessoas / moradia. Casas aumentam o limite. Clique para selecionar os aldeões ociosos (também há uma tecla para isso, nas Configurações).'],
   wave: ['Ondas', 'Cada fase tem ' + PHASE.len + ' ondas. As setas mostram de que lado vem a próxima. Vencida a última, há uma trégua e a fase seguinte vem com mais zumbis, mais fortes e mais rápidos.'],
   call: ['Chamar onda', 'Adianta a próxima onda e paga ouro pelo tempo que faltava.'], bell: ['Sino', 'Recolhe todos os aldeões ao castelo (cada abrigado acelera os tiros dele) ou os solta de volta ao serviço. Tecla G.'],
   speed: ['Velocidade', 'Pausa, 1×, 2× ou 4×. Espaço pausa; Tab troca a velocidade. Dá para construir e dar ordens com o jogo pausado.'],
@@ -216,7 +216,7 @@ function newGame(seed) {
   UI.menu = UI.tool = UI.selB = null; UI.selU = []; UI.hover = -1;
   cam.d = 17; cam.p = .9;
   show('play'); resize(); centerOn(CASTLE); setSpeed(0); renderTools(); renderSub(); renderInfo(); updateTop();
-  $('#feed').innerHTML = ''; $('#explain').hidden = true; feed('Mapa nº ' + G.seed); feed('Pausado · espaço começa', 'good');
+  $('#feed').innerHTML = ''; $('#explain').hidden = true; feed('Mapa nº ' + G.seed); feed('Pausado · ' + keyLabel(BIND.pause).toLowerCase() + ' começa', 'good');
 }
 const fmtCost = c => Object.entries(c).map(([k, v]) => RES[k] + v).join(' ') || 'grátis';
 const canPay = c => Object.entries(c).every(([k, v]) => G.res[k] >= v);
@@ -814,8 +814,10 @@ function modal(title, body, btns) {
   for (const [label, fn] of btns) { const b = el('button', 'btn small', label); b.onclick = () => { $('#modal').hidden = true; fn && fn(); }; f.append(b); }
   $('#modal').hidden = false;
 }
-function toMenu() {
-  G = null; show('menu');
+function toMenu(keep) {                                 // keep: saiu pela pausa, a partida fica na memória (pausada) até recarregar a página
+  if (keep && G && !G.over) setSpeed(0); else G = null;
+  show('menu'); $('#m-cont').hidden = !G;
+  if (G) { const t = $('#m-tab'); t.innerHTML = ''; [['b', 'Mapa nº ' + G.seed], ['span', `Fase ${G.phase + 1} · onda ${G.wave}`], ['span', `População ${G.used}/${G.cap}`], ['span', `${G.kills} zumbis abatidos`]].forEach(([k, x]) => { const e = el(k); e.textContent = x; t.append(e); }); }
   let best = 0; try { best = +(localStorage.getItem(SAVE_KEY) || 0); } catch (e) {}
   $('#m-info').textContent = best ? 'Recorde: onda ' + best : 'Mapa novo a cada partida';
 }
@@ -826,11 +828,45 @@ function icon(k, o) {                                  // miniatura 3D da peça 
   const d = TROOPS[k];
   return R3D.thumb(d ? (d.civ || d.siege ? k : k + '0') : k === 'house' ? 'house' + G.up.house : k === 'tower' ? 'tower' + G.up.tower : k === 'gate' ? 'gate' + G.up.wall : k);
 }
-const TOOLS = [['build', '🔨', 'Construir', '1'], ['troop', '⚔️', 'Treinar', '2'], ['upg', '📜', 'Pesquisas', '3'], ['demo', '💥', 'Demolir', '4']];
+const TOOLS = [['build', '🔨', 'Construir'], ['troop', '⚔️', 'Treinar'], ['upg', '📜', 'Pesquisas'], ['demo', '💥', 'Demolir']];
+/* Teclas: padrão em KEY_DEF; o que o jogador trocar nas Configurações fica em localStorage. Mouse, Esc, Shift e setas são fixos. */
+const KEY_DEF = { build: '1', troop: '2', upg: '3', demo: '4', bell: 'g', idle: '.', home: 'h', pause: ' ', speed: 'tab', up: 'w', down: 's', left: 'a', right: 'd', tiltUp: 'r', tiltDown: 'f' };
+const KEY_NAMES = [['build', 'Construir'], ['troop', 'Treinar'], ['upg', 'Pesquisas'], ['demo', 'Demolir'], ['bell', 'Sino'], ['idle', 'Aldeões ociosos'], ['home', 'Ir ao castelo'], ['pause', 'Pausar'], ['speed', 'Velocidade'],
+  ['up', 'Câmera: cima'], ['down', 'Câmera: baixo'], ['left', 'Câmera: esquerda'], ['right', 'Câmera: direita'], ['tiltUp', 'Inclinar: mais'], ['tiltDown', 'Inclinar: menos']];
+const KEY_FIXED = ['escape', 'shift', 'control', 'alt', 'meta', 'enter', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'];
+const BIND = { ...KEY_DEF };
+try { const d = JSON.parse(localStorage.getItem('bastiao.keys')) || {}; for (const a in KEY_DEF) if (typeof d[a] === 'string' && d[a] && !KEY_FIXED.includes(d[a])) BIND[a] = d[a]; } catch (e) {}
+const keyLabel = k => k === ' ' ? 'Espaço' : k.length === 1 ? k.toUpperCase() : k[0].toUpperCase() + k.slice(1);
+function openKeys(back) {                                // janela de Configurações; back = o que reabrir ao fechar (a pausa)
+  const body = $('#mo-body'), foot = $('#mo-foot'); let wait = null;
+  const draw = () => {
+    body.innerHTML = '<span class="dim">Clique numa tecla e aperte a nova (Esc cancela). Se ela já estiver em uso, as duas trocam.<br>O mouse, o Esc, o Shift e as setas não mudam.</span>';
+    const grid = el('div', 'kgrid');
+    for (const [a, n] of KEY_NAMES) { const b = el('button', 'kb' + (wait === a ? ' on' : '')); b.textContent = wait === a ? 'aperte…' : keyLabel(BIND[a]); b.onclick = () => { wait = wait === a ? null : a; draw(); }; grid.append(el('span', '', n), b); }
+    body.append(grid);
+  };
+  const store = () => { try { localStorage.setItem('bastiao.keys', JSON.stringify(BIND)); } catch (e) {} };
+  const onKey = e => {
+    if (!wait) return; e.preventDefault(); e.stopPropagation();
+    const k = e.key.toLowerCase();
+    if (!KEY_FIXED.includes(k)) { const other = Object.keys(BIND).find(a => a !== wait && BIND[a] === k); if (other) BIND[other] = BIND[wait]; BIND[wait] = k; store(); }
+    wait = null; draw();
+  };
+  const reset = el('button', 'btn small', 'Restaurar padrão'), close = el('button', 'btn small', 'Fechar');
+  reset.onclick = () => { Object.assign(BIND, KEY_DEF); store(); wait = null; draw(); };
+  close.onclick = () => { removeEventListener('keydown', onKey, true); $('#modal').hidden = true; if (G) renderTools(); if (back) back(); };
+  $('#mo-title').textContent = 'Configurações'; foot.innerHTML = ''; foot.append(reset, close);
+  addEventListener('keydown', onKey, true); draw(); $('#modal').hidden = false;
+}
+function leaveMenu(fn) {                                 // saída do menu: toca a animação (#menu.go, em style.css) e só então troca de tela
+  const m = $('#menu'); if (m.classList.contains('go')) return;
+  m.classList.add('go'); setTimeout(() => { m.classList.remove('go'); fn(); }, 520);
+}
+const playing = () => G && $('#play').classList.contains('on');   // com a partida guardada atrás do menu, nada roda nem ouve teclas
 function renderTools() {
   const nav = $('#tools'); nav.innerHTML = '';
-  for (const [id, e, n, key] of TOOLS) {
-    const b = el('button', (id === UI.menu || (id === 'demo' && UI.tool && UI.tool.t === 'demo')) ? 'on' : '', `<span class="e">${e}</span><span>${n}</span><kbd>${key}</kbd>`);
+  for (const [id, e, n] of TOOLS) {
+    const b = el('button', (id === UI.menu || (id === 'demo' && UI.tool && UI.tool.t === 'demo')) ? 'on' : '', `<span class="e">${e}</span><span>${n}</span><kbd>${keyLabel(BIND[id])}</kbd>`);
     b.dataset.tip = 'h:' + id; b.onclick = () => pickTool(id); nav.append(b);
   }
 }
@@ -1089,20 +1125,30 @@ function selectIdle() {                                // chip da população: s
 }
 const KEYS = {};
 addEventListener('keydown', e => {
-  if (!G || !$('#modal').hidden) return;
-  const k = e.key.toLowerCase(); KEYS[k] = true;
+  if (!playing() || !$('#modal').hidden) return;
+  const k = e.key.toLowerCase(), a = Object.keys(BIND).find(x => BIND[x] === k); KEYS[k] = true;
   if (k === 'escape') cancel();
-  else if (k === ' ') { e.preventDefault(); setSpeed(G.speed ? 0 : 1); }
-  else if (k >= '1' && k <= '4') pickTool(TOOLS[k - 1][0]);
-  else if (k === 'tab') { e.preventDefault(); setSpeed(G.speed === 1 ? 2 : G.speed === 2 ? 4 : 1); }
-  else if (k === 'g') bell(); else if (k === '.') selectIdle(); else if (k === 'h') centerOn(CASTLE);
+  else if (a === 'pause') { e.preventDefault(); setSpeed(G.speed ? 0 : 1); }
+  else if (a === 'speed') { e.preventDefault(); setSpeed(G.speed === 1 ? 2 : G.speed === 2 ? 4 : 1); }
+  else if (TOOLS.some(t => t[0] === a)) pickTool(a);
+  else if (a === 'bell') bell(); else if (a === 'idle') selectIdle(); else if (a === 'home') centerOn(CASTLE);
 });
 addEventListener('keyup', e => { KEYS[e.key.toLowerCase()] = false; });
 addEventListener('blur', () => { for (const k in KEYS) KEYS[k] = false; });
-addEventListener('resize', () => { if (G) resize(); });
+addEventListener('resize', () => { if (playing()) resize(); });
 
-$('#m-new').onclick = () => newGame();
-$('#p-menu').onclick = () => { const s = G.speed; setSpeed(0); modal('Pausa', `Mapa nº ${G.seed} · onda ${G.wave}`, [['▶ Continuar', () => setSpeed(s || 1)], ['🎲 Novo mapa', () => newGame()], ['Sair', toMenu]]); };
+$('#m-new').onclick = () => {
+  const go = () => leaveMenu(() => newGame());
+  if (!G) return go();
+  modal('Novo mapa?', 'A partida em andamento será abandonada.', [['Começar de novo', go], ['Voltar', null]]);
+};
+$('#m-continue').onclick = () => leaveMenu(() => { show('play'); resize(); renderTools(); renderSub(); renderInfo(); updateTop(); feed('Pausado · ' + keyLabel(BIND.pause).toLowerCase() + ' continua', 'good'); });
+$('#m-set').onclick = () => openKeys();
+function pauseMenu(prev) {                                // prev: velocidade de antes da pausa (ao voltar das Configurações)
+  const s = prev != null ? prev : G.speed; setSpeed(0);
+  modal('Pausa', `Mapa nº ${G.seed} · onda ${G.wave}`, [['▶ Continuar', () => setSpeed(s || 1)], ['⚙ Configurações', () => openKeys(() => pauseMenu(s))], ['🎲 Novo mapa', () => newGame()], ['Sair', () => toMenu(true)]]);
+}
+$('#p-menu').onclick = () => pauseMenu();
 $('#p-call').onclick = () => { if (!G || G.over) return; if (!isFinite(G.nextWave)) return feed('Vença antes a onda final da fase', 'bad'); const gold = Math.round(Math.max(0, G.nextWave - G.time) / 4); G.res.gold += gold; if (gold) feed('Onda adiantada · +' + gold + '🪙', 'good'); launchWave(); updateTop(); };
 $('#p-bell').onclick = () => G && (bell(), updateTop()); $('#c-pop').onclick = () => G && selectIdle();
 document.querySelectorAll('#camctl button').forEach(b => b.onclick = () => { const c = b.dataset.c; if (c === 'in') zoom(1 / 1.25); else if (c === 'out') zoom(1.25); else { cam.p += c === 'up' ? .12 : -.12; clampCam(); } });
@@ -1113,13 +1159,13 @@ const STEP = 1 / 30;
 let last = 0, acc = 0, uiT = 0;
 function frame(ts) {
   const dt = Math.min(.1, (ts - last) / 1000 || 0); last = ts;
-  if (G) {
+  if (playing()) {
     if (!G.over) { acc += dt * G.speed; while (acc >= STEP) { tick(STEP); acc -= STEP; if (!G || G.over) break; } }
     if (G) {
       const v = cam.d * .9 * dt * (KEYS.shift ? 2 : 1);
-      if (KEYS.a || KEYS.arrowleft) cam.x -= v; if (KEYS.d || KEYS.arrowright) cam.x += v;
-      if (KEYS.w || KEYS.arrowup) cam.z -= v; if (KEYS.s || KEYS.arrowdown) cam.z += v;
-      if (KEYS.r) cam.p += dt; if (KEYS.f) cam.p -= dt;                    // R / F: inclinar
+      if (KEYS[BIND.left] || KEYS.arrowleft) cam.x -= v; if (KEYS[BIND.right] || KEYS.arrowright) cam.x += v;
+      if (KEYS[BIND.up] || KEYS.arrowup) cam.z -= v; if (KEYS[BIND.down] || KEYS.arrowdown) cam.z += v;
+      if (KEYS[BIND.tiltUp]) cam.p += dt; if (KEYS[BIND.tiltDown]) cam.p -= dt;   // inclinar
       clampCam(); draw();
       if ((uiT += dt) > .25) { uiT = 0; updateTop(); }
     }

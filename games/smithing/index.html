@@ -12,10 +12,11 @@
 <section id="menu" class="screen on">
   <div class="embers" data-n="26"></div>
   <div class="menu-box">
-    <div class="menu-forge"><img id="menu-anvil" alt=""><img id="menu-hammer" alt=""><i id="menu-spark"></i></div>
-    <h1>SMITHING</h1>
-    <p class="sub">Forje, venda, repita.</p>
-    <button id="play" class="btn big">▶ Jogar</button>
+    <div class="menu-forge"><img id="menu-anvil" alt=""><img id="menu-ore" alt=""><img id="menu-hammer" alt=""><i id="menu-spark"></i></div>
+    <h1>Smithing</h1>
+    <div id="play-wrap"><button id="play" class="btn big">▶ Jogar</button><div id="play-info" hidden></div></div>   <!-- play-info: aba com o resumo do save, ao passar o mouse -->
+    <button id="reset" class="btn danger small" hidden>⟲ Reiniciar</button>
+    <div id="reset-ask" hidden><span>Apagar todo o progresso?</span><button class="btn danger small" data-a="y">Sim, apagar</button><button class="btn small" data-a="n">Cancelar</button></div>
   </div>
 </section>
 

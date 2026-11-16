@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Adventure</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="menu-bg"></canvas>
+
+<!-- Título: personagens salvos -->
+<section id="title" class="screen">
+  <div class="box">
+    <h1>Adventure</h1>
+    <div id="chars"></div>
+    <button id="t-new" class="btn big">＋ Novo personagem</button>
+    <button id="t-dev" class="btn small ghost" hidden>🛠 Editor de regiões</button>
+  </div>
+</section>
+
+<!-- Criar personagem -->
+<section id="create" class="screen">
+  <div class="box">
+    <h2>Novo personagem</h2>
+    <input id="n-name" maxlength="14" placeholder="Nome" spellcheck="false" autocomplete="off">
+    <div id="classes"></div>
+    <div class="row"><button id="n-back" class="btn">← Voltar</button><button id="n-go" class="btn big">Criar ▶</button></div>
+  </div>
+</section>
+
+<!-- Modo: solo, criar sala, entrar -->
+<section id="mode" class="screen">
+  <div class="box">
+    <h2 id="mode-who"></h2>
+    <button id="m-solo" class="btn big">▶ Jogar sozinho</button>
+    <div class="card">
+      <button id="m-host" class="btn big">👥 Criar sala</button>
+      <label class="chk"><input type="checkbox" id="m-local"> Só neste navegador</label>
+    </div>
+    <div class="card">
+      <div class="row"><input id="m-code" maxlength="16" placeholder="Código da sala" spellcheck="false" autocomplete="off"><button id="m-join" class="btn">Entrar</button></div>
+    </div>
+    <button id="m-back" class="btn">← Voltar</button>
+  </div>
+</section>
+
+<!-- Jogo -->
+<section id="game" class="screen">
+  <canvas id="cv"></canvas>
+  <canvas id="trans"></canvas>
+  <div id="hud">
+    <div class="me">
+      <b id="h-name"></b>
+      <div class="bar hp" id="h-hp"><i></i><b></b></div>
+      <div class="bar mp" id="h-mp"><i></i><b></b></div>
+      <div class="bar xp" id="h-xp"><i></i><b></b></div>
+      <span id="h-gold"></span> <span id="h-online"></span>
+    </div>
+    <div class="top"><b id="h-region"></b><span id="h-room"></span></div>
+    <div class="tools"><button id="b-char" class="btn small" title="Atributos (C)">🧍</button><button id="b-bag" class="btn small" title="Mochila (I)">🎒</button><button id="b-quests" class="btn small" title="Missões (J)">📜</button><button id="b-menu" class="btn small" title="Menu (Esc)">☰</button></div>
+    <div class="slots">
+      <div class="slot" id="s-a"><kbd>🖱 E</kbd><span></span></div>
+      <div class="slot" id="s-b"><kbd>🖱 D</kbd><span></span></div>
+      <div class="slot" id="s-d" title="Esquiva: não leva dano enquanto rola"><kbd>Espaço</kbd><span>Rolar</span></div>
+      <div class="slot item" id="s-1" title="Poção de vida"><kbd>1</kbd><span>❤️</span><em></em></div>
+      <div class="slot item" id="s-2" title="Poção de mana"><kbd>2</kbd><span>💧</span><em></em></div>
+    </div>
+    <div id="chat"><div id="chat-log"></div><input id="chat-in" maxlength="120" placeholder="Mensagem (Enter)" hidden autocomplete="off"></div>
+    <div id="toasts"></div>
+    <div id="banner"></div>
+    <p class="help">WASD anda · mouse mira · E fala · C atributos · I mochila · J missões · Enter chat</p>
+  </div>
+  <div id="panel" class="panel" hidden></div>
+  <div id="dead" class="overlay" hidden><div><h2>Você caiu</h2><p>Voltando à vila em <b id="dead-t"></b>…</p></div></div>
+  <div id="wait" class="overlay" hidden><div><p id="wait-t"></p><button id="w-cancel" class="btn">Cancelar</button></div></div>
+  <div id="pause" class="overlay" hidden><div class="box">
+    <h2>Pausa</h2><p id="p-info" class="dim"></p>
+    <button id="p-go" class="btn big">Continuar</button><button id="p-exit" class="btn">Salvar e sair</button>
+  </div></div>
+</section>
+
+<!-- Editor do mundo (modo dev, só no próprio computador) -->
+<section id="dev" class="screen">
+  <aside class="dside">
+    <div class="row dtop"><button id="d-back" class="btn small">← Sair</button><b>Editor</b><span class="sp"></span><button id="d-undo" class="btn small" title="Desfazer (Ctrl+Z)">↶</button><button id="d-redo" class="btn small" title="Refazer (Ctrl+Y)">↷</button></div>
+    <nav id="d-tabs"><button data-t="mapa">Mapa</button><button data-t="monstros">Monstros</button><button data-t="npcs">NPCs</button><button data-t="missoes">Missões</button><button data-t="arquivo">Arquivo</button></nav>
+    <div id="d-pane"></div>
+  </aside>
+  <div id="dstage"><canvas id="dcv"></canvas><div id="d-hint"></div><div id="d-status"></div><canvas id="d-trans" hidden></canvas></div>
+  <div id="d-lock" class="overlay" hidden><div class="box lockbox">
+    <h2 id="d-lock-t"></h2>
+    <input id="d-pass" type="password" autocomplete="off" placeholder="Senha">
+    <input id="d-pass2" type="password" autocomplete="off" placeholder="Repita a senha">
+    <p id="d-lock-err" class="warn small"></p>
+    <div class="row"><button id="d-lock-back" class="btn">← Voltar</button><button id="d-lock-go" class="btn big">Entrar</button></div>
+  </div></div>
+</section>
+
+<script src="data.js"></script>
+<script src="regions.js"></script>
+<script src="game.js"></script>
+<script src="net.js"></script>
+<script src="render.js"></script>
+<script src="transition.js"></script>
+<script src="main.js"></script>
+<script src="gen.js"></script>
+<script src="dev.js"></script>
+<script src="menubg.js"></script>
+</body>
+</html>

@@ -11,13 +11,11 @@
 <!-- Menu inicial -->
 <section id="menu" class="screen on">
   <div class="menu-box">
-    <canvas id="menu-art" width="84" height="28"></canvas>
+    <canvas id="menu-art" width="96" height="36"></canvas>
     <h1>COMBATE</h1>
-    <p class="sub">Arrume a mochila. Vença a luta.</p>
-    <button id="m-continue" class="btn big" hidden>▶ Continuar jornada</button>
-    <button id="m-new" class="btn big">⚔ Nova jornada</button>
+    <div id="m-cont" class="mrow" hidden><button id="m-continue" class="btn big">▶ Continuar jornada</button><div id="m-info" class="panel mside"></div></div>   <!-- m-info: aba com o resumo da jornada, ao passar o mouse -->
+    <div class="mrow"><button id="m-new" class="btn big">⚔ Nova jornada</button><div id="m-best" class="panel mside" hidden></div></div>
     <button id="m-tree" class="btn">💠 Árvore de melhorias <b id="m-ess"></b></button>
-    <p id="m-best" class="dim"></p>
   </div>
 </section>
 
@@ -37,39 +35,40 @@
   <header class="bar">
     <button id="g-menu" class="btn small">☰ Menu</button>
     <b class="title" id="g-round"></b>
-    <span class="coin">❤ <b id="g-lives"></b></span>
-    <span class="coin gold">🪙 <b id="g-gold"></b></span>
-    <span class="coin ess">💠 <b id="g-ess"></b></span>
+    <span class="coin" data-tip="<b>Vidas</b><br>Perder uma luta gasta uma vida; sem vidas a jornada acaba. Em cada NG+ você ganha +1 vida, que não acumula de um NG para o outro.">❤ <b id="g-lives"></b></span>
+    <span class="coin gold" data-tip="<b>Ouro</b><br>Compra itens, melhorias e treino. Zera a cada NG+.">🪙 <b id="g-gold"></b></span>
+    <span class="coin ess" data-tip="<b>Essência</b><br>Ganha a cada vitória e nunca se perde. Gaste na árvore de melhorias.">💠 <b id="g-ess"></b></span>
   </header>
 
   <div id="arena">
     <canvas id="cv" width="256" height="104"></canvas>
-    <div class="plate" id="pa"><b class="pn"></b><div class="hp"><i></i><span></span></div><div class="st"></div></div>
+    <div class="plate" id="pa" data-tip="<b>Você</b><br>⚔ dano/s · 🛡 bloqueio/s · ⛨ armadura · ✨ poder mágico<br>Na luta: 🛡 bloqueio atual · ☠ veneno"><b class="pn"></b><div class="hp"><i></i><span></span></div><div class="st"></div></div>
     <div class="plate right" id="pb"><b class="pn"></b><div class="hp"><i></i><span></span></div><div class="st"></div></div>
     <div id="fx"></div>
     <div id="center-ctl">
       <button id="fight" class="btn big">⚔ LUTAR!</button>
-      <div id="speed" hidden><button data-s="1">1×</button><button data-s="2">2×</button><button data-s="4">4×</button></div>
-      <div id="timer" hidden></div>
+      <button id="auto" class="btn small" hidden data-tip="<b>Auto-play</b> (do ng.1 em diante)<br>As lutas começam sozinhas. Pausa com item ★★★ na loja, derrota, reserva acima do limite e chefe final."></button>
+      <div id="speed" hidden data-tip="Velocidade da luta"><button data-s="1">1×</button><button data-s="2">2×</button><button data-s="4">4×</button></div>
+      <div id="timer" hidden data-tip="Aos 25 s começa a exaustão: os dois lados perdem vida a cada segundo, cada vez mais."></div>
     </div>
   </div>
 
   <footer id="hud">
     <aside class="panel" id="side">
-      <h2>Reserva <small id="stash-n"></small></h2>
+      <h2 data-tip="<b>Reserva</b><br>Itens guardados fora da mochila (não lutam). O espólio pode passar do limite, mas a luta só começa de volta a ele. No NG+ só os lendários ✦ ficam.">Reserva <small id="stash-n"></small></h2>
       <div id="stash"></div>
-      <div id="sell">🪙 Arraste aqui para vender</div>
       <div id="info"></div>
+      <div id="sell" data-tip="Vende pela metade do que foi investido no item.">🪙 Arraste aqui para vender</div>
     </aside>
 
     <div class="packbox">
-      <h2>Sua mochila <small>R ou botão direito gira</small></h2>
+      <h2 data-tip="<b>Mochila</b><br>Só os itens daqui lutam. Itens de apoio dão bônus aos vizinhos encostados.">Sua mochila <small>R ou botão direito gira</small></h2>
       <div id="pack" class="grid"></div>
     </div>
 
     <section class="panel" id="mid">
       <div id="prep-ui">
-        <div class="tabs"><button data-tab="shop" class="on">🛒 Loja</button><button data-tab="train">💪 Treino</button></div>
+        <div class="tabs"><button data-tab="shop" class="on" data-tip="Itens à venda. <span class=&quot;stars&quot;>★★★</span> = raro.">🛒 Loja</button><button data-tab="train" data-tip="Melhorias do herói compradas com ouro. Seguem nos NG+.">💪 Treino</button></div>
         <div id="shop"></div>
         <div id="train" hidden></div>
       </div>
@@ -77,7 +76,7 @@
     </section>
 
     <div class="packbox enemy">
-      <h2 id="e-title">Mochila do inimigo</h2>
+      <h2 id="e-title" data-tip="<b>Mochila do inimigo</b><br>Clique num item para ver detalhes. Os itens dos inimigos ficam mais fortes a cada dezena e a cada NG.">Mochila do inimigo</h2>
       <div id="epack" class="grid"></div>
     </div>
   </footer>

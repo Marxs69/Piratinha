@@ -468,9 +468,20 @@ const SFX = {
 /* ======================= Telas ======================= */
 function show(id) { document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === id)); }
 const hasProgress = () => S.stats.forged > 0 || S.stats.oreBought > 0 || S.stats.mines > 0;
-function menuLabel() { $('#play').textContent = hasProgress() ? '▶ Continuar' : '▶ Jogar'; }
+function menuLabel() {
+  const on = hasProgress(), info = $('#play-info');
+  $('#play').textContent = on ? '▶ Continuar' : '▶ Jogar'; $('#reset').hidden = !on; $('#reset-ask').hidden = true; info.hidden = !on; info.innerHTML = '';
+  if (on) [['b', `${S.coins.toLocaleString('pt-BR')} moedas`], ['span', `${S.stats.forged} peças forjadas`], ['span', `${S.stats.orders} encomendas entregues`], ['span', `Bigorna nv. ${S.up.anvil} · Martelo nv. ${S.up.hammer}`]]
+    .forEach(([t, x]) => { const e = document.createElement(t); e.textContent = x; info.append(e); });
+}
+/* Saída do menu: toca a animação (#menu.go, em style.css) e só então troca de tela */
+function leaveMenu(fn) {
+  const m = $('#menu'); if (m.classList.contains('go')) return;
+  m.classList.add('go'); setTimeout(() => { m.classList.remove('go'); fn(); }, 520);
+}
 $('#menu-anvil').src = sprite('anvil', ANVIL, 8);
 $('#menu-hammer').src = sprite('hammer', HAMMERS[1].sh, 4);
+$('#menu-ore').src = sprite('ingot', ['#fff3c4', '#ffb347', '#e0571b'], 3);   // o mesmo lingote em brasa que vai à bigorna no jogo
 // Cenário: texturas em pixel art (tijolos, madeira) e brasas subindo no menu e na forja
 for (const k in TEX) document.documentElement.style.setProperty('--tex-' + k, TEX[k]());
 document.querySelectorAll('.embers').forEach(d => {
@@ -480,7 +491,10 @@ document.querySelectorAll('.embers').forEach(d => {
     d.append(e);
   }
 });
-$('#play').onclick = () => { show('game'); renderAll(); };
+$('#play').onclick = () => leaveMenu(() => { show('game'); renderAll(); });
+$('#reset').onclick = () => { $('#reset').hidden = true; $('#reset-ask').hidden = false; };          // Reiniciar pede confirmação ali mesmo (a janela do jogo não aparece no menu)
+$('#reset-ask [data-a=n]').onclick = menuLabel;
+$('#reset-ask [data-a=y]').onclick = () => { S = fresh(); save(); clearAnvil(); renderAll(); menuLabel(); };
 
 /* ======================= Arrastar ======================= */
 /* sel.ores tem um espaço por lingote que o molde usa · sel.gems um espaço por gema · sel.re = id da peça sendo reforjada */
@@ -1007,7 +1021,7 @@ function pxDisc(g, x, y, r, c) { g.fillStyle = c; for (let dy = -r; dy <= r; dy+
 // Texto com contorno, que "salta" ao aparecer e sobe sumindo (mina e floresta)
 function popText(g, f, x, y) {
   const age = f.L - f.l, s = 1 + .7 * Math.max(0, 1 - age / .12);
-  g.save(); g.font = `bold ${f.big ? 19 : 15}px ui-monospace, monospace`; g.textAlign = 'center';
+  g.save(); g.font = `bold ${f.big ? 19 : 15}px Grenze, ui-monospace, monospace`; g.textAlign = 'center';
   const half = g.measureText(f.txt).width * s / 2 + 8; x = clamp(x, half, g.canvas.width - half);   // não deixa o texto sair da tela
   g.translate(x, y - age * 34); g.scale(s, s); g.globalAlpha = Math.min(1, f.l * 3); g.lineJoin = 'round'; g.lineWidth = 4; g.strokeStyle = '#0e0a08';
   g.strokeText(f.txt, 0, 0); g.fillStyle = f.c; g.fillText(f.txt, 0, 0); g.restore();
@@ -1200,7 +1214,7 @@ function mineDraw(m, t, dt, rdt) {
   const ox = sk ? Math.round(rand(-sk, sk) / 2) * 2 : 0, oy = sk ? Math.round(rand(-sk, sk) / 2) * 2 : 0;
   mg.imageSmoothingEnabled = false; mg.globalAlpha = 1; mg.fillStyle = '#0e0a08'; mg.fillRect(0, 0, 640, 340); mg.drawImage(mlo, ox, oy, 640, 340);
   if (m.white > 0) { mg.fillStyle = `rgba(255,247,214,${m.white * 2})`; mg.fillRect(0, 0, 640, 340); m.white -= rdt; }
-  mg.font = 'bold 13px ui-monospace, monospace'; mg.textAlign = 'left';
+  mg.font = 'bold 13px Grenze, ui-monospace, monospace'; mg.textAlign = 'left';
   m.tally.forEach((s, i) => { if (!s.n) return; const x = tallyX(i) * 2 + 16 + ox, y = 19 + oy; mg.fillStyle = '#0e0a08'; mg.fillText('×' + s.n, x, y + 2); mg.fillStyle = s.pop > 0 ? '#fff7d6' : '#f3e9dc'; mg.fillText('×' + s.n, x, y); });
   m.fx = m.fx.filter(f => (f.l -= rdt) > 0);
   m.fx.forEach(f => popText(mg, f, f.x + ox, Math.max(52, f.y) + oy));
@@ -1366,7 +1380,7 @@ function runeDraw(R, t, dt) {
   const sk = R.shake; R.shake = Math.max(0, sk - dt * 40);
   const ox = sk ? Math.round(rand(-sk, sk) / 2) * 2 : 0, oy = sk ? Math.round(rand(-sk, sk) / 2) * 2 : 0;
   rg.imageSmoothingEnabled = false; rg.globalAlpha = 1; rg.fillStyle = '#0e0a08'; rg.fillRect(0, 0, 640, 340); rg.drawImage(rlo, ox, oy, 640, 340);
-  rg.font = 'bold 12px ui-monospace, monospace'; rg.textAlign = 'center';
+  rg.font = 'bold 12px Grenze, ui-monospace, monospace'; rg.textAlign = 'center';
   N.forEach((n, i) => { if (n.res != null || t < n.t - 1) return; rg.fillStyle = '#0e0a08'; rg.fillText(i + 1, n.x * 2 + ox, n.y * 2 + 6 + oy); rg.fillStyle = n === cur ? '#ffffff' : '#b9b0d0'; rg.fillText(i + 1, n.x * 2 + ox, n.y * 2 + 4 + oy); });
   R.fx = R.fx.filter(f => (f.l -= dt) > 0); R.fx.forEach(f => popText(rg, f, f.x + ox, Math.max(30, f.y) + oy));
   if (flash) popText(rg, { txt: R.grade ? `Runa ${R.G.n} ${RUNE_G[R.grade].n}!  (${Math.round(R.acc * 100)}%)` : `A pedra rachou… (${Math.round(R.acc * 100)}%)`, c: R.grade ? gc : '#a8a29e', big: true, l: 1, L: 1 + Math.min(R.ft, .12) }, 320, 176);
@@ -1503,7 +1517,7 @@ function forestLoop(now) {
   const sk = f.shake; f.shake = Math.max(0, sk - dt * 40);
   const ox = sk ? Math.round(rand(-sk, sk) / 2) * 2 : 0, oy = sk ? Math.round(rand(-sk, sk) / 2) * 2 : 0;
   tg.imageSmoothingEnabled = false; tg.fillStyle = '#0e0a08'; tg.fillRect(0, 0, 640, 340); tg.drawImage(flo, ox, oy, 640, 340);
-  tg.font = 'bold 15px ui-monospace, monospace'; tg.textAlign = 'center'; tg.lineJoin = 'round'; tg.lineWidth = 4; tg.strokeStyle = '#0e0a08';
+  tg.font = 'bold 15px Grenze, ui-monospace, monospace'; tg.textAlign = 'center'; tg.lineJoin = 'round'; tg.lineWidth = 4; tg.strokeStyle = '#0e0a08';
   const title = `${tr.o.n}  ${'★'.repeat(treeStars(tr.o))}${'☆'.repeat(5 - treeStars(tr.o))}`;
   tg.strokeText(title, 320, 24); tg.fillStyle = '#f3e9dc'; tg.fillText(title, 320, 24);
   f.fx = f.fx.filter(x => (x.l -= dt) > 0); f.fx.forEach(x => popText(tg, x, 320, 96));
@@ -1649,7 +1663,7 @@ function drawFurnace(t, b, inside) {
   fg.fillStyle = grd; fg.fillRect(X, Y, BW, 24);
   if (b) { fg.fillStyle = '#4ade8044'; fg.fillRect(X + (b.c - b.w / 2) * BW, Y - 4, b.w * BW, 32); fg.strokeStyle = '#4ade80'; fg.lineWidth = 3; fg.strokeRect(X + (b.c - b.w / 2) * BW, Y - 4, b.w * BW, 32); }
   fg.fillStyle = '#fff'; fg.fillRect(X + T * BW - 2, Y - 8, 4, 40);
-  fg.fillStyle = '#b9a896'; fg.font = '12px monospace'; fg.textAlign = 'left'; fg.fillText('frio', X, Y + 44); fg.textAlign = 'right'; fg.fillText('quente', X + BW, Y + 44);
+  fg.fillStyle = '#b9a896'; fg.font = '12px Grenze, ui-monospace, monospace'; fg.textAlign = 'left'; fg.fillText('frio', X, Y + 44); fg.textAlign = 'right'; fg.fillText('quente', X + BW, Y + 44);
   if (b && t > f.grace) { fg.fillStyle = '#0006'; fg.fillRect(X, 10, BW, 6); fg.fillStyle = '#fbbf24'; fg.fillRect(X, 10, BW * clamp((t - f.grace) / f.D, 0, 1), 6); }
 }
 function endFurnace() {

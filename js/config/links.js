@@ -23,17 +23,19 @@ const LINKS = [
   { n: 'GameCopyWorld',       u: 'https://gamecopyworld.com/games/index.php',        g: 'tools',  i: ICO('gamecopyworld-com') },
   { n: 'BetterRepack',        u: 'https://dl.betterrepack.com/public/',              g: 'out',    i: ICO('dl-betterrepack-com') },
 ];
-const GAMES = [                                  // aparecem na dock; adicione novos jogos aqui
+const GAMES = [                                  // aparecem no app Jogos; adicione novos jogos aqui
   { n: 'DOOM', file: 'DOOM.exe', u: './games/doom/index.html', g: 'game', e: '👹', local: true, max: true },
   { n: 'Smithing', file: 'Smithing.exe', u: './games/smithing/index.html', g: 'game', e: '⚒️', local: true, max: true },
   { n: 'Combate', file: 'Combate.exe', u: './games/combate/index.html', g: 'game', e: '⚔️', local: true, max: true },
   { n: 'Colônia', file: 'Colonia.exe', u: './games/colonia/index.html', g: 'game', e: '🏕️', local: true, max: true },
   { n: 'Bastião', file: 'Bastiao.exe', u: './games/bastiao/index.html', g: 'game', e: '🏰', local: true, max: true },
+  { n: 'Adventure', file: 'Adventure.exe', u: './games/adventure/index.html', g: 'game', e: '🗡️', local: true, max: true },
 ];
-const APPITEMS = [   // apps e jogos: aparecem na área de trabalho, na taskbar ou na dock (botão direito: "Mover para…"); tag = grupo na Loja
-  { id: 'sys:store', tag: 'sistema', n: 'Loja', e: '🛍️', cat: 'apps', d: 'Instale e remova apps e jogos.', fn: () => openStore(), p0: 'taskbar' },
-  { id: 'sys:browser', tag: 'sistema', n: 'Navegador', e: '🌐', cat: 'apps', d: 'Navegue em abas dentro do sistema.', fn: () => openBrowser(), p0: 'taskbar' },
-  { id: 'sys:term', tag: 'sistema', n: 'Terminal', e: '💻', cat: 'apps', d: 'Linha de comando do PIRATINHA OS.', fn: () => openTerm(), p0: 'taskbar' },
+const APPITEMS = [   // apps e jogos: aparecem na área de trabalho, na taskbar ou na dock (botão direito: "Mover para…"); tag = grupo na Loja; os jogos (cat 'jogos') ficam no app Jogos, fora da Loja
+  { id: 'sys:store', tag: 'sistema', n: 'Loja', e: '🛍️', cat: 'apps', d: 'Instale e remova apps.', fn: () => openStore(), p0: 'dock' },
+  { id: 'sys:browser', tag: 'sistema', n: 'Navegador', e: '🌐', cat: 'apps', d: 'Navegue em abas dentro do sistema.', fn: () => openBrowser(), p0: 'dock' },
+  { id: 'sys:term', tag: 'sistema', n: 'Terminal', e: '💻', cat: 'apps', d: 'Linha de comando do PIRATINHA OS.', fn: () => openTerm(), p0: 'dock' },
+  { id: 'sys:games', tag: 'sistema', n: 'Jogos', e: '🕹️', cat: 'apps', d: 'Sua biblioteca de jogos: instale e jogue.', fn: () => openGames(), p0: 'dock' },
   { id: 'sys:calc', tag: 'util', n: 'Calculadora', e: '🧮', cat: 'apps', d: 'Contas rápidas.', fn: () => openCalc(), p0: 'none' },
   { id: 'sys:notes', tag: 'util', n: 'Bloco de notas', e: '📝', cat: 'apps', d: 'Anotações salvas no navegador.', fn: () => openNotes(), p0: 'none' },
   { id: 'sys:b64', tag: 'util', n: 'Base64', e: '🔣', cat: 'apps', d: 'Codifique e decodifique texto e arquivos em Base64.', fn: () => openB64(), p0: 'none' },
@@ -44,11 +46,12 @@ const APPITEMS = [   // apps e jogos: aparecem na área de trabalho, na taskbar 
   { id: 'sys:input', tag: 'hw', n: 'Teste de teclado e mouse', e: '⌨️', cat: 'apps', d: 'Ghosting do teclado, taxa de atualização do mouse, CPS e duplo clique fantasma.', fn: () => openInput(), p0: 'none' },
   { id: 'sys:screen', tag: 'hw', n: 'Teste de monitor', e: '🖥️', cat: 'apps', d: 'Pixels mortos, FPS e Hz reais e teste de rastro (ghosting).', fn: () => openScreen(), p0: 'none' },
   { id: 'sys:paint', tag: 'util', n: 'Paint', e: '🎨', cat: 'apps', d: 'Desenhe e salve em PNG.', fn: () => openPaint(), p0: 'none' },
-  { id: GAMES[0].u, n: 'DOOM', e: '👹', cat: 'jogos', d: 'Tiro em primeira pessoa clássico, rodando Freedoom.', fn: () => openApp(GAMES[0]), p0: 'dock' },
-  { id: GAMES[1].u, n: 'Smithing', e: '⚒️', cat: 'jogos', d: 'Forje armas e armaduras no ritmo do martelo, entregue encomendas e venda no leilão.', fn: () => openApp(GAMES[1]), p0: 'dock' },
-  { id: GAMES[2].u, n: 'Combate', e: '⚔️', cat: 'jogos', d: 'Arrume a mochila com armas e escudos, espie a mochila do inimigo e vença as lutas automáticas.', fn: () => openApp(GAMES[2]), p0: 'dock' },
-  { id: GAMES[3].u, n: 'Colônia', e: '🏕️', cat: 'jogos', d: 'Escolha um lugar no mundo, monte o grupo e erga uma colônia: construa, escave, cace e defenda.', fn: () => openApp(GAMES[3]), p0: 'dock' },
-  { id: GAMES[4].u, n: 'Bastião', e: '🏰', cat: 'jogos', d: 'Comande aldeões e soldados, erga muros e torres e segure ondas infinitas de zumbis num mapa hexagonal sorteado.', fn: () => openApp(GAMES[4]), p0: 'dock' },
+  { id: GAMES[0].u, n: 'DOOM', e: '👹', cat: 'jogos', d: 'Tiro em primeira pessoa clássico, rodando Freedoom.', fn: () => playGame(0), p0: 'none' },
+  { id: GAMES[1].u, n: 'Smithing', e: '⚒️', cat: 'jogos', d: 'Forje armas e armaduras no ritmo do martelo, entregue encomendas e venda no leilão.', fn: () => playGame(1), p0: 'none' },
+  { id: GAMES[2].u, n: 'Combate', e: '⚔️', cat: 'jogos', d: 'Arrume a mochila com armas e escudos, espie a mochila do inimigo e vença as lutas automáticas.', fn: () => playGame(2), p0: 'none' },
+  { id: GAMES[3].u, n: 'Colônia', e: '🏕️', cat: 'jogos', d: 'Escolha um lugar no mundo, monte o grupo e erga uma colônia: construa, escave, cace e defenda.', fn: () => playGame(3), p0: 'none' },
+  { id: GAMES[4].u, n: 'Bastião', e: '🏰', cat: 'jogos', d: 'Comande aldeões e soldados, erga muros e torres e segure ondas infinitas de zumbis num mapa hexagonal sorteado.', fn: () => playGame(4), p0: 'none' },
+  { id: GAMES[5].u, n: 'Adventure', e: '🗡️', cat: 'jogos', d: 'RPG de ação em tempo real, sozinho ou em coop com até 4 amigos: explore regiões, cumpra missões e desça à cripta.', fn: () => playGame(5), p0: 'none' },
 ].map(a => Object.assign({ app: true, u: a.id, win: a.id, local: true, g: 'app' }, a));
 LINKS.push(...APPITEMS);
 const FOOTER_URL = 'https://desciclopedia.org/wiki/Especial:Aleat%C3%B3ria';

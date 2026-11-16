@@ -138,6 +138,27 @@ const ITEM_ART = {
     p.s(6, 1, 4, 2, PAL.wood).s(7, 3, 2, 3, PAL.glass);
     p.disc(7.5, 10, 4.4, PAL.green).p(6, 8, '#fff').p(9, 12, PAL.dark[2]).p(8, 10, PAL.dark[2]);
   },
+  wand(p) {              // 1×2 (varinha: cabo curto e cristal roxo)
+    p.s(7, 11, 2, 16, PAL.wood).s(6, 26, 4, 3, PAL.gold).r(6, 11, 4, 1, PAL.gold[1]);
+    p.disc(7.5, 6.5, 3.4, PAL.purple).p(6, 5, '#fff');
+    [[7.5, 1], [2, 6.5], [13, 6.5]].forEach(([x, y]) => p.p(x, y, PAL.gold[0]));
+  },
+  staff(p) {             // 1×3 (cajado: haste longa e orbe azul preso em garras)
+    p.s(7, 13, 2, 32, PAL.wood).s(6, 44, 4, 2, PAL.iron).r(5, 13, 6, 2, PAL.gold[1]);
+    p.r(4, 8, 1, 5, PAL.wood[1]).r(11, 8, 1, 5, PAL.wood[2]);
+    p.disc(7.5, 7, 4.2, PAL.blue).p(6, 5, '#fff').p(6, 6, '#fff');
+  },
+  hat(p) {               // 2×2 (chapéu de mago: cone torto, aba larga e fita dourada)
+    for (let y = 3; y < 23; y++) {
+      const hw = Math.round(1 + (y - 3) * .5), lean = Math.round((22 - y) * .2);
+      for (let x = 16 - hw; x < 16 + hw; x++) p.p(x + lean, y, x < 15 ? PAL.purple[0] : x < 18 ? PAL.purple[1] : PAL.purple[2]);
+    }
+    p.s(2, 23, 28, 4, PAL.purple).r(7, 20, 18, 2, PAL.gold[1]);
+    [[15, 11], [16, 12], [14, 12], [15, 13]].forEach(([x, y]) => p.p(x + 2, y, PAL.gold[0])); p.p(17, 12, '#fff');
+  },
+  tome(p) {              // 1×1 (grimório)
+    p.s(3, 3, 10, 11, PAL.purple).r(3, 3, 2, 11, PAL.dark[2]).r(12, 4, 1, 9, '#fff').disc(8.5, 8, 1.8, PAL.gold);
+  },
   amulet(p) {            // 1×1
     [[3, 2], [3, 3], [4, 4], [5, 5], [6, 6], [12, 2], [12, 3], [11, 4], [10, 5], [9, 6]].forEach(([x, y]) => p.p(x, y, PAL.gold[1]));
     p.disc(7.5, 10, 3.6, PAL.gold).disc(7.5, 10, 2.2, PAL.purple).p(7, 9, '#fff');
@@ -155,7 +176,7 @@ function itemImg(id, r = 0) {      // data URL do item na orientação pedida (0
   const k = id + r;
   if (!_itemCache[k]) {
     const d = ITEMS[id], p = new Pix(d.w * 16, d.h * 16);
-    ITEM_ART[id](p);
+    (ITEM_ART[id] || (q => q.s(2, 2, d.w * 16 - 4, d.h * 16 - 4, PAL.stone)))(p);   // item sem arte: um bloco de pedra, para não quebrar a tela
     let c = p.outline().canvas();
     if (r) c = rot90(c);
     _itemCache[k] = c.toDataURL();
@@ -188,6 +209,7 @@ function humanoid(o) {
   if (o.mask) p.r(11, 10, 6, 3, PAL.dark[2]);
   if (o.horns) p.p(9, 5, PAL.bone[1]).p(8, 4, PAL.bone[0]).p(8, 3, PAL.bone[0]).p(16, 5, PAL.bone[1]).p(17, 4, PAL.bone[0]).p(17, 3, PAL.bone[0]);
   if (o.crown) { p.r(9, 4, 8, 2, PAL.gold[1]); [9, 12, 13, 16].forEach(x => p.p(x, 3, PAL.gold[0])); p.p(12, 5, PAL.red[1]).p(14, 5, PAL.purple[1]); }
+  if (o.hat) p.s(7, 6, 12, 2, PAL.purple).s(10, 3, 6, 3, PAL.purple).r(12, 1, 3, 2, PAL.purple[1]).p(14, 0, PAL.purple[0]).r(9, 5, 8, 1, PAL.gold[1]);   // chapéu de mago
   if (o.cape) p.r(6, 13, 2, 10, o.cape[1]).r(5, 16, 1, 8, o.cape[2]);
   // escudo no braço de trás
   if (o.shield) p.disc(7, 17, 3.6, o.shield === 'iron' ? PAL.blue : PAL.wood).p(7, 17, PAL.steel[0]);
@@ -200,7 +222,8 @@ function humanoid(o) {
   if (w === 'axe') p.r(20, 4, 1, 18, PAL.wood[1]).s(21, 5, 4, 6, PAL.steel).s(17, 6, 3, 4, PAL.steel);
   if (w === 'spear') p.r(20, 5, 1, 20, PAL.wood[1]).r(20, 1, 1, 4, PAL.steel[0]).p(19, 3, PAL.steel[1]).p(21, 3, PAL.steel[1]).p(19, 4, PAL.steel[1]).p(21, 4, PAL.steel[1]);
   if (w === 'mace') p.r(20, 9, 1, 13, PAL.wood[1]).disc(20.5, 6, 2.6, PAL.iron);
-  if (w === 'staff') p.r(20, 6, 1, 19, PAL.wood[1]).disc(20.5, 4, 2, PAL.green);
+  if (w === 'staff') p.r(20, 6, 1, 19, PAL.wood[1]).disc(20.5, 4, 2, o.orb || PAL.green);
+  if (w === 'wand') p.r(20, 11, 1, 9, PAL.wood[1]).disc(20.5, 9, 1.6, PAL.purple).p(20, 8, '#fff');
   return p.outline().canvas();
 }
 
@@ -222,9 +245,9 @@ const CHAR_DEF = {
 };
 
 const _charCache = {};
-function charSprite(id) {          // { img: canvas colorido, white: silhueta branca (piscar ao levar golpe) }
+function charSprite(id, def) {     // { img: canvas colorido, white: silhueta branca (piscar ao levar golpe) } · def: aparência própria (o herói muda com a mochila), guardada pela chave id
   if (!_charCache[id]) {
-    const img = humanoid(CHAR_DEF[id]);
+    const img = humanoid(def || CHAR_DEF[id]);
     const white = document.createElement('canvas'); white.width = img.width; white.height = img.height;
     const g = white.getContext('2d'); g.drawImage(img, 0, 0); g.globalCompositeOperation = 'source-in'; g.fillStyle = '#fff'; g.fillRect(0, 0, 28, 28);
     _charCache[id] = { img, white };
@@ -233,22 +256,40 @@ function charSprite(id) {          // { img: canvas colorido, white: silhueta br
 }
 
 /* ======================= Cenário da arena ======================= */
-function arenaBg(w, h) {
+const _hex = c => [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16));
+const mixc = (a, b, t) => { const A = _hex(a), B = _hex(b); return '#' + A.map((v, i) => Math.round(v + (B[i] - v) * t).toString(16).padStart(2, '0')).join(''); };
+/* stage 0..9 = dezena da jornada. Cada dezena leva a cena do entardecer até o inferno: céu vermelho, lua de sangue,
+   grama queimada, chão em brasas, rachaduras de lava e árvores que secam e pegam fogo.
+   O canvas devolvido leva .stage e .fires (pontos onde frame() desenha as chamas animadas). */
+function arenaBg(w, h, stage = 0) {
   const c = document.createElement('canvas'); c.width = w; c.height = h;
   const g = c.getContext('2d'), R = (x, y, a, b, col) => { g.fillStyle = col; g.fillRect(x, y, a, b); };
   let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-  const ground = h - 26;
-  ['#2a1f4e', '#43286a', '#6b2f78', '#a8456f', '#e0705a', '#f5a35c'].forEach((col, i, a) => R(0, Math.round(i * ground / a.length), w, Math.ceil(ground / a.length) + 1, col));
-  for (let i = 0; i < 26; i++) R(Math.floor(rnd() * w / 2) * 2, Math.floor(rnd() * ground * .45 / 2) * 2, 2, 2, i % 3 ? '#cdb8ff' : '#fff');
-  R(w - 60, 16, 16, 16, '#ffe9a8'); R(w - 62, 18, 20, 12, '#ffe9a8'); R(w - 58, 14, 12, 20, '#ffe9a8');
+  const t = Math.min(1, stage / 9), M = (a, b) => mixc(a, b, t), ground = h - 26, fires = [];
+  const SKY = ['#2a1f4e', '#43286a', '#6b2f78', '#a8456f', '#e0705a', '#f5a35c'], HELL = ['#120305', '#2c0707', '#560c0b', '#8c170f', '#c63412', '#ff7a1e'];
+  SKY.forEach((col, i, a) => R(0, Math.round(i * ground / a.length), w, Math.ceil(ground / a.length) + 1, M(col, HELL[i])));
+  for (let i = 0; i < 26; i++) { const x = Math.floor(rnd() * w / 2) * 2, y = Math.floor(rnd() * ground * .45 / 2) * 2; if (i >= 26 * t) R(x, y, 2, 2, i % 3 ? '#cdb8ff' : '#fff'); }   // as estrelas somem aos poucos
+  const moon = M('#ffe9a8', '#ff3a1c'); R(w - 60, 16, 16, 16, moon); R(w - 62, 18, 20, 12, moon); R(w - 58, 14, 12, 20, moon);
   for (let x = 0; x < w; x += 2) {                          // montanhas ao fundo e colinas
     const m = ground - 22 - Math.abs(Math.sin(x * .021) * 20 + Math.sin(x * .057 + 1) * 9);
-    R(x, Math.round(m / 2) * 2, 2, ground - m + 2, '#4a2a63');
+    R(x, Math.round(m / 2) * 2, 2, ground - m + 2, M('#4a2a63', '#2b0a0c'));
+    if (stage >= 7 && rnd() < .12) R(x, Math.round(m / 2) * 2 + 2 + Math.floor(rnd() * 5) * 2, 2, 4, '#ff5a14');   // veios de lava
     const k = ground - 6 - Math.abs(Math.sin(x * .034 + 2) * 12);
-    R(x, Math.round(k / 2) * 2, 2, ground - k + 2, '#33204d');
+    R(x, Math.round(k / 2) * 2, 2, ground - k + 2, M('#33204d', '#190506'));
   }
-  R(0, ground, w, 4, '#5fae4a'); R(0, ground + 4, w, 2, '#3e7d36'); R(0, ground + 6, w, h, '#6b4a33');
-  for (let i = 0; i < 90; i++) R(Math.floor(rnd() * w / 2) * 2, ground + 8 + Math.floor(rnd() * 8) * 2, 2, 2, i % 2 ? '#553827' : '#86603f');
-  for (let x = 0; x < w; x += 6) if (rnd() < .5) R(x, ground - 2, 2, 2, '#7fd062');
+  // árvores atrás dos lutadores: verdes → secas (dezena 3+) → em chamas (uma a uma, a partir da dezena 5)
+  [.05, .17, .3, .7, .83, .95].forEach((f, i) => {
+    const x = Math.round(w * f / 2) * 2, dry = stage >= 3, burn = stage >= 5 + i % 3, bark = M('#5a3a22', '#1c0d0a');
+    R(x - 2, ground - 24, 4, 24, bark);
+    if (!dry) { const leaf = M('#3f8a3a', '#7a6a2a'); R(x - 10, ground - 38, 20, 14, leaf); R(x - 6, ground - 44, 12, 8, leaf); R(x - 8, ground - 36, 4, 4, M('#5fae4a', '#9a8a3a')); }
+    else { R(x - 8, ground - 30, 6, 2, bark); R(x - 8, ground - 34, 2, 4, bark); R(x + 2, ground - 34, 6, 2, bark); R(x + 6, ground - 40, 2, 6, bark); R(x - 2, ground - 32, 2, 8, bark); }
+    if (burn) fires.push([x, ground - 34, 6], [x - 6, ground - 30, 3], [x + 6, ground - 38, 3]);
+  });
+  R(0, ground, w, 4, M('#5fae4a', '#3b1a12')); R(0, ground + 4, w, 2, M('#3e7d36', '#200c08')); R(0, ground + 6, w, h, M('#6b4a33', '#2a130f'));
+  for (let i = 0; i < 90; i++) R(Math.floor(rnd() * w / 2) * 2, ground + 8 + Math.floor(rnd() * 8) * 2, 2, 2, i % 2 ? M('#553827', '#170a08') : M('#86603f', '#4a1c12'));
+  for (let i = 0; i < Math.round(70 * t); i++) R(Math.floor(rnd() * w / 2) * 2, ground + 2 + Math.floor(rnd() * 11) * 2, 2, 2, i % 3 ? '#ff7a1e' : '#ffd257');   // brasas no chão
+  if (stage >= 6) for (let n = 0; n < stage - 4; n++) { let x = Math.floor(rnd() * w / 2) * 2, y = ground + 8 + Math.floor(rnd() * 6) * 2; for (let i = 0; i < 14; i++) { R(x, y, 4, 2, '#ff5a14'); x += 4; if (rnd() < .5) y += rnd() < .5 ? 2 : -2; y = Math.max(ground + 6, Math.min(h - 2, y)); } }   // rachaduras de lava
+  for (let x = 0; x < w; x += 6) if (rnd() < .5 * (1 - t)) R(x, ground - 2, 2, 2, '#7fd062');
+  c.stage = stage; c.fires = fires;
   return c;
 }
