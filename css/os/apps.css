@@ -169,3 +169,57 @@
 .gh[data-g="colonia"] { background: radial-gradient(circle at 50% 45%, rgba(16,20,13,.1), rgba(16,20,13,.6)), url("../../assets/games/colonia-grama.png") center / 128px 128px #5fae48; image-rendering: pixelated; }
 .gh[data-g="adventure"] { background: linear-gradient(rgba(16,20,13,.1), rgba(16,20,13,.5)), url("../../assets/games/adventure.png") center / cover no-repeat #5f9e48; image-rendering: pixelated; }
 .gh[data-g="bastiao"] { background: linear-gradient(rgba(20,16,12,.15), rgba(20,16,12,.45)), url("../../assets/games/bastiao.svg") center bottom / cover no-repeat #2b2436; }
+
+/* Jogos: abas (Loja, Biblioteca, Comunidade) cobrindo o topo, conteúdo no meio e barra fixa embaixo (atualizações, Downloads, Amigos) */
+.view.sys.gms { position: relative; flex-direction: column; align-items: stretch; }
+.gtabs { flex: none; width: 100%; display: flex; gap: 4px; padding: 8px 14px 0; border-bottom: 1px solid var(--glass-line); background: rgba(0,0,0,.18); }
+.gtabs button { padding: 10px 16px 9px; border: 0; border-bottom: 3px solid transparent; background: none; color: var(--text-dim); font: inherit; font-size: 15px; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; }
+.gtabs button:hover { color: var(--text); } .gtabs button.on { color: var(--text); border-bottom-color: var(--accent); }
+.gpane { flex: 1; min-height: 0; overflow: auto; }
+.glib { display: flex; height: 100%; }
+.gt i { filter: drop-shadow(0 2px 4px rgba(0,0,0,.5)); }
+.gsec { margin: 4px 2px 10px; font-size: 15px; font-weight: normal; letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim); } .gsec small { font-size: 13px; }
+.gshop, .gfr { padding: 16px 18px; }
+/* Loja: destaques numa barra rolável (ícone e nome abaixo) e a lista de todos os jogos */
+.gcw { display: flex; align-items: stretch; gap: 6px; margin-bottom: 22px; }
+.garr { flex: none; width: 30px; border: 1px solid var(--glass-line); border-radius: 10px; background: rgba(255,255,255,.06); color: var(--text); font-size: 22px; cursor: pointer; } .garr:hover { background: rgba(255,255,255,.14); }
+.gcar { flex: 1; min-width: 0; display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 6px; }
+.gcard { flex: none; width: 150px; scroll-snap-align: start; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 8px; border: 1px solid transparent; border-radius: 12px; background: rgba(255,255,255,.05); color: var(--text); font: inherit; cursor: pointer; }
+.gcard:hover { background: rgba(255,255,255,.12); border-color: var(--glass-line); }
+.gcard .tile { width: 120px; height: 120px; border-radius: 14px; } .gcard .tile i { font-size: 72px; }
+.gcard b { font-weight: normal; font-size: 14px; text-align: center; line-height: 1.25; min-height: 2.5em; display: flex; align-items: center; }
+.glist { display: flex; flex-direction: column; gap: 4px; }
+.gli, .gfi { display: flex; align-items: center; gap: 12px; padding: 7px 10px; border: 1px solid transparent; border-radius: 10px; background: rgba(255,255,255,.04); color: var(--text); font: inherit; text-align: left; }
+.gli { cursor: pointer; } .gli:hover { background: rgba(255,255,255,.11); border-color: var(--glass-line); }
+.gli .tile { width: 46px; height: 46px; border-radius: 10px; } .gli .tile i { font-size: 30px; }
+.gtx { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; } .gtx b { font-weight: normal; font-size: 14px; } .gtx small { font-size: 12px; color: var(--text-dim); }
+.gpr { flex: none; display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.gdc { padding: 2px 6px; background: #4c6b22; color: #beee11; font-size: 14px; } .gold { color: var(--text-dim); text-decoration: line-through; font-size: 12px; } .gnew { color: #c7e7a3; }
+.gcard .gpr { gap: 4px; font-size: 12px; }
+.gshot { display: block; width: calc(100% - 44px); max-width: 720px; aspect-ratio: 16 / 9; margin: 18px 22px 0; object-fit: cover; border-radius: 12px; border: 1px solid var(--glass-line); box-shadow: 0 10px 30px rgba(0,0,0,.35); }   /* imagem do jogo na página da loja */
+.gfp { display: flex; align-items: center; gap: 8px; padding: 14px 22px; font-size: 14px; color: #90ba3c; }
+/* Amigos: avatar, nome e, abaixo, o jogo em verde (online em azul, offline em cinza) */
+.gfoot { flex: none; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px; padding: 6px 10px; border-top: 1px solid var(--glass-line); background: rgba(0,0,0,.18); }   /* mesma cor das abas do topo */
+.gfend { display: flex; justify-content: flex-end; } .gfmid { display: flex; align-items: center; gap: 8px; } .gfstart { min-width: 0; display: flex; align-items: center; gap: 12px; }
+.gfbtn, .gdbtn, .gabtn { flex: none; padding: 7px 14px; border: 1px solid transparent; border-radius: 8px; background: none; color: var(--text-dim); font: inherit; font-size: 14px; cursor: pointer; } .gfbtn small { color: #57cbde; font-size: 12px; } .gdbtn small { color: #90ba3c; font-size: 12px; }
+.gfbtn:hover, .gfbtn.on, .gdbtn:hover, .gdbtn.on, .gabtn:hover, .gabtn.on { color: var(--text); background: rgba(255,255,255,.1); border-color: var(--glass-line); }
+.gnews { min-width: 0; max-width: 220px; display: flex; align-items: center; gap: 8px; padding: 0; border: 0; background: none; color: var(--text-dim); font: inherit; font-size: 12px; text-align: left; cursor: pointer; }
+.gnews[hidden] { display: none; } .gnews span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .gnews:hover { color: var(--text); }
+.gnews .tile { width: 22px; height: 22px; border-radius: 5px; } .gnews .tile i { font-size: 14px; }
+.gpop { position: absolute; right: 10px; bottom: 52px; z-index: 5; width: min(340px, calc(100% - 20px)); max-height: calc(100% - 110px); overflow: auto; border: 1px solid var(--glass-line); border-radius: 12px; background: var(--glass-strong); backdrop-filter: blur(var(--blur)); -webkit-backdrop-filter: blur(var(--blur)); box-shadow: 0 16px 40px rgba(0,0,0,.35); }   /* painéis transparentes, como a janela */
+.gpop[hidden] { display: none; }
+.gapop { right: auto; left: 10px; width: min(300px, calc(100% - 20px)); } .gapop p { margin: 0; padding: 14px 16px; font-size: 14px; line-height: 1.45; }
+.gdpop { right: auto; left: 50%; transform: translateX(-50%); width: min(420px, calc(100% - 20px)); }
+.gdl .tile { width: 40px; height: 40px; border-radius: 8px; } .gdl .tile i { font-size: 26px; } .gdl .pbar { margin: 4px 0 2px; }
+/* Comunidade: imagens dos amigos em grade, com quem postou */
+.gcom { padding: 16px 18px; display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; align-items: start; }
+.gpost { overflow: hidden; border: 1px solid var(--glass-line); border-radius: 12px; background: rgba(255,255,255,.05); }
+.gpost img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; } .gpost img.px { image-rendering: pixelated; }
+.gby { display: flex; align-items: center; gap: 10px; padding: 10px 12px 0; } .gby .gtx small { color: #90ba3c; }
+.gpost p { margin: 8px 12px; font-size: 14px; line-height: 1.4; }
+.glike { margin: 0 12px 12px; padding: 4px 10px; border: 1px solid var(--glass-line); border-radius: 8px; background: none; color: var(--text-dim); font: inherit; font-size: 13px; cursor: pointer; } .glike:hover, .glike.on { color: var(--text); background: rgba(255,255,255,.1); } .glike.on { border-color: #57cbde; }
+.gfr .gsec { margin-top: 14px; } .gfr .gsec:first-child { margin-top: 0; }
+.gfi { margin-bottom: 4px; }
+.fav { flex: none; width: 38px; height: 38px; border-radius: 8px; display: grid; place-items: center; font-size: 24px; line-height: 1; }
+.gfp .fav { width: 28px; height: 28px; font-size: 18px; border-radius: 6px; }
+.gfi.s2 small { color: #90ba3c; } .gfi.s1 small { color: #57cbde; } .gfi.s0 { opacity: .55; }

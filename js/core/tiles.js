@@ -12,3 +12,4 @@ function tile(l) {
   t.append(img); return t;
 }
 const etile = e => () => { const t = document.createElement('div'); t.className = 'tile'; t.innerHTML = '<i>' + e + '</i>'; return t; };
+const gtile = g => { const t = etile(g.e)(); t.classList.add('gt'); t.style.background = 'linear-gradient(135deg, ' + g.c[0] + ', ' + g.c[1] + ')'; return t; };   // ícone de jogo da Loja e dos amigos

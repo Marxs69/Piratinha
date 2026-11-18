@@ -2,7 +2,6 @@
 
 const JOKES = [
   { i: '⬇️', t: 'Atualização do sistema', m: 'PIRATINHA OS 9.0.1 está pronto. Clique para instalar.', u: 1 },
-  { i: '🎮', t: 'Barba-Negra', m: 'começou a jogar DOOM.', g: 1 },
   { i: '🦜', t: 'Papagaio', m: 'instalou 14 extensões sem perguntar.' },
   { i: '🛡️', t: 'Antivírus', m: 'tirou o dia de folga.' },
   { i: '📦', t: 'tesouro.zip', m: 'terminou de baixar. Ninguém sabe onde.' },
@@ -39,7 +38,7 @@ function drawPanel() {
 function pushNote(j) {
   const n = Object.assign({ time: new Date() }, j); NOTES.unshift(n); if (NOTES.length > 40) NOTES.pop();
   const t = document.createElement('div'); t.className = 'toast' + (j.g ? ' game' : ''); t.innerHTML = '<span class="ti"></span><div><b></b><em></em></div>';
-  $('.ti', t).textContent = j.i; $('b', t).textContent = j.t; $('em', t).textContent = j.m;
+  if (j.gt) $('.ti', t).replaceWith(gtile(j.gt)); else $('.ti', t).textContent = j.i; $('b', t).textContent = j.t; $('em', t).textContent = j.m;
   const kill = () => { t.classList.add('out'); setTimeout(() => t.remove(), 250); };
   t.onclick = () => { actNote(n); kill(); }; toasts.append(t); setTimeout(kill, 8000);
   if (npanel.style.display === 'block') drawPanel(); else { unread++; dot.textContent = unread > 9 ? '9+' : unread; bell.classList.add('alert'); }

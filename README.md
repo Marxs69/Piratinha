@@ -7,6 +7,7 @@ Tudo o que o usuário muda fica só no navegador (`localStorage`).
 
 - **Modo OS**: área de trabalho, janelas, taskbar, dock, menu Iniciar e apps.
 - **Modo antigo**: a lista de sites em cards (sempre no celular).
+- **App Jogos**: loja, biblioteca, comunidade e amigos fictícios.
 - **Idiomas**: português e inglês (`js/i18n/`).
 
 ## Jogos
@@ -14,28 +15,28 @@ Tudo o que o usuário muda fica só no navegador (`localStorage`).
 | Jogo | Pasta | Resumo |
 |---|---|---|
 | DOOM | `games/doom/` | Freedoom em WebAssembly. |
-| Smithing | `games/smithing/` | Forja: minere, forje e venda. |
-| Combate | `games/combate/` | Auto-batalha com mochila. |
-| Colônia | `games/colonia/` | Gerenciamento de colônia. |
-| Bastião | `games/bastiao/` | Defesa de castelo em 3D contra zumbis. |
-| Adventure | `games/adventure/` | RPG de ação, sozinho ou em coop (até 4). |
+| Smithing Shop | `games/smithing/` | Forja: minere, forje e venda. |
+| Hero's Journey | `games/combate/` | Auto-batalha com mochila. |
+| Sim Colony | `games/colonia/` | Gerenciamento de colônia. |
+| Zombie Fortress | `games/bastiao/` | Defesa de castelo em 3D contra zumbis. |
+| RPG Adventure | `games/adventure/` | RPG de ação, sozinho ou em coop (até 4). |
 
-O equilíbrio de cada jogo fica nas tabelas do topo de `game.js` (no Adventure, em `data.js`).
+Equilíbrio: topo de `game.js` (no RPG Adventure, `data.js`).
 
-### Adventure
+### RPG Adventure
 
-- **Coop**: quem cria a sala hospeda o jogo; os outros entram pelo código. Conexão P2P (`lib/trystero.js`). "Só neste navegador" testa com duas janelas.
-- **Mapas**: `regions.js`. Classes, itens, monstros, NPCs e missões: `data.js`.
-- **Editor** (`index.html#dev`): só aparece no seu computador (localhost ou arquivo aberto direto), nunca no GitHub Pages, e pede senha. A senha fica só no navegador; para esquecê-la, apague `adventure-devkey` do armazenamento do site.
-- **Salvar no projeto** (aba Arquivo) grava o `regions.js`. No Brave, ligue `brave://flags/#file-system-access-api`; sem isso, ele baixa o arquivo.
+- **Coop**: P2P pelo código da sala (`lib/trystero.js`).
+- **Dados**: mapas em `regions.js`; o resto em `data.js`.
+- **Editor**: `index.html#dev`, só local e com senha (`adventure-devkey`).
+- **Salvar no projeto**: grava `regions.js` (no Brave, ligue `brave://flags/#file-system-access-api`).
 
 ## Estrutura
 
 ```
 index.html        carrega CSS e JS (a ordem importa)
-assets/           ícones, wallpapers e capas dos jogos
+assets/           ícones, wallpapers e imagens
 css/              estilos
-js/config/        links.js: sites, jogos e apps
+js/config/        links.js (sites, jogos, apps) e catalog.js (loja, amigos)
 js/               núcleo, área de trabalho, apps, idiomas
 games/            um jogo por pasta
 ```

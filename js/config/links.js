@@ -22,14 +22,15 @@ const LINKS = [
   { n: 'FLiNG Trainer',       u: 'https://flingtrainer.com/',                        g: 'tools',  i: ICO('flingtrainer-com') },
   { n: 'GameCopyWorld',       u: 'https://gamecopyworld.com/games/index.php',        g: 'tools',  i: ICO('gamecopyworld-com') },
   { n: 'BetterRepack',        u: 'https://dl.betterrepack.com/public/',              g: 'out',    i: ICO('dl-betterrepack-com') },
+  { n: 'CS.RIN.RU',           u: 'https://cs.rin.ru/',                               g: 'out' },
 ];
 const GAMES = [                                  // aparecem no app Jogos; adicione novos jogos aqui
   { n: 'DOOM', file: 'DOOM.exe', u: './games/doom/index.html', g: 'game', e: '👹', local: true, max: true },
-  { n: 'Smithing', file: 'Smithing.exe', u: './games/smithing/index.html', g: 'game', e: '⚒️', local: true, max: true },
-  { n: 'Combate', file: 'Combate.exe', u: './games/combate/index.html', g: 'game', e: '⚔️', local: true, max: true },
-  { n: 'Colônia', file: 'Colonia.exe', u: './games/colonia/index.html', g: 'game', e: '🏕️', local: true, max: true },
-  { n: 'Bastião', file: 'Bastiao.exe', u: './games/bastiao/index.html', g: 'game', e: '🏰', local: true, max: true },
-  { n: 'Adventure', file: 'Adventure.exe', u: './games/adventure/index.html', g: 'game', e: '🗡️', local: true, max: true },
+  { n: 'Smithing Shop', file: 'SmithingShop.exe', u: './games/smithing/index.html', g: 'game', e: '⚒️', local: true, max: true },
+  { n: "Hero's Journey", file: 'HerosJourney.exe', u: './games/combate/index.html', g: 'game', e: '⚔️', local: true, max: true },
+  { n: 'Sim Colony', file: 'SimColony.exe', u: './games/colonia/index.html', g: 'game', e: '🏕️', local: true, max: true },
+  { n: 'Zombie Fortress', file: 'ZombieFortress.exe', u: './games/bastiao/index.html', g: 'game', e: '🏰', local: true, max: true },
+  { n: 'RPG Adventure', file: 'RPGAdventure.exe', u: './games/adventure/index.html', g: 'game', e: '🗡️', local: true, max: true },
 ];
 const APPITEMS = [   // apps e jogos: aparecem na área de trabalho, na taskbar ou na dock (botão direito: "Mover para…"); tag = grupo na Loja; os jogos (cat 'jogos') ficam no app Jogos, fora da Loja
   { id: 'sys:store', tag: 'sistema', n: 'Loja', e: '🛍️', cat: 'apps', d: 'Instale e remova apps.', fn: () => openStore(), p0: 'dock' },
@@ -47,11 +48,11 @@ const APPITEMS = [   // apps e jogos: aparecem na área de trabalho, na taskbar 
   { id: 'sys:screen', tag: 'hw', n: 'Teste de monitor', e: '🖥️', cat: 'apps', d: 'Pixels mortos, FPS e Hz reais e teste de rastro (ghosting).', fn: () => openScreen(), p0: 'none' },
   { id: 'sys:paint', tag: 'util', n: 'Paint', e: '🎨', cat: 'apps', d: 'Desenhe e salve em PNG.', fn: () => openPaint(), p0: 'none' },
   { id: GAMES[0].u, n: 'DOOM', e: '👹', cat: 'jogos', d: 'Tiro em primeira pessoa clássico, rodando Freedoom.', fn: () => playGame(0), p0: 'none' },
-  { id: GAMES[1].u, n: 'Smithing', e: '⚒️', cat: 'jogos', d: 'Forje armas e armaduras no ritmo do martelo, entregue encomendas e venda no leilão.', fn: () => playGame(1), p0: 'none' },
-  { id: GAMES[2].u, n: 'Combate', e: '⚔️', cat: 'jogos', d: 'Arrume a mochila com armas e escudos, espie a mochila do inimigo e vença as lutas automáticas.', fn: () => playGame(2), p0: 'none' },
-  { id: GAMES[3].u, n: 'Colônia', e: '🏕️', cat: 'jogos', d: 'Escolha um lugar no mundo, monte o grupo e erga uma colônia: construa, escave, cace e defenda.', fn: () => playGame(3), p0: 'none' },
-  { id: GAMES[4].u, n: 'Bastião', e: '🏰', cat: 'jogos', d: 'Comande aldeões e soldados, erga muros e torres e segure ondas infinitas de zumbis num mapa hexagonal sorteado.', fn: () => playGame(4), p0: 'none' },
-  { id: GAMES[5].u, n: 'Adventure', e: '🗡️', cat: 'jogos', d: 'RPG de ação em tempo real, sozinho ou em coop com até 4 amigos: explore regiões, cumpra missões e desça à cripta.', fn: () => playGame(5), p0: 'none' },
+  { id: GAMES[1].u, n: 'Smithing Shop', e: '⚒️', cat: 'jogos', d: 'Forje armas e armaduras no ritmo do martelo, entregue encomendas e venda no leilão.', fn: () => playGame(1), p0: 'none' },
+  { id: GAMES[2].u, n: "Hero's Journey", e: '⚔️', cat: 'jogos', d: 'Arrume a mochila com armas e escudos, espie a mochila do inimigo e vença as lutas automáticas.', fn: () => playGame(2), p0: 'none' },
+  { id: GAMES[3].u, n: 'Sim Colony', e: '🏕️', cat: 'jogos', d: 'Escolha um lugar no mundo, monte o grupo e erga uma colônia: construa, escave, cace e defenda.', fn: () => playGame(3), p0: 'none' },
+  { id: GAMES[4].u, n: 'Zombie Fortress', e: '🏰', cat: 'jogos', d: 'Comande aldeões e soldados, erga muros e torres e segure ondas infinitas de zumbis num mapa hexagonal sorteado.', fn: () => playGame(4), p0: 'none' },
+  { id: GAMES[5].u, n: 'RPG Adventure', e: '🗡️', cat: 'jogos', d: 'RPG de ação em tempo real, sozinho ou em coop com até 4 amigos: explore regiões, cumpra missões e desça à cripta.', fn: () => playGame(5), p0: 'none' },
 ].map(a => Object.assign({ app: true, u: a.id, win: a.id, local: true, g: 'app' }, a));
 LINKS.push(...APPITEMS);
 const FOOTER_URL = 'https://desciclopedia.org/wiki/Especial:Aleat%C3%B3ria';
