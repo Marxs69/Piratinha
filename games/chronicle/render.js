@@ -65,8 +65,8 @@ function rebuildMap() {
     if (p >= 0) {
       if (exP && !exP[p]) fog = true;
       else if (!terrOnly && !(pc[p * 3] === 255 && pc[p * 3 + 1] === 0 && pc[p * 3 + 2] === 255)) {
-        const lum = (r * .3 + g * .59 + b * .11) / 150, k = .78;
-        r = pc[p * 3] * (k + (1 - k) * lum); g = pc[p * 3 + 1] * (k + (1 - k) * lum); b = pc[p * 3 + 2] * (k + (1 - k) * lum);
+        const lum = (r * .3 + g * .59 + b * .11) / 150, k = .78, tint = R.mode === 'pol' ? .93 + (WD.provs[p].state * 7 % 5) * .035 : 1;
+        r = pc[p * 3] * (k + (1 - k) * lum) * tint; g = pc[p * 3 + 1] * (k + (1 - k) * lum) * tint; b = pc[p * 3 + 2] * (k + (1 - k) * lum) * tint;
       }
     } else if (sea[i] >= 0 && exZ && !exZ[sea[i]]) fog = true;
     else if (WD.water[i] === 2 && exP) { const nb = prov[i + 1] >= 0 ? prov[i + 1] : prov[i - 1] >= 0 ? prov[i - 1] : prov[i + W] >= 0 ? prov[i + W] : prov[i - W]; if (nb >= 0 && !exP[nb]) fog = true; }
@@ -85,14 +85,14 @@ function rebuildMap() {
       if (occ && ((px + py) >> 2) % 2 === 0) { const c = nat(ctrl[p]).col; R0 = c[0]; G0 = c[1]; B0 = c[2]; }
       let a = 0;
       if (dx === K - 1 && eR) a = Math.max(a, eR); if (dy === K - 1 && eD) a = Math.max(a, eD);
-      if (a === 1) { R0 *= .82; G0 *= .82; B0 *= .82; } else if (a === 2) { R0 *= .62; G0 *= .62; B0 *= .62; } else if (a === 3) { R0 *= .25; G0 *= .25; B0 *= .25; } else if (a === 4) { R0 = R0 * .45; G0 = G0 * .45; B0 = B0 * .5; }
+      if (a === 1) { R0 *= .84; G0 *= .84; B0 *= .84; } else if (a === 2) { R0 *= .45; G0 *= .45; B0 *= .45; } else if (a === 3) { R0 *= .25; G0 *= .25; B0 *= .25; } else if (a === 4) { R0 = R0 * .45; G0 = G0 * .45; B0 = B0 * .5; }
       d[o] = R0; d[o + 1] = G0; d[o + 2] = B0; d[o + 3] = 255;
     }
   }
   // fronteira entre nações mais grossa: escurece também o pixel do outro lado
   if (R.mode !== 'ter') for (let y = 0; y < H - 1; y++) for (let x = 0; x < W - 1; x++) {
-    const i = y * W + x, p = prov[i]; if (p < 0) continue;
-    const q = prov[i + 1], s = prov[i + W];
+    const i = y * W + x, p = prov[i]; if (p < 0 || (exP && !exP[p])) continue;
+    let q = prov[i + 1], s = prov[i + W]; if (exP && q >= 0 && !exP[q]) q = -1; if (exP && s >= 0 && !exP[s]) s = -1;
     if (q >= 0 && own[q] !== own[p]) { const o = ((y * K) * BW + (x + 1) * K) * 4; for (let dy = 0; dy < K; dy++) { const oo = o + dy * BW * 4; d[oo] *= .35; d[oo + 1] *= .35; d[oo + 2] *= .35; } }
     if (s >= 0 && own[s] !== own[p]) { const o = (((y + 1) * K) * BW + x * K) * 4; for (let dx = 0; dx < K; dx++) { const oo = o + dx * 4; d[oo] *= .35; d[oo + 1] *= .35; d[oo + 2] *= .35; } }
   }
@@ -153,8 +153,9 @@ function drawFrame() {
     for (const p of WD.provs) {
       if (me && !me.exP[p.id]) continue; const wx = p.cx * K + K / 2, wy = p.cy * K + K / 2; if (!vis(wx, wy)) continue;
       if (z < 4 && WD.states[p.state].cap !== p.id) continue;
-      const [sx, sy] = toScreen(wx, wy), t = z < 4 ? WD.states[p.state].n : p.n;
+      const [sx, sy] = toScreen(wx, wy), stCap = WD.states[p.state].cap === p, t = z < 4 ? WD.states[p.state].n : p.n;
       c.lineWidth = 3; c.strokeStyle = 'rgba(0,0,0,.5)'; c.fillStyle = z < 4 ? '#f5e9c8' : '#fff'; c.strokeText(t, sx, sy + 14); c.fillText(t, sx, sy + 14);
+      if (stCap) { const tw = c.measureText(t).width; c.fillStyle = '#fff'; c.strokeStyle = 'rgba(0,0,0,.6)'; c.lineWidth = 1.2; c.beginPath(); c.arc(sx - tw / 2 - 7, sy + 14, 3.2, 0, Math.PI * 2); c.fill(); c.stroke(); }
     }
     c.font = 'italic 11px "Alegreya Sans", sans-serif';
     for (const zz of WD.seas) { if (me && !me.exZ[zz.id]) continue; if (!vis(zz.cx * K, zz.cy * K)) continue; const [sx, sy] = toScreen(zz.cx * K, zz.cy * K); c.fillStyle = 'rgba(200,225,255,.55)'; c.fillText(zz.n, sx, sy); }
@@ -166,6 +167,13 @@ function drawFrame() {
     for (const [a, b, t] of R.links) { const [col, w, dash] = LINK_STYLE[t]; c.strokeStyle = col; c.lineWidth = w * Math.min(1.6, z / 1.5); c.setLineDash(dash); line(a, b); if (t === 2) { c.strokeStyle = 'rgba(255,255,255,.55)'; c.lineWidth = 1; c.setLineDash([2, 5]); line(a, b); } }
     c.strokeStyle = 'rgba(255,140,0,.85)'; c.lineWidth = 1.6; c.setLineDash([7, 4]); for (const [a, b] of R.pipes) line(a, b);
     c.setLineDash([]);
+  }
+  // capitais dos países: estrela amarela
+  if (z >= .7) for (const n of S.nations) {
+    if (!n.alive || n.capital < 0 || (me && !me.exP[n.capital])) continue; const p = WD.provs[n.capital], wx = p.cx * K + K / 2, wy = p.cy * K + K / 2; if (!vis(wx, wy)) continue;
+    const [sx, sy] = toScreen(wx, wy), r = clamp(3 + z * 1.6, 4, 9), yy = sy + (z >= 2.2 ? 27 : 0);
+    c.beginPath(); for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r * .45 : r; c.lineTo(sx + Math.cos(a) * rr, yy + Math.sin(a) * rr); } c.closePath();
+    c.fillStyle = S.ctrl[n.capital] === n.id ? '#ffd23f' : '#a33'; c.strokeStyle = 'rgba(0,0,0,.75)'; c.lineWidth = 1.2; c.fill(); c.stroke();
   }
   // cercos
   for (const k in S.sieges) {

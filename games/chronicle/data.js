@@ -248,11 +248,12 @@ T('soc_charters', 'soc', 1080, 'Cartas municipais', ['soc_chancery'], { g: ['mer
 T('soc_universities', 'soc', 1100, 'Universidades', ['soc_chancery'], { b: ['university'] });
 T('soc_orders', 'soc', 1120, 'Ordens militares', ['soc_feudal'], { g: ['military_order', 'theocracy'], m: { army: .05 } });
 T('soc_scholastic', 'soc', 1200, 'Escolástica', ['soc_universities'], { m: { research: .08 }, g: ['sages'] });
-T('soc_common_law', 'soc', 1250, 'Direito comum', ['soc_charters'], { m: { stab: .05 } });
+T('soc_common_law', 'soc', 1250, 'Direito comum', ['soc_charters'], { m: { stab: .05 }, g: ['khanate'] });
 T('soc_printing', 'soc', 1450, 'Imprensa', ['soc_scholastic'], { m: { research: .12 } });
-T('soc_humanism', 'soc', 1470, 'Humanismo', ['soc_printing'], { m: { stab: .03, research: .05 } });
+T('soc_humanism', 'soc', 1470, 'Humanismo', ['soc_printing'], { m: { stab: .03, research: .05 }, g: ['principality', 'city_state', 'sultanate'] });
 T('soc_absolutism', 'soc', 1600, 'Absolutismo', ['soc_humanism', 'soc_common_law'], { g: ['absolute'], i: ['absolut'], slots: 1 });
 T('soc_scientific', 'soc', 1620, 'Revolução científica', ['soc_humanism'], { m: { research: .15 } });
+T('soc_glorious', 'soc', 1680, 'Revolução parlamentar', ['soc_scientific', 'soc_absolutism'], { g: ['parl_monarchy', 'company', 'protectorate'], m: { stab: .03 } });
 T('soc_enlightenment', 'soc', 1700, 'Iluminismo', ['soc_scientific'], { g: ['enlightened', 'constitutional'], i: ['liberal'] });
 T('soc_constitution', 'soc', 1780, 'Constitucionalismo', ['soc_enlightenment'], { g: ['parliamentary', 'presidential'], i: ['conservative', 'radical'] });
 T('soc_nationalism', 'soc', 1800, 'Nacionalismo', ['soc_constitution'], { g: ['federal', 'junta', 'caudillo'], m: { manpower: .15 } });
@@ -261,13 +262,13 @@ T('soc_unions', 'soc', 1880, 'Sindicatos', ['soc_socialism'], { g: ['syndicalist
 T('soc_mass_politics', 'soc', 1890, 'Política de massas', ['soc_unions'], { i: ['socdem', 'natpop', 'agrarian'] });
 T('soc_mass_media', 'soc', 1920, 'Comunicação de massa', ['soc_mass_politics', 'eco_electricity'], { g: ['one_party', 'totalitarian'], i: ['totalism', 'futurism'] });
 T('soc_technocracy', 'soc', 1930, 'Tecnocracia', ['soc_mass_media'], { g: ['technate'], i: ['technocrat'] });
-T('soc_welfare', 'soc', 1945, 'Estado de bem-estar', ['soc_mass_media'], { m: { stab: .1, growth: .05 } });
+T('soc_welfare', 'soc', 1945, 'Estado de bem-estar', ['soc_mass_media'], { m: { stab: .1, growth: .05 }, g: ['peoples_dem', 'mil_regime', 'social_state'] });
 T('soc_globalization', 'soc', 1990, 'Globalização', ['soc_welfare', 'eco_internet'], { i: ['neolib', 'green'], m: { trade: .1 } });
-T('soc_transhumanism', 'soc', 2020, 'Transumanismo', ['soc_globalization'], { i: ['transhum'], g: ['corporate'] });
+T('soc_transhumanism', 'soc', 2020, 'Transumanismo', ['soc_globalization'], { i: ['transhum'], g: ['corporate', 'net_state', 'surveillance'] });
 T('soc_digital_dem', 'soc', 2040, 'Democracia digital', ['soc_transhumanism'], { g: ['liquid'] });
 T('soc_ai_gov', 'soc', 2080, 'Governança algorítmica', ['soc_digital_dem', 'eco_ai'], { g: ['synthocracy'], i: ['accel'] });
-T('soc_posthuman', 'soc', 2120, 'Pós-humanismo', ['soc_ai_gov'], { i: ['posthuman'], m: { research: .2 } });
-T('soc_galactic', 'soc', 2165, 'Hegemonia orbital', ['soc_posthuman', 'nav_orbit'], { g: ['hegemony'], i: ['cosmism'] });
+T('soc_posthuman', 'soc', 2120, 'Pós-humanismo', ['soc_ai_gov'], { i: ['posthuman'], m: { research: .2 }, g: ['hive'] });
+T('soc_galactic', 'soc', 2165, 'Hegemonia orbital', ['soc_posthuman', 'nav_orbit'], { g: ['hegemony', 'star_empire'], i: ['cosmism'] });
 const TECH = Object.fromEntries(TECHS.map(t => [t.id, t]));
 const CATS = { mil: 'Militar', nav: 'Naval', eco: 'Economia', soc: 'Sociedade' };
 
@@ -338,15 +339,15 @@ VERTS.forEach(v => {
    t: título do governante · m: modificadores · coup: risco de golpe (1 = normal) · fmt: nome do país */
 const GOVS = {
   tribal:        { n: 'Chefatura tribal', cat: 'Tribal', succ: 'elect', t: 'Chefe', fmt: 'Tribo de {}', m: { tax: -.3, manpower: .3, research: -.2 }, coup: .6 },
-  tribal_conf:   { n: 'Confederação tribal', cat: 'Tribal', succ: 'council', term: 8, t: 'Chefe supremo', fmt: 'Confederação de {}', m: { tax: -.2, stab: .1, research: -.15 }, coup: .4 },
-  horde:         { n: 'Horda nômade', cat: 'Tribal', succ: 'elect', t: 'Cã', fmt: 'Horda de {}', m: { tax: -.4, army: .2, manpower: .4, prod: -.2, speed: .3 }, coup: 1.2 },
-  feudal:        { n: 'Monarquia feudal', cat: 'Monarquia', succ: 'hered', t: 'Rei', fmt: 'Reino de {}', m: { tax: -.1, manpower: .2 }, coup: .5 },
-  elective:      { n: 'Monarquia eletiva', cat: 'Monarquia', succ: 'elect', t: 'Rei eleito', fmt: 'Reino de {}', m: { tax: -.05, research: .05, stab: -.05 }, coup: .4 },
+  tribal_conf:   { n: 'Confederação tribal', until: 1750, next: 'feudal', cat: 'Tribal', succ: 'council', term: 8, t: 'Chefe supremo', fmt: 'Confederação de {}', m: { tax: -.2, stab: .1, research: -.15 }, coup: .4 },
+  horde:         { n: 'Horda nômade', until: 1500, next: 'khanate', cat: 'Tribal', succ: 'elect', t: 'Cã', fmt: 'Horda de {}', m: { tax: -.4, army: .2, manpower: .4, prod: -.2, speed: .3 }, coup: 1.2 },
+  feudal:        { n: 'Monarquia feudal', until: 1800, next: 'absolute', cat: 'Monarquia', succ: 'hered', t: 'Rei', fmt: 'Reino de {}', m: { tax: -.1, manpower: .2 }, coup: .5 },
+  elective:      { n: 'Monarquia eletiva', until: 1800, next: 'constitutional', cat: 'Monarquia', succ: 'elect', t: 'Rei eleito', fmt: 'Reino de {}', m: { tax: -.05, research: .05, stab: -.05 }, coup: .4 },
   absolute:      { n: 'Monarquia absoluta', cat: 'Monarquia', succ: 'hered', t: 'Rei', fmt: 'Reino de {}', m: { tax: .15, stab: .1, research: -.05, manpower: .1 }, coup: .3 },
   enlightened:   { n: 'Despotismo esclarecido', cat: 'Monarquia', succ: 'hered', t: 'Monarca', fmt: 'Reino de {}', m: { research: .15, tax: .1 }, coup: .4 },
   constitutional:{ n: 'Monarquia constitucional', cat: 'Monarquia', succ: 'hered', t: 'Monarca', fmt: 'Reino Unido de {}', m: { research: .1, prod: .1, stab: .05 }, coup: .2 },
-  empire:        { n: 'Império', cat: 'Monarquia', succ: 'hered', t: 'Imperador', fmt: 'Império de {}', m: { tax: .1, army: .1, stab: -.05 }, coup: .6, minProv: 120 },
-  merchant:      { n: 'República mercantil', cat: 'República', succ: 'term', term: 10, t: 'Doge', fmt: 'Sereníssima de {}', m: { trade: .3, tax: .1, manpower: -.2 }, coup: .3 },
+  empire:        { n: 'Império', minRank: 4, cat: 'Monarquia', succ: 'hered', t: 'Imperador', fmt: 'Império de {}', m: { tax: .1, army: .1, stab: -.05 }, coup: .6 },
+  merchant:      { n: 'República mercantil', until: 1850, next: 'parliamentary', cat: 'República', succ: 'term', term: 10, t: 'Doge', fmt: 'Sereníssima de {}', m: { trade: .3, tax: .1, manpower: -.2 }, coup: .3 },
   oligarchic:    { n: 'República oligárquica', cat: 'República', succ: 'term', term: 6, t: 'Cônsul', fmt: 'República de {}', m: { tax: .1, stab: .05 }, coup: .5 },
   parliamentary: { n: 'República parlamentar', cat: 'República', succ: 'term', term: 4, t: 'Primeiro-ministro', fmt: 'República de {}', m: { research: .15, prod: .1, manpower: -.1 }, coup: .4 },
   presidential:  { n: 'República presidencialista', cat: 'República', succ: 'term', term: 4, t: 'Presidente', fmt: 'República de {}', m: { stab: .05, prod: .1 }, coup: .7 },
@@ -365,13 +366,27 @@ const GOVS = {
   corporate:     { n: 'Corporatocracia', cat: 'Tecnocracia', succ: 'council', term: 5, t: 'CEO', fmt: '{} S.A.', m: { tax: .25, prod: .2, stab: -.15 }, coup: 1 },
   liquid:        { n: 'Democracia líquida', cat: 'República', succ: 'term', term: 2, t: 'Mediador', fmt: 'Rede de {}', m: { research: .2, stab: .1 }, coup: .2 },
   synthocracy:   { n: 'Sintocracia', cat: 'Tecnocracia', succ: 'ai', t: 'Inteligência regente', fmt: 'Núcleo de {}', m: { research: .3, prod: .25 }, coup: 0 },
+  khanate:       { n: 'Canato', until: 1800, next: 'sultanate', cat: 'Tribal', succ: 'hered', t: 'Cã', fmt: 'Canato de {}', m: { army: .15, manpower: .25, tax: -.15, speed: .2 }, coup: .9 },
+  principality:  { n: 'Principado', maxRank: 2, cat: 'Monarquia', succ: 'hered', t: 'Príncipe', fmt: 'Principado de {}', m: { tax: .05, research: .05, trade: .05 }, coup: .4 },
+  city_state:    { n: 'Cidade-Estado', maxRank: 1, until: 1900, cat: 'República', succ: 'term', term: 5, t: 'Gonfaloneiro', fmt: 'Cidade de {}', m: { trade: .25, research: .1, manpower: -.3 }, coup: .4 },
+  sultanate:     { n: 'Sultanato', minRank: 2, cat: 'Monarquia', succ: 'hered', t: 'Sultão', fmt: 'Sultanato de {}', m: { tax: .1, army: .1, stab: .03 }, coup: .7 },
+  parl_monarchy: { n: 'Monarquia parlamentar', cat: 'Monarquia', succ: 'hered', t: 'Monarca', fmt: 'Reino de {}', m: { stab: .08, tax: .05, research: .05 }, coup: .2 },
+  company:       { n: 'Companhia mercantil', cat: 'República', succ: 'council', term: 6, t: 'Governador-geral', fmt: 'Companhia de {}', m: { trade: .3, colon: .3, stab: -.05 }, coup: .5 },
+  protectorate:  { n: 'Protetorado', cat: 'Ditadura', succ: 'junta', t: 'Lorde protetor', fmt: 'Protetorado de {}', m: { army: .1, stab: .05, research: -.05 }, coup: 1.2 },
+  peoples_dem:   { n: 'Democracia popular', cat: 'Socialista', succ: 'party', t: 'Presidente do conselho', fmt: 'República Democrática de {}', m: { prod: .1, stab: .08, trade: -.1 }, coup: .4 },
+  mil_regime:    { n: 'Regime militar', cat: 'Ditadura', succ: 'junta', t: 'Presidente militar', fmt: 'República de {}', m: { army: .15, stab: .05, research: -.05 }, coup: 1.5 },
+  social_state:  { n: 'Estado social', cat: 'República', succ: 'term', term: 4, t: 'Chanceler', fmt: 'República Federal de {}', m: { stab: .12, growth: .05, tax: .05 }, coup: .2 },
+  net_state:     { n: 'Estado-rede', cat: 'Tecnocracia', succ: 'council', term: 4, t: 'Coordenador', fmt: 'Rede de {}', m: { research: .2, trade: .1, stab: -.05 }, coup: .4 },
+  surveillance:  { n: 'Estado de vigilância', cat: 'Ditadura', succ: 'party', t: 'Guardião', fmt: 'Estado de {}', m: { stab: .2, research: -.05, coup: 0 }, coup: .1 },
+  hive:          { n: 'Coletivo-colmeia', cat: 'Tecnocracia', succ: 'ai', t: 'Mente coletiva', fmt: 'Colmeia de {}', m: { prod: .3, research: .2, stab: .1, growth: -.1 }, coup: 0 },
+  star_empire:   { n: 'Império estelar', minRank: 4, cat: 'Monarquia', succ: 'hered', t: 'Imperador estelar', fmt: 'Império Estelar de {}', m: { tax: .15, army: .15, research: .1 }, coup: .4 },
   hegemony:      { n: 'Hegemonia orbital', cat: 'Tecnocracia', succ: 'council', term: 10, t: 'Hegemon', fmt: 'Hegemonia de {}', m: { tax: .1, prod: .1, research: .1, army: .1, stab: .1 }, coup: .2 },
 };
 
-/* ---------- níveis de título (como no CK3): limitam quantas províncias o país sustenta ----------
+/* ---------- níveis de título (como no CK3): limitam quantos estados o país sustenta (Limite de domínio) ----------
    cap: províncias sem perder estabilidade · req: mínimo para proclamar o nível · no nível 3 cada governo usa o próprio nome (fmt/t) */
 const RANK_N = ['Baronia', 'Condado', 'Ducado', 'Reino', 'Império'];
-const RANK_CAP = [10, 25, 60, 150, 1e9], RANK_REQ = [0, 6, 16, 40, 100];
+const RANK_CAP = [2, 4, 9, 22, 1e9], RANK_REQ = [0, 2, 4, 8, 18];   // em estados (inteiros ou não)
 const RANKSET = {
   Monarquia:   { f: ['Baronato de {}', 'Condado de {}', 'Ducado de {}', null, 'Império de {}'], t: ['Barão', 'Conde', 'Duque', null, 'Imperador'] },
   Tribal:      { f: ['Clã de {}', 'Tribo de {}', 'Chefado de {}', 'Alto Reino de {}', 'Grande Horda de {}'], t: ['Chefe de clã', 'Chefe', 'Grande chefe', 'Alto rei', 'Grão-cã'], f3for: ['tribal'] },
@@ -470,13 +485,21 @@ const svcName = (k, y) => { let n = SVC[k].names[0][1]; for (const [a, x] of SVC
 
 /* ---------- leis (cada uma tem opções com modificadores; trocar custa estabilidade) ---------- */
 const LAWS = {
-  tax:   { n: 'Impostos', o: { low: { n: 'Baixos', m: { tax: -.2, stab: .08, growth: .03 } }, normal: { n: 'Normais', m: {} }, high: { n: 'Altos', m: { tax: .2, stab: -.08 } }, extort: { n: 'Extorsivos', m: { tax: .4, stab: -.2, growth: -.1 } } } },
+  tax:   { eco: 1, n: 'Impostos', o: { low: { n: 'Baixos', m: { tax: -.2, stab: .08, growth: .03 } }, normal: { n: 'Normais', m: {} }, high: { n: 'Altos', m: { tax: .2, stab: -.08 } }, extort: { n: 'Extorsivos', m: { tax: .4, stab: -.2, growth: -.1 } } } },
   draft: { n: 'Recrutamento', o: { volunteer: { n: 'Voluntários', m: { manpower: -.4, prod: .05 } }, limited: { n: 'Limitado', m: {} }, wide: { n: 'Amplo', m: { manpower: .3, prod: -.05 } }, total: { n: 'Mobilização total', m: { manpower: .8, prod: -.15, stab: -.05 }, req: 'mil_conscription' } } },
-  trade: { n: 'Comércio', o: { free: { n: 'Livre comércio', m: { trade: .15, prod: -.03 }, req: 'eco_mercantilism' }, normal: { n: 'Tarifas moderadas', m: {} }, protect: { n: 'Protecionismo', m: { trade: -.1, prod: .06 } }, autarky: { n: 'Autarquia', m: { trade: -.4, prod: .08, stab: .03 } } } },
+  trade: { eco: 1, n: 'Comércio', o: { free: { n: 'Livre comércio', m: { trade: .15, prod: -.03 }, req: 'eco_mercantilism' }, normal: { n: 'Tarifas moderadas', m: {} }, protect: { n: 'Protecionismo', m: { trade: -.1, prod: .06 } }, autarky: { n: 'Autarquia', m: { trade: -.4, prod: .08, stab: .03 } } } },
   spend: { n: 'Gastos públicos', o: { austerity: { n: 'Austeridade', m: { stab: -.05 }, svc: .5 }, normal: { n: 'Equilibrados', m: {}, svc: 1 }, welfare: { n: 'Bem-estar social', m: { stab: .08, growth: .05 }, svc: 1.6, req: 'soc_welfare' } } },
   press: { n: 'Imprensa', o: { censored: { n: 'Censurada', m: { stab: .05, research: -.05 } }, regulated: { n: 'Regulada', m: {} }, free: { n: 'Livre', m: { research: .06, stab: -.03 }, req: 'soc_printing' } } },
+  currency: { eco: 1, n: 'Moeda', o: { metal: { n: 'Moeda metálica', m: {} }, paper: { n: 'Papel-moeda', m: { tax: .05, trade: .05, stab: -.02 }, req: 'eco_banking' }, gold: { n: 'Padrão-ouro', m: { trade: .1, stab: .03, prod: -.03 }, req: 'eco_steam' }, fiat: { n: 'Moeda fiduciária', m: { prod: .06, tax: .05, stab: -.03 }, req: 'soc_welfare' }, digital: { n: 'Moeda digital', m: { tax: .08, trade: .1 }, req: 'eco_internet' } } },
+  bank:  { eco: 1, n: 'Sistema bancário', o: { none: { n: 'Agiotas', m: {} }, private: { n: 'Bancos privados', m: { prod: .04, trade: .04, stab: -.02 }, req: 'eco_banking' }, central: { n: 'Banco central', m: { stab: .04, tax: .04 }, req: 'eco_doubleentry' }, state: { n: 'Banco estatal', m: { prod: .06, trade: -.06 }, req: 'soc_socialism' } } },
+  labor: { n: 'Trabalho', o: { serfdom: { n: 'Servidão', m: { tax: .05, prod: -.05, stab: -.03 } }, free: { n: 'Trabalho livre', m: {} }, unions: { n: 'Sindicatos', m: { stab: .05, prod: -.03 }, req: 'soc_unions' }, collective: { n: 'Coletivizado', m: { prod: .08, stab: -.06 }, req: 'soc_socialism' } } },
+  land:  { n: 'Terra', o: { feudal: { n: 'Feudal', m: { manpower: .1, prod: -.04 } }, private: { n: 'Propriedade privada', m: { prod: .05, food: .05 }, req: 'soc_common_law' }, reform: { n: 'Reforma agrária', m: { food: .1, stab: .04, tax: -.03 }, req: 'soc_mass_politics' }, collective: { n: 'Fazendas coletivas', m: { food: -.05, prod: .05 }, req: 'soc_socialism' } } },
+  edu:   { n: 'Educação', o: { clergy: { n: 'Do clero', m: { stab: .03 } }, public: { n: 'Pública', m: { research: .08 }, req: 'soc_enlightenment' }, mandatory: { n: 'Obrigatória', m: { research: .15, prod: .03 }, req: 'soc_nationalism' } } },
+  health:{ n: 'Saúde', o: { charity: { n: 'Caridade', m: {} }, public: { n: 'Pública', m: { growth: .08 }, req: 'soc_enlightenment' }, universal: { n: 'Universal', m: { growth: .15, stab: .05 }, req: 'soc_welfare' } } },
+  police:{ n: 'Policiamento', o: { militia: { n: 'Milícias locais', m: {} }, police: { n: 'Polícia nacional', m: { stab: .05, coup: -.2 }, req: 'soc_nationalism' }, secret: { n: 'Polícia secreta', m: { stab: .08, coup: -.5, research: -.04 }, req: 'soc_mass_media' } } },
+  vote:  { n: 'Sufrágio', o: { nobles: { n: 'Só nobres', m: {} }, census: { n: 'Censitário', m: { stab: .03 }, req: 'soc_constitution' }, universal: { n: 'Universal', m: { stab: .06, research: .03 }, req: 'soc_mass_politics' } } },
 };
-const LAW_DEF = { tax: 'normal', draft: 'limited', trade: 'normal', spend: 'normal', press: 'regulated' };
+const LAW_DEF = { tax: 'normal', draft: 'limited', trade: 'normal', spend: 'normal', press: 'regulated', currency: 'metal', bank: 'none', labor: 'free', land: 'feudal', edu: 'clergy', health: 'charity', police: 'militia', vote: 'nobles' };
 
 /* ---------- espaço: foguete de cada vertente e a lua sorteada em cada partida ---------- */
 const ROCKETS = { none: 'Foguete químico', clock: 'Foguete de corda', steam: 'Foguete a vapor', tesla: 'Canhão eletromagnético', diesel: 'Foguete a diesel', atom: 'Foguete nuclear', bio: 'Nave orgânica', cyber: 'Lançador em rede', solar: 'Vela solar', nano: 'Elevador de nanotubos', space: 'Nave estelar' };
