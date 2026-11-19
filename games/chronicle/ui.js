@@ -416,6 +416,45 @@ function modTable(b, n) {
     const r = el('div', 'brow'); r.append(el('span', 'nm', MODS[k] || 'Risco de golpe'), el('span', 'lv ' + ((k === 'coup' ? -v : v) >= 0 ? 'good' : 'bad'), sgn(v))); tip(r, modBreakTip(n, k)); c.append(r); });
   b.append(c);
 }
+/* corte: prestígio, sucessão, opinião, segredos, educação e esquemas (nomes mudam com a era e o governo) */
+function opBar(v) { const d = el('div', 'opbar'), f = el('div', 'opfill'); const x = (v ?? 0) / 100; f.style.left = x < 0 ? (50 + x * 50) + '%' : '50%'; f.style.width = Math.abs(x) * 50 + '%'; f.style.background = x < 0 ? '#e5636b' : '#8fd17f'; d.append(f); return d; }
+function winCourt(b, n) {
+  const msg = el('div', 'msg'), c = el('div', 'cols'), pv = n.pres ?? 50;
+  const pc = el('div', 'card'); pc.append(tip(el('h4', '', '👑 ' + presName(n) + ' · ' + Math.round(pv)), 'Sobe com vitórias, investidura e segredos expostos; cai com derrotas e esquemas descobertos. Volta devagar a 50.\nCada 10 acima de 50: estabilidade +2% e risco de golpe −10%. Também melhora a opinião da corte.'), bar(pv / 100, '#e8c25a')); c.append(pc);
+  const sc = el('div', 'card'), law = LAWS.succ.o[n.laws.succ], hered = GOVS[n.gov].succ === 'hered';
+  sc.append(el('h4', '', '⚜️ Sucessão'));
+  if (!hered) sc.append(el('div', 'dim', GOVS[n.gov].n + ': ' + ({ elect: 'eleição', term: 'mandatos', council: 'escolha do conselho', theo: 'o clero escolhe', junta: 'a junta escolhe', ai: 'a máquina decide' }[GOVS[n.gov].succ] || 'regras próprias')));
+  else { const kids = (n.kids || []).slice().sort((a, b) => a.born - b.born); sc.append(tip(el('div', '', 'Lei: ' + law.n), law.d + '\nMude na aba Leis.'), el('div', 'dim', kids.length ? 'Herdeiro: ' + charName(kids[0]) + ' · ' + ageOf(kids[0]) + ' anos' : 'Sem herdeiros: crise de sucessão ou união pessoal'));
+    if (n.regent) sc.append(el('div', 'gold', 'Regência de ' + charName(n.regent) + ' até ' + charName(n.ruler) + ' fazer 16 anos')); }
+  c.append(sc); b.append(c);
+  // personagens
+  const t = el('table', 't'); t.style.marginTop = '12px'; const h = t.insertRow(); ['Personagem', 'Cargo', 'Idade', 'Opinião', 'Segredo', ''].forEach(x => h.append(el('th', '', x)));
+  const rows = [...COUNCIL.map(([k]) => [n.council[k], roleName(n, k), k]), [n.spouse, roleName(n, 'spouse'), null], ...(n.kids || []).map(k => [k, k.f ? 'Herdeira' : 'Herdeiro', null])].filter(x => x[0]);
+  rows.forEach(([ch, role, slot]) => { const r = t.insertRow(); r.insertCell().append(tip(el('span', '', charName(ch)), ch.tr.map(traitTip).join('\n\n'))); r.insertCell().textContent = role; r.insertCell().textContent = ageOf(ch) + '';
+    const oc = r.insertCell(); oc.style.width = '120px'; oc.append(tip(opBar(ch.op), 'Opinião sobre o governante: ' + Math.round(ch.op ?? 0) + '\n' + (opParts(n, ch).map(([k, v]) => k + ' ' + (v > 0 ? '+' : '') + v).join('\n') || 'Indiferente') + (slot ? '\nAbaixo de −30, conspira (risco de golpe).' : '')));
+    const se = r.insertCell(); if (ch.secK && ch.sec) { se.append(tip(el('span', '', SECRETS[ch.sec].e + ' ' + SECRETS[ch.sec].n), 'Descoberto pelo ' + roleName(n, 'spymaster').toLowerCase()));
+      if (ch.secK === 1) { se.append(btn('Chantagear', () => { msg.textContent = useSecret(n, ch, 'blackmail'); drawWin(); }, 'sm', '', 'Fica com medo: opinião +30 e não conspira por 10 anos'));
+        if (slot) se.append(btn('Expor', () => { msg.textContent = useSecret(n, ch, 'expose'); drawWin(); }, 'sm red', '', 'Cai em desgraça e deixa o cargo; ' + presName(n).toLowerCase() + ' +3')); } }
+    else se.append(el('span', 'dim', '—'));
+    const ac = r.insertCell(); const a = ageOf(ch);
+    if (!slot && n.kids && n.kids.includes(ch) && a < 16) { const sel = el('select'); COUNCIL.forEach(([k]) => sel.append(new Option('Tutor: ' + roleName(n, k), k))); sel.value = ch.tut || ''; sel.onchange = () => { ch.tut = sel.value; drawWin(); }; ac.append(tip(sel, 'Aos 16 anos: +3 no atributo do tutor e, com sorte, um traço dele (' + (ch.tut ? TUTOR_TR[ch.tut].map(x => TRAITS[x].n.toLowerCase()).join(', ') : 'escolha um tutor') + ')')); }
+  });
+  b.append(t);
+  // esquemas
+  const ec = el('div', 'card'); ec.style.marginTop = '12px'; ec.append(tip(el('h4', '', '🕵️ Esquemas · força ' + Math.round(schemePower(n))), 'Força: astúcia do ' + roleName(n, 'spymaster').toLowerCase() + ' e metade da do governante (conspiradores +5).\nUm esquema por vez; contra outro país, a força deles atrapalha e o risco de ser descoberto sobe.\nDescoberto: ' + presName(n).toLowerCase() + ' −10 (e relação −50 com o alvo).'));
+  if (n.scheme) { const s0 = n.scheme; ec.append(el('div', '', schemeTxt(n, s0)), bar(s0.prog, '#b48be0'), btn('Cancelar', () => { n.scheme = null; drawWin(); }, 'sm')); }
+  else {
+    const fs = S.nations.filter(o => o.alive && o.id !== n.id && n.exP[o.capital]).sort((a, b) => (n.rel[a.id] || 0) - (n.rel[b.id] || 0));
+    Object.keys(SCHEMES).forEach(k => { const d = SCHEMES[k], r = el('div', 'row'); r.append(tip(el('b', 'nm', schemeName(k)), d.d + '\nCusto 💰' + schemeCost(k) + ' · cerca de ' + d.m + ' meses'));
+      const sel = el('select'); if (d.tgt !== 'foreign') COUNCIL.forEach(([s0]) => sel.append(new Option(roleName(n, s0) + ': ' + charName(n.council[s0]) + ' (' + Math.round(n.council[s0].op ?? 0) + ')', 'own:' + s0)));
+      if (d.tgt !== 'own') fs.slice(0, 40).forEach(o => sel.append(new Option(natName(o) + ' (' + Math.round(n.rel[o.id] || 0) + ')', 'nat:' + o.id)));
+      r.append(sel, btn('Começar (💰' + schemeCost(k) + ')', () => { const [ty, v] = sel.value.split(':'); msg.textContent = startScheme(n, k, ty === 'own' ? { own: v } : { nat: +v }); drawWin(); drawTop(); }, 'sm', n.money < schemeCost(k) ? 'Sem dinheiro' : ''));
+      ec.append(r); });
+  }
+  const intel = Object.entries(n.intel || {}).filter(([id]) => nat(+id).alive); if (intel.length) { ec.append(el('h4', '', 'Segredos de outros governantes'));
+    intel.forEach(([id, I]) => { const o = nat(+id), r = el('div', 'brow'); r.append(el('span', 'nm', charName(o.ruler) + ' · ' + natName(o) + ' · ' + SECRETS[I.sec].e + ' ' + SECRETS[I.sec].n), btn('Expor', () => { msg.textContent = exposeForeign(n, +id); drawWin(); }, 'sm red', o.ruler.id !== I.cid ? 'Outro governante agora' : '', presName(o) + ' deles −15 e estabilidade −8; o seu +3')); ec.append(r); }); }
+  b.append(ec, msg);
+}
 /* fé oficial: doutrina, fervor, chefe religioso e guerra santa */
 function winFaith(b, n) {
   const R0 = RELIGIONS[REL_IDS[n.relig]], F = faithOf(n.relig), h = headOf(n.relig), msg = el('div', 'msg'), c = el('div', 'cols');
@@ -439,14 +478,15 @@ function winFaith(b, n) {
   b.append(hw, msg);
 }
 function winGov(b) {
-  const n = me(), msg = el('div', 'msg'), tab = tabs(b, 'govTab', [['gov', '🏛️ Governo'], ['ideo', '⚑ Ideologia'], ['faith', '🙏 Fé'], ['laws', '📜 Leis'], ['mods', '📊 Modificadores']]);
+  const n = me(), msg = el('div', 'msg'), tab = tabs(b, 'govTab', [['gov', '🏛️ Governo'], ['court', '🕯️ Corte'], ['ideo', '⚑ Ideologia'], ['faith', '🙏 Fé'], ['laws', '📜 Leis'], ['mods', '📊 Modificadores']]);
+  if (tab === 'court') { winCourt(b, n); return; }
   if (tab === 'faith') { winFaith(b, n); return; }
   if (tab === 'laws') { lawGrid(b, n, false, msg); return; }
   if (tab === 'mods') { modTable(b, n); return; }
   if (tab === 'ideo') {
     const inf = ideoInfluence(n), c = el('div', 'card'); c.append(el('h4', '', 'Ideologia atual: ' + IDEOS[n.ideo].n), modChips(IDEOS[n.ideo].m));
     c.append(el('h4', '', 'Influência do governante e do conselho'));
-    const who = [[titleOf(n), n.ruler, 3], ...COUNCIL.map(([k, t]) => [t, n.council[k], 1])];
+    const who = [[titleOf(n), n.ruler, 3], ...COUNCIL.map(([k]) => [roleName(n, k), n.council[k], 1])];
     Object.entries(inf).sort((a, b) => b[1] - a[1]).forEach(([i, v]) => { const r = el('div', 'brow'); r.append(el('span', 'nm', IDEOS[i].n), el('span', 'lv', v + '')); tip(r, who.filter(([, ch]) => ch && ch.ld === i).map(([t, ch, w]) => t + ' ' + charName(ch) + ' (+' + w + ')').join('\n')); c.append(r, bar(v / 8, IDEOS[i].col)); });
     c.append(tip(el('small', 'dim', 'Mudar para uma ideologia com influência custa menos estabilidade; em eleições, os partidos influentes ganham apoio.'), 'Troque conselheiros para mudar a influência.'));
     b.append(c);
@@ -472,7 +512,7 @@ function winGov(b) {
   b.append(top);
   if (n.senior != null) b.append(el('p', 'gold', (n.subj ? SUBJECTS[n.subj.tier].n : 'Súdito') + ' de ' + natName(nat(n.senior)) + ' · liberdade ' + Math.round(n.subj ? n.subj.lib : 0) + '%.'));
   const cc = el('div', 'cols'); cc.style.marginTop = '12px';
-  COUNCIL.forEach(([k, t, s]) => cc.append(cardL(n.council[k], t, btn('Trocar (💰' + councilCost() + ')', () => councilPick(k, t), 'sm', '', 'Escolha entre 3 candidatos. Este cargo usa ' + STATS[s].n + '.'))));
+  COUNCIL.forEach(([k, , s]) => { const t = roleName(n, k); cc.append(cardL(n.council[k], t, btn('Trocar (💰' + councilCost() + ')', () => councilPick(k, t), 'sm', '', 'Escolha entre 3 candidatos. Este cargo usa ' + STATS[s].n + '.'))); });
   b.append(el('h3', 'gold', 'Conselho'), cc, msg);
   const dm = demandsOf(n), dc = el('div', 'card'); dc.style.marginTop = '12px';
   dc.append(tip(el('h4', '', '🗡️ Exigências · pressão do conselho ' + Math.round(n.press || 0) + '%'), 'Cada conselheiro pode querer uma forma de governo, uma lei ou uma ideologia — sempre algo que o país já pode adotar.\nExigências de conselheiros não atendidas aumentam a pressão (mais rápido com estabilidade baixa, classe alta insatisfeita e governos propensos a golpe).\nEm 100%, o conselheiro mais exigente toma o poder e impõe tudo o que queria.\nAs vontades do próprio governante custam −2 de estabilidade cada.'), bar((n.press || 0) / 100, (n.press || 0) > 70 ? '#e5636b' : '#d9b45a'));

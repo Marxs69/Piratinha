@@ -33,7 +33,7 @@ function deathChance(c) {                                    // por mês; dispar
 }
 function charMonthly(n) {
   const g = GOVS[n.gov], R = n.ruler, y = curYear();
-  for (const [k, t] of COUNCIL) { const c = n.council[k]; if (c && chance(deathChance(c))) { n.council[k] = mkChar(n, { boost: t ? COUNCIL.find(x => x[0] === k)[2] : null, dyn: newDynasty(n) }); if (n.id === S.player) log(t + ' ' + charName(c) + ' morreu aos ' + ageOf(c) + ' anos; um substituto assumiu.', 'info', [n.id]); } }
+  for (const [k, t] of COUNCIL) { const c = n.council[k]; if (c && chance(deathChance(c))) { n.council[k] = mkChar(n, { boost: t ? COUNCIL.find(x => x[0] === k)[2] : null, dyn: newDynasty(n) }); if (n.id === S.player) log(roleName(n, k) + ' ' + charName(c) + ' morreu aos ' + ageOf(c) + ' anos; um substituto assumiu.', 'info', [n.id]); } }
   if (n.spouse && chance(deathChance(n.spouse))) { if (n.id === S.player) log('Morreu ' + charName(n.spouse) + ', cônjuge do governante.', 'info', [n.id]); n.spouse = null; }
   if (g.succ === 'hered' && !n.spouse && ageOf(R) >= 16 && ageOf(R) < 60 && chance(.02)) n.spouse = mkChar(n, { f: !R.f, dyn: newDynasty(n), age: Math.max(16, ageOf(R) - 3) });
   if (n.senior != null && (!n.subj || n.subj.tier === 'union')) { const s = nat(n.senior); if (s.alive && GOVS[s.gov].succ === 'hered') { n.ruler = s.ruler; n.dyn = s.dyn; return; } freeSubject(n, null); succeed(n, false); return; }
@@ -49,8 +49,7 @@ function charMonthly(n) {
 function succeed(n, death) {
   const g = GOVS[n.gov], old = n.ruler;
   if (g.succ === 'hered') {
-    const heirs = (n.kids || []).filter(k => ageOf(k) >= 0).sort((a, b) => a.born - b.born);
-    if (heirs.length) { n.ruler = heirs[0]; n.kids = heirs.slice(1); n.spouse = ageOf(n.ruler) >= 16 ? mkChar(n, { f: !n.ruler.f, dyn: newDynasty(n), age: ageOf(n.ruler) }) : null; if (ageOf(n.ruler) < 16) { n.stab -= 8; log('Regência em ' + natName(n) + ': ' + charName(n.ruler) + ' tem só ' + ageOf(n.ruler) + ' anos.', 'info', [n.id]); } }
+    if (lawSuccession(n)) { /* lei de sucessão (sim/court.js) */ }
     else if (tryUnion(n)) { calcMods(n); return; }
     else { n.ruler = mkChar(n, { ruler: true }); n.spouse = mkChar(n, { f: !n.ruler.f, dyn: newDynasty(n), age: ageOf(n.ruler) - 2 }); n.kids = []; n.stab -= 15; log('Crise de sucessão em ' + natName(n) + ': um parente distante assume.', n.id === S.player ? 'bad' : 'info', [n.id]); }
   } else {
@@ -75,7 +74,7 @@ function coup(n) {                                           // golpe militar: o
 }
 /* exigências: o que o governante e o conselho querem e o país ainda não adotou (só conta o que já é possível adotar) */
 function demandsOf(n) {
-  const out = [], who = [[n.ruler, titleOf(n), 3, 'ruler'], ...COUNCIL.map(([k, t]) => [n.council[k], t, 1, k])];
+  const out = [], who = [[n.ruler, titleOf(n), 3, 'ruler'], ...COUNCIL.map(([k]) => [n.council[k], roleName(n, k), 1, k])];
   who.forEach(([c, t, w, slot]) => { if (!c) return;
     if (c.lg && c.lg !== n.gov && govOk(n, c.lg)) out.push({ ty: 'gov', v: c.lg, w, c, t, slot });
     if (c.ll && n.laws[c.ll.k] !== c.ll.o && lawOk(n, c.ll.k, c.ll.o)) out.push({ ty: 'law', k: c.ll.k, v: c.ll.o, w, c, t, slot });

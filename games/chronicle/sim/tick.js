@@ -33,7 +33,7 @@ function projTick(n) {                                          // reivindicaç�
 const aiTick = n => { if (n.id !== S.player) ai(n); };
 const aliveEvents = n => { if (n.alive) eventsTick(n); };
 /* por país vivo, todo mês */
-const NATION_MONTH = [calcMods, researchTick, worksTick, mpStabTick, projTick, supportTick, slaveTick, unrestTick, pressTick, charMonthly, tmodTick, aliveEvents, aiTick];
+const NATION_MONTH = [calcMods, researchTick, worksTick, mpStabTick, projTick, supportTick, slaveTick, unrestTick, pressTick, charMonthly, courtTick, tmodTick, aliveEvents, aiTick];
 
 function nanGuard() { if (S.nations.some(n => n.alive && !Number.isFinite(n.money + n.stab + n.manpower + (n.income || 0)))) repairGame(false); }   // nunca deixa um −NaN se espalhar
 function mineStates() { S._mine = S.nations.map(() => []); WD.states.forEach(st => { const o = S.own[st.cap]; if (o >= 0 && S.ctrl[st.cap] === o) S._mine[o].push(st); }); }

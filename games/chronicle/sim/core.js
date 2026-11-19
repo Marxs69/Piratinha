@@ -73,16 +73,16 @@ const MOD_SOURCES = [
   n => [...n.eff].filter(id => TECH[id] && TECH[id].fx.m).map(id => ['Tecnologia: ' + TECH[id].n, TECH[id].fx.m]),
   n => { if (!n.vert) return []; const v = VERT[n.vert], o = {}; for (const k in v.m) o[k] = v.m[k] * n.vlv / v.len * (.5 + .5 * (n.vsat == null ? 1 : n.vsat)); return [['Vertente: ' + v.n, o]]; },
   n => [n.ruler, ...Object.values(n.council || {})].flatMap(c => c ? c.tr.filter(t => TRAITS[t]).map(t => ['Traço ' + TRAITS[t].n + ' (' + charName(c) + ')', TRAITS[t].m]) : []),
-  n => { const R = n.ruler, C = n.council || {}, out = [];
+  n => { const R = n.regent || n.ruler, C = n.council || {}, out = [];   // na regência valem os atributos do regente
     if (R) { const o = {}; STAT_MOD.forEach(([s, k, w]) => o[k] = (R.st[s] - 8) * w); out.push(['Atributos do governante', o]); }
-    STAT_MOD.forEach(([s, k, , w]) => { const role = Object.keys(COUNCIL_STAT).find(r => COUNCIL_STAT[r] === s), c = C[role]; if (c) out.push(['Conselho: ' + COUNCIL.find(x => x[0] === role)[1], { [k]: (c.st[s] - 8) * w }]); });
-    if (C.spymaster) out.push(['Conselho: ' + COUNCIL.find(x => x[0] === 'spymaster')[1], { coup: -(C.spymaster.st.int - 8) * .04 }]);
+    STAT_MOD.forEach(([s, k, , w]) => { const role = Object.keys(COUNCIL_STAT).find(r => COUNCIL_STAT[r] === s), c = C[role]; if (c) out.push(['Conselho: ' + roleName(n, role), { [k]: (c.st[s] - 8) * w }]); });
+    if (C.spymaster) out.push(['Conselho: ' + roleName(n, 'spymaster'), { coup: -(C.spymaster.st.int - 8) * .04 }]);
     if (R) out.push(['Atributos do governante', { coup: -(R.st.int - 8) * .02 }]);
     return out; },
   n => { const gd = GOVS[n.gov], out = [], age = govAge(n);       // instituições velhas perdem legitimidade com o tempo; título pequeno demais soa como pretensão
     if (age > 0) out.push(['Governo ultrapassado há ' + age + ' anos', { stab: -Math.min(.25, .05 + age / 250), coup: Math.min(.5, age / 100) }]);
     if (gd.minRank && (n.rank || 0) < gd.minRank) out.push(['Título pequeno para o governo', { stab: -.1 }]); return out; },
-  n => Object.keys(LAWS).map(k => ['Lei: ' + LAWS[k].n + ' — ' + LAWS[k].o[n.laws[k]].n, LAWS[k].o[n.laws[k]].m]),
+  n => Object.keys(LAWS).filter(k => condOk(n, LAWS[k].o[n.laws[k]].when)).map(k => ['Lei: ' + LAWS[k].n + ' — ' + LAWS[k].o[n.laws[k]].n, LAWS[k].o[n.laws[k]].m]),   // lei sem efeito quando a condição dela não vale (ex.: sucessão numa república)
   n => { const cv = n.cov || {}; return [['Serviços públicos', { growth: (cv.health || 0) * .5, research: (cv.edu || 0) * .3, tax: (cv.adm || 0) * .15, coup: -(cv.sec || 0) * .6 }]]; },
   n => { const bf = n.bfx || {}; return [['Prédios', { army: Math.min(.3, bf.army || 0), manpower: Math.min(.4, bf.mp || 0) }]]; },
   n => n.sats ? [['Satélites', { research: Math.min(20, n.sats) * .01, trade: Math.min(20, n.sats) * .005 }]] : [],
@@ -91,7 +91,8 @@ const MOD_SOURCES = [
   n => { const cs = n.csat, cl = n.cls; if (!(cs && cl && n.popT)) return []; const mid = cl.mid / n.popT;   // a média pesquisa e paga impostos; a alta insatisfeita conspira
     return [['Classes sociais', { research: mid * .8 * cs.mid, tax: mid * .5 * cs.mid + (cs.high - .7) * .1, coup: Math.max(0, 1 - cs.high) * 1.2 }]]; },
   n => (n.tmods || []).filter(x => x.u > S.t).map(x => ['Evento: ' + x.l, x.m]),
-  n => faithMods(n),                                                                       // doutrina, fervor e excomunhão (sim/faith.js)          // modificadores temporários (EFF.mod)
+  n => faithMods(n),
+  n => courtMods(n),                                                                       // prestígio, conselho hostil e regência (sim/court.js)                                                                       // doutrina, fervor e excomunhão (sim/faith.js)          // modificadores temporários (EFF.mod)
 ];
 const modList = n => MOD_SOURCES.flatMap(f => f(n)).filter(x => x[1]);
 /* de onde vem um modificador: [[rótulo, valor]] somando fontes com o mesmo rótulo */

@@ -235,3 +235,6 @@ h4.bgrp { font: 700 11px var(--title); color: var(--dim); letter-spacing: 1px; m
 .prow.preg { margin-top: 6px; border-top: 1px solid rgba(255,255,255,.08); padding-top: 6px; }
 .prow.pst { padding-left: 22px; }
 .plist.tree { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); } .plist.tree .preg { grid-column: 1 / -1; }
+.opbar { position: relative; height: 8px; border-radius: 4px; background: rgba(255,255,255,.08); }
+.opbar::after { content: ''; position: absolute; left: 50%; top: -2px; width: 1px; height: 12px; background: rgba(255,255,255,.4); }
+.opfill { position: absolute; top: 0; height: 100%; border-radius: 4px; }

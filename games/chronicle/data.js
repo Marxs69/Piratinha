@@ -600,8 +600,9 @@ const LAWS = {
   relig: { n: 'Religião', o: { state: { n: 'Igreja de Estado', m: { stab: .04, research: -.03 }, mp: 1, d: 'Minorias religiosas: −0,8 de estabilidade por 10% da população' }, tolerant: { n: 'Tolerância', m: {}, mp: .5, when: { tech: 'soc_humanism' }, d: 'Minorias religiosas pesam metade' }, free: { n: 'Liberdade de culto', m: { research: .03 }, mp: .15, when: { tech: 'soc_enlightenment' }, d: 'Minorias quase não pesam' }, secular: { n: 'Estado laico', m: { research: .05, stab: -.02 }, mp: 0, when: { tech: 'soc_socialism' }, d: 'Nenhuma religião oficial; templos rendem menos estabilidade' } } },
   culture:{ n: 'Cidadania', o: { primary: { n: 'Só a cultura principal', m: {}, mp: 1, d: 'Minorias culturais: −0,8 de estabilidade por 10% da população e menos satisfação' }, accepted: { n: 'Culturas aceitas', m: { manpower: .05 }, mp: .5, when: { tech: 'soc_common_law' }, d: 'Minorias culturais pesam metade' }, multi: { n: 'Multiculturalismo', m: { growth: .03, manpower: .08 }, mp: .1, when: { tech: 'soc_welfare' }, d: 'Minorias quase não pesam' } } },
   women: { n: 'Mulheres', o: { patriarchy: { n: 'Patriarcado', m: {}, lab: .55, fr: .08, d: 'Força de trabalho: 55% da população' }, property: { n: 'Direito à propriedade', m: { prod: .02 }, lab: .57, fr: .12, when: { tech: 'soc_enlightenment' }, d: 'Força de trabalho: 57%' }, suffrage: { n: 'Sufrágio feminino', m: { stab: .03, prod: .03 }, lab: .6, fr: .25, when: { tech: 'soc_mass_politics' }, d: 'Força de trabalho: 60%; mais governantes mulheres' }, equality: { n: 'Igualdade plena', m: { prod: .05, research: .04, stab: .02 }, lab: .64, fr: .45, when: { tech: 'soc_welfare' }, d: 'Força de trabalho: 64%; metade dos governantes pode ser mulher' } } },
+  succ:  { n: 'Sucessão', o: { partition: { n: 'Partilha', m: { stab: .03 }, when: { succ: 'hered' }, d: 'O primogênito herda; com 2+ herdeiros adultos e 4+ estados, o segundo leva um quarto do reino como país próprio (aliado e da mesma dinastia)' }, primo: { n: 'Primogenitura', m: {}, when: { succ: 'hered', tech: 'soc_common_law' }, d: 'O primogênito herda tudo; os irmãos mais novos ficam ressentidos' }, elective: { n: 'Eletiva', m: { stab: .02 }, when: { succ: 'hered' }, d: 'O conselho escolhe o mais capaz entre herdeiros e conselheiros; nada de regência, mas a dinastia pode mudar' } } }
 };
-const LAW_DEF = { tax: 'normal', draft: 'limited', trade: 'normal', spend: 'normal', press: 'regulated', currency: 'metal', bank: 'none', labor: 'free', land: 'feudal', edu: 'clergy', health: 'charity', police: 'militia', vote: 'nobles', subsidy: 'none', company: 'guilds', hours: 'free', slavery: 'colonial', relig: 'state', culture: 'primary', women: 'patriarchy' };
+const LAW_DEF = { tax: 'normal', draft: 'limited', trade: 'normal', spend: 'normal', press: 'regulated', currency: 'metal', bank: 'none', labor: 'free', land: 'feudal', edu: 'clergy', health: 'charity', police: 'militia', vote: 'nobles', subsidy: 'none', company: 'guilds', hours: 'free', slavery: 'colonial', relig: 'state', culture: 'primary', women: 'patriarchy', succ: 'partition' };
 
 /* ---------- autonomia de culturas e religiões que não são a principal/oficial (−2 a +2; 0 = livre) ----------
    w: peso como minoria (estabilidade e satisfação) · as: assimilação/conversão por ano · ag: agitação (revoltas) */
@@ -714,6 +715,29 @@ const SUBJ_LAWS = {
   rule:    { n: 'Governo', o: { self: { n: 'Autogoverno', lib: -10, int: .5 }, advisors: { n: 'Conselheiros do suserano', lib: 0, int: 1 }, governor: { n: 'Governador nomeado', lib: 12, int: 2 } } },
 };
 const SUBJ_LAW_DEF = { tribute: 'normal', army: 'own', rule: 'advisors' };
+/* ---------- corte ----------
+   nomes dos cargos mudam com a era e o tipo de governo: [condição (cat = grupos de governo, y = a partir do ano), nome]; vale o último que servir */
+const ROLE_NAMES = {
+  chancellor: [[{}, 'Chanceler'], [{ y: 1700 }, 'Secretário de Estado'], [{ cat: ['República', 'Ditadura', 'Tecnocracia'], y: 1800 }, 'Ministro do Exterior'], [{ cat: ['Socialista'] }, 'Comissário do Exterior'], [{ cat: ['Teocracia'] }, 'Núncio']],
+  marshal:    [[{}, 'Marechal'], [{ y: 1750 }, 'Ministro da Guerra'], [{ y: 1945 }, 'Ministro da Defesa'], [{ cat: ['Socialista'] }, 'Comissário da Defesa'], [{ cat: ['Tribal'] }, 'Chefe guerreiro']],
+  steward:    [[{}, 'Tesoureiro'], [{ y: 1700 }, 'Ministro da Fazenda'], [{ y: 1930 }, 'Ministro da Economia'], [{ cat: ['Socialista'] }, 'Comissário do Plano'], [{ cat: ['Tribal'] }, 'Guardião do tesouro']],
+  spymaster:  [[{}, 'Mestre espião'], [{ y: 1800 }, 'Chefe de polícia'], [{ y: 1900 }, 'Diretor de inteligência'], [{ cat: ['Ditadura', 'Socialista'], y: 1900 }, 'Chefe da polícia secreta'], [{ cat: ['Tribal'] }, 'Olhos do chefe']],
+  scholar:    [[{}, 'Erudito'], [{ y: 1800 }, 'Ministro da Instrução'], [{ y: 1920 }, 'Ministro da Ciência'], [{ cat: ['Teocracia'] }, 'Grande teólogo'], [{ cat: ['Tribal'] }, 'Sábio']],
+  spouse:     [[{}, 'Consorte'], [{ cat: ['República', 'Ditadura', 'Socialista', 'Tecnocracia'] }, 'Cônjuge do governante']],
+  pres:       [[{}, 'Prestígio'], [{ cat: ['República'] }, 'Popularidade'], [{ cat: ['Ditadura', 'Socialista', 'Tecnocracia'] }, 'Legitimidade']],
+};
+/* segredos que um personagem pode esconder (descobertos pelo chefe da espionagem) */
+const SECRETS = { murder: { n: 'Assassinato', e: '🩸' }, affair: { n: 'Caso amoroso', e: '💋' }, embezzle: { n: 'Desvio de dinheiro', e: '💰' }, heresy: { n: 'Heresia', e: '🕯️' }, debts: { n: 'Dívidas', e: '📜' } };
+/* esquemas: alvo ('own' = conselheiro seu, 'foreign' = outro país); m = meses; risk = chance de ser descoberto por mês; names = nome pela era */
+const SCHEMES = {
+  bribe:   { tgt: 'own', m: 3, risk: .01, c: 25, names: [[860, 'Subornar'], [1900, 'Cooptar']], d: 'Opinião do conselheiro +40' },
+  spy:     { tgt: 'foreign', m: 6, risk: .02, c: 20, names: [[860, 'Espionar'], [1900, 'Operação de inteligência']], d: 'Descobre os segredos do governante deles' },
+  slander: { tgt: 'foreign', m: 8, risk: .03, c: 30, names: [[860, 'Difamar'], [1700, 'Panfletos difamatórios'], [1950, 'Campanha de desinformação']], d: 'Prestígio deles −15 e estabilidade −5' },
+  murder:  { tgt: 'any', m: 12, risk: .04, c: 60, names: [[860, 'Envenenar'], [1600, 'Assassinar'], [1900, 'Eliminar'], [1990, 'Operação encoberta']], d: 'O alvo morre (um conselheiro seu ou o governante de outro país)' },
+};
+/* o que cada tutor ensina (o conselheiro do cargo) */
+const TUTOR_TR = { chancellor: ['charismatic', 'just', 'honest'], marshal: ['brave', 'strategist', 'robust'], steward: ['diligent', 'greedy', 'builder'], spymaster: ['schemer', 'paranoid', 'cruel'], scholar: ['scholar', 'genius', 'navigator'] };
+const TRAIT_OPP = [['brave', 'craven'], ['just', 'cruel'], ['greedy', 'generous'], ['zealous', 'cynical'], ['diligent', 'lazy'], ['honest', 'schemer'], ['content', 'ambitious'], ['genius', 'slow']];
 const COUNCIL = [['chancellor', 'Chanceler', 'dip'], ['marshal', 'Marechal', 'mar'], ['steward', 'Tesoureiro', 'adm'], ['spymaster', 'Mestre espião', 'int'], ['scholar', 'Erudito', 'lea']];
 
 /* ---------- culturas: sílabas para nomes de lugares, pessoas e dinastias ---------- */

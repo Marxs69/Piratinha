@@ -37,6 +37,7 @@ const COND = {
   faithShare: { ok: (n, v) => { const r = REL_IDS.indexOf(v[0]), pt = Math.max(1, n.popT || 0); return inR(((n.rels || {})[r] || 0) / pt, v.slice(1)); }, txt: v => rTxt('Seguidores de ' + RELIGIONS[v[0]].n, v.slice(1), x => Math.round(x * 100) + '%'), ids: v => [['RELIGIONS', v[0]]] },
   flag:    { ok: (n, v) => !!(n.flags || {})[v], txt: v => 'Marca: ' + v },
   noFlag:  { ok: (n, v) => !(n.flags || {})[v], txt: v => 'Sem a marca: ' + v },
+  succ:    { ok: (n, v) => arr(v).includes(GOVS[n.gov].succ), txt: v => arr(v).includes('hered') ? 'Monarquia hereditária' : 'Sucessão: ' + arr(v).join(', ') },
   govOld:  { ok: (n, v) => (govAge(n) > 0) === v, txt: v => v ? 'Governo ultrapassado' : 'Governo atual' },
   press:   { ok: (n, v) => inR(n.press || 0, v), txt: v => rTxt('Pressão do conselho', v) },
   any:     { ok: (n, v) => v.some(c => condOk(n, c)), txt: v => 'Uma destas: ' + v.map(c => condTxt(c).join(', ')).join(' | '), sub: v => v },

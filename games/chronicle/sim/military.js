@@ -176,7 +176,7 @@ function battleDay(p, A, B) {
   const lr = L.reduce((t, a) => t + regs(a), 0), wr = Wn.reduce((t, a) => t + regs(a), 0);
   applyLoss(sl, lr * pur, w);
   if (w) { w.bp = w.bp || {}; w.bp[Wn[0].o] = (w.bp[Wn[0].o] || 0) + clamp(Math.round(lr * .5), 1, 10); }
-  Wn.forEach(a => a.xp = Math.min(1, (a.xp || 0) + .05)); L.forEach(a => { a.xp = Math.min(1, (a.xp || 0) + .015); a.fat = Math.min(1, (a.fat || 0) + .15); });
+  Wn.forEach(a => a.xp = Math.min(1, (a.xp || 0) + .05)); addPres(nat(Wn[0].o), 1); addPres(nat(L[0].o), -1); L.forEach(a => { a.xp = Math.min(1, (a.xp || 0) + .015); a.fat = Math.min(1, (a.fat || 0) + .15); });
   const ln = nat(L[0].o), wn = nat(Wn[0].o), wiped = L.reduce((t, a) => t + regs(a), 0) < wr * .1;
   L.forEach(a => { if (a.gen && chance(wiped ? .3 : .06)) { if (a.o === S.player) log('O general ' + charName(a.gen) + ' morreu em ' + WD.provs[p].n + '.', 'bad', [S.player]); a.gen = null; } });
   if (L[0].o === S.player || Wn[0].o === S.player) log('Batalha em ' + WD.provs[p].n + ': ' + natName(wn) + ' venceu ' + natName(ln) + (wiped ? ' e aniquilou o exército inimigo' : '') + ' (' + bt.d + ' dias).', Wn[0].o === S.player ? 'good' : 'bad', [S.player]);
