@@ -372,8 +372,8 @@ function govForms(b, n, msg) {
 function lawGrid(b, n, eco, msg) {
   b.append(el('h3', 'gold', (eco ? 'Leis econômicas' : 'Leis') + ' · mudar custa 💰' + lawCost() + ' e 3 de estabilidade'));
   const lw = el('div', 'laws'); Object.entries(LAWS).filter(([, L]) => !!L.eco === eco).forEach(([k, L]) => { const row = el('div', 'lawrow'); row.append(el('b', '', L.n));
-    Object.entries(L.o).forEach(([o, d]) => { const on = n.laws[k] === o, ok = !d.req || hasT(n, d.req), cd = (n.lawCd || {})[k] > S.t, op = el('div', 'opt law' + (on ? ' on' : '') + (ok ? '' : ' off'));
-      op.append(el('b', '', d.n), modChips(d.m)); tip(op, d.n + '\n' + (modLines(d.m).join('\n') || 'Sem modificadores') + (d.m.coup ? '\nRisco de golpe ' + sgn(d.m.coup) : '') + (d.svc ? '\nServiços: efeito e custo ×' + d.svc : '') + (d.d ? '\n' + d.d : '') + (ok ? '' : '\n⛔ Exige ' + TECH[d.req].n) + (cd && !on ? '\n⛔ Mudada há pouco' : ''));
+    Object.entries(L.o).forEach(([o, d]) => { const on = n.laws[k] === o, ok = lawOk(n, k, o), cd = (n.lawCd || {})[k] > S.t, op = el('div', 'opt law' + (on ? ' on' : '') + (ok ? '' : ' off'));
+      op.append(el('b', '', d.n), modChips(d.m)); tip(op, d.n + '\n' + (modLines(d.m).join('\n') || 'Sem modificadores') + (d.m.coup ? '\nRisco de golpe ' + sgn(d.m.coup) : '') + (d.svc ? '\nServiços: efeito e custo ×' + d.svc : '') + (d.d ? '\n' + d.d : '') + (ok ? '' : '\n⛔ Exige ' + condFail(n, d.when).join(', ')) + (cd && !on ? '\n⛔ Mudada há pouco' : ''));
       if (!on && ok && !cd) op.onclick = () => { const e = setLaw(n, k, o); msg.textContent = e; if (!e) refresh(); }; row.append(op); });
     lw.append(row); });
   b.append(lw, msg);

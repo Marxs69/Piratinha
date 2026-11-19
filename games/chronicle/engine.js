@@ -115,7 +115,7 @@ function validateData() {
     chkC(ev.when, w); (ev.opts || []).forEach((o, i) => { chkC(o.when, w + ' escolha ' + i); chkF(o.fx, w + ' escolha ' + i); if (!o.n) err.push(w + ' escolha ' + i + ': sem nome'); }); });
   const modOk = (m, w) => Object.keys(m || {}).forEach(k => { if (!MODS[k] && k !== 'coup') err.push(w + ': modificador desconhecido ' + k); });
   for (const g in GOVS) modOk(GOVS[g].m, 'governo ' + g); for (const i in IDEOS) modOk(IDEOS[i].m, 'ideologia ' + i); for (const t in TRAITS) modOk(TRAITS[t].m, 'traço ' + t);
-  for (const k in LAWS) for (const o in LAWS[k].o) { modOk(LAWS[k].o[o].m, 'lei ' + k + '.' + o); const r = LAWS[k].o[o].req; if (r && !TECH[r]) err.push('lei ' + k + '.' + o + ': TECH sem ' + r); }
+  for (const k in LAWS) for (const o in LAWS[k].o) { modOk(LAWS[k].o[o].m, 'lei ' + k + '.' + o); chkC(LAWS[k].o[o].when, 'lei ' + k + '.' + o); }
   TECHS.forEach(t => { const w = 'tecnologia ' + t.id; modOk(t.fx.m, w); t.req.forEach(r => { if (!TECH[r]) err.push(w + ': requisito ' + r + ' não existe'); });
     (t.fx.b || []).forEach(b => { if (!BUILDINGS[b]) err.push(w + ': prédio ' + b + ' não existe'); }); (t.fx.g || []).forEach(g => { if (!GOVS[g]) err.push(w + ': governo ' + g + ' não existe'); });
     (t.fx.i || []).forEach(i => { if (!IDEOS[i]) err.push(w + ': ideologia ' + i + ' não existe'); }); });

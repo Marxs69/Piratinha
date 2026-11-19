@@ -20,7 +20,7 @@ function leanOf(n, c) {
   }
   return c;
 }
-const lawOk = (n, k, o) => { const d = LAWS[k] && LAWS[k].o[o]; return !!d && (!d.req || hasT(n, d.req)); };
+const lawOk = (n, k, o) => { const d = LAWS[k] && LAWS[k].o[o]; return !!d && condOk(n, d.when); };   // condições da opção: COND (engine.js)
 const ageOf = c => curYear() - c.born;
 const charName = c => c.n + ' ' + c.dyn;
 function newDynasty(n) { const cul = CULTURES[n.cul]; let s = pickR(cul.a) + pickR(cul.b); return s.charAt(0).toUpperCase() + s.slice(1); }
@@ -141,7 +141,7 @@ function rename(n, name) { name = (name || '').trim().replace(/\s+/g, ' '); if (
 /* ---------- leis ---------- */
 const lawCost = () => Math.round(50 * eraScale());
 function setLaw(n, k, o) {
-  const L = LAWS[k] && LAWS[k].o[o]; if (!L) return 'Inválido'; if (L.req && !hasT(n, L.req)) return 'Exige ' + TECH[L.req].n;
+  const L = LAWS[k] && LAWS[k].o[o]; if (!L) return 'Inválido'; if (!condOk(n, L.when)) return 'Exige ' + condFail(n, L.when).join(', ');
   n.lawCd = n.lawCd || {}; if (n.lawCd[k] > S.t) return 'Mudada há pouco'; if (n.money < lawCost()) return 'Sem dinheiro';
   n.money -= lawCost(); n.laws[k] = o; n.lawCd[k] = S.t + 360 * 2; n.stab = Math.max(0, n.stab - 3); calcMods(n); return '';
 }
