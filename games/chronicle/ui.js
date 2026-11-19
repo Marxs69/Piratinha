@@ -213,7 +213,12 @@ function sideProv(sd, p) {
   }
   sideState(sd, st);
 }
-function unitTip(n, t) { const b = UNIT_BASE[t]; return unitName(n, t) + '\nAtaque ' + (b.a * n.up[t]).toFixed(2) + ' · defesa ' + (b.d * n.up[t]).toFixed(2) + '\nCusto 💰' + recCost(n, t) + ' · 1k de contingente\nManutenção sobe com a era' + (t === 'art' ? '\nAcelera cercos' : t === 'vrt' && n.vert ? '\nUnidade da vertente ' + VERT[n.vert].n + '; consome ' + GOODS[VERT[n.vert].good].n : ''); }
+function unitTip(n, t) {
+  const f = k => (unitStat(n, t, k) * (['fire', 'shock', 'def'].includes(k) ? n.up[t] : 1)).toFixed(2), nd = unitNeeds(n, t);
+  return unitName(n, t) + '\nFogo ' + f('fire') + ' · choque ' + f('shock') + ' · defesa ' + f('def') + '\nMoral ' + f('mor') + ' · letalidade ' + f('kill') + ' · movimento ' + f('spd')
+    + (UNIT_BASE[t].back ? '\nLuta da segunda linha (metade do dano) quando a primeira está cheia' : '') + '\nConsome por regimento/mês: ' + Object.keys(nd).map(g => GOODS[g].e + ' ' + GOODS[g].n.toLowerCase() + ' ' + nd[g]).join(', ')
+    + '\nCusto 💰' + recCost(n, t) + ' · 1k de contingente' + (t === 'art' ? '\nAcelera cercos' : '');
+}
 function buildingRows(n, st) {                               // prédios do estado divididos em grupos, com − e +
   const so = stateOwnerOf(st.id), B = S.bld[st.id], wrap = el('div'), groups = {};
   Object.keys(BUILDINGS).forEach(b => {
@@ -280,27 +285,51 @@ function dipButtons(t) {
   }
   out.append(msg); return out;
 }
+const VET_COL = ['#9a9a9a', '#cfcfcf', '#7fb3d5', '#b48be0', '#e8c25a'];
+const vetTip = a => { const v = vetOf(a), k = vetLv(a), nx = VET[k + 1]; return 'Veterania: ' + v.n + '\nDano e defesa ×' + v.m + ' · moral ×' + v.mo + '\n' + (nx ? 'Próximo nível (' + nx.n + ') com ' + pct(nx.x) + ' de experiência; agora ' + pct(a.xp || 0) : 'Nível máximo') + '\nSobe lutando (e, em paz, treinando até ' + VET[2].n + '). Reforços e recrutas diluem.'; };
+function battleBox(sd, p) {                                    // painel da batalha em andamento
+  const bt = S.battles[p]; if (!bt) return;
+  const c = el('div', 'card'); c.append(el('h4', '', '⚔️ Batalha · dia ' + bt.d + ' · fase de ' + (bt.ph === 'fire' ? 'fogo' : 'choque')));
+  c.append(tip(el('div', 'dim', 'Dados: ' + (bt.ra ?? 0) + ' × ' + (bt.rb ?? 0) + ' · com bônus: ' + (+(bt.pa ?? 0)).toFixed(1) + ' × ' + (+(bt.pb ?? 0)).toFixed(1) + ' · largura ' + (bt.Wa || '?') + '/' + (bt.Wb || '?')),
+    'Um dado (0–9) por lado a cada 3 dias; as fases de fogo e choque se alternam.\nBônus: general melhor (+1 a cada 4 de marcial de diferença), reconhecimento, terreno contra quem ataca (engenheiros reduzem), desembarque (−2).\nLargura: quantos regimentos lutam na primeira linha; o resto espera. Artilharia atira da segunda linha com metade do dano.'));
+  sd.append(c);
+}
 function sideArmy(sd, id) {
-  const a = S.armies.find(a => a.id === id); if (!a) { select(null); return; } const n = nat(a.o), P = WD.provs.length;
-  const h = el('div', 'side-h'); h.append(flagEl(n.flag, 'fl')); const tt = el('div'); tt.append(el('h2', '', 'Exército · ' + fmtK(regs(a))), el('small', 'dim', a.p < P ? WD.provs[a.p].n : WD.seas[a.p - P].n)); h.append(tt); sd.append(h);
-  ['inf', 'cav', 'art', 'vrt'].forEach(t => { if (a[t] > .05) sd.append(tip(el('div', 'brow', fmtK(a[t]) + ' · ' + unitName(n, t)), unitTip(n, t))); });
-  sd.append(tip(el('div', 'dim', 'Moral'), 'Cai em batalha; quem chega a zero recua.\nRecupera fora de combate, mais rápido em casa.'), bar(a.mor, '#7fe08a'));
+  const a = S.armies.find(a => a.id === id); if (!a) { select(null); return; } const n = nat(a.o), P = WD.provs.length, mine = a.o === S.player;
+  const h = el('div', 'side-h'); h.append(flagEl(n.flag, 'fl')); const tt = el('div'); tt.append(el('h2', '', 'Exército · ' + fmtK(regs(a))), el('small', 'dim', a.p < P ? WD.provs[a.p].n : WD.seas[a.p - P].n + ' (embarcado)')); h.append(tt); sd.append(h);
+  UT.forEach(t => { if (a[t] > .05) sd.append(tip(el('div', 'brow', fmtK(a[t]) + ' · ' + unitName(n, t)), unitTip(n, t))); });
+  const v = vetLv(a); sd.append(tip(el('div', '', '🎖️ ' + VET[v].n), vetTip(a)), bar(Math.min(1, (a.xp || 0) / .9), VET_COL[v]));
+  sd.append(tip(el('div', 'dim', 'Moral'), 'Cai em batalha; quem chega a zero recua.\nRecupera fora de combate: mais rápido em casa, devagar se cansado, quase nada sem suprimento (teto de 60%).'), bar(a.mor, '#7fe08a'));
+  sd.append(tip(el('div', 'dim', 'Cansaço ' + pct(a.fat || 0)), 'Marchar e lutar cansam (terreno difícil cansa mais).\nCansaço tira até 35% do dano e deixa a moral voltar mais devagar. Passa descansando com suprimento.'), bar(a.fat || 0, '#e5a35b'));
+  if (a.p < P) { const [x, why] = attritionOf(a), cap = provSupply(a.p, a.o), ok = inSupply(a);
+    sd.append(tip(el('div', x > 0 ? 'bad' : 'dim', '📦 ' + (ok ? 'Abastecido' : 'Sem linha de suprimento') + ' · suprimento ' + Math.round(cap) + 'k · atrito ' + (x * 100).toFixed(1) + '%/mês'),
+      'Suprimento: quantos regimentos amigos a província sustenta (população, terreno, estradas e logística; em casa ×1,5, ocupada ×0,6, terra sem dono ×0,35).\nLinha de suprimento: até ' + logiRange(n) + ' províncias de território amigo ou ocupado; fora dela, +2% de atrito, metade dos suprimentos e moral até 60%.' + (why.length ? '\nAgora: ' + why.join(', ') : ''))); }
   if (a.gen) sd.append(tip(el('div', 'gold', '★ General ' + charName(a.gen) + ' · ' + sgn(genMul(a.gen) - 1)), genTip(a.gen)));
-  if (a.o !== S.player) return;
-  sd.append(el('p', 'dim', a.exp ? '🧭 Explorando: vai sozinho até a terra incógnita mais próxima.' : a.path.length ? 'Marchando: ' + a.path.length + ' passos' : 'Botão direito no mapa para mover.'));
+  const sp = Object.keys(a.sup || {}); if (sp.length) { const ch = el('div', 'chips'); sp.forEach(k => ch.append(tip(el('span', 'chip p', SUPPORT[k].e + ' ' + supName(n, k)), SUPPORT[k].d))); sd.append(ch); }
+  if (a.inv) sd.append(el('p', 'gold', '⚓ Invasão de ' + WD.provs[a.inv.to].n + ': ' + { go: 'indo ao porto de ' + WD.provs[a.inv.port].n, sail: 'navegando', land: 'desembarcando', back: 'voltando ao porto' }[a.inv.st]));
+  if (a.front != null && frontById(a.front)) sd.append(el('p', 'dim', '🚩 ' + frontName(frontById(a.front)) + ' · ' + (fordOf(a.o, a.front) === 'adv' ? 'avançar' : 'defender')));
+  if (a.p < P) battleBox(sd, a.p);
+  if (!mine) return;
+  sd.append(el('p', 'dim', a.exp ? '🧭 Explorando: vai sozinho até a terra incógnita mais próxima.' : a.path.length ? 'Marchando: ' + a.path.length + ' passos' : 'Botão direito no mapa para mover; numa costa além-mar, planeja uma invasão.'));
+  const rs = el('div', 'row'); Object.keys(STANCES).forEach(k => { const d = STANCES[k]; rs.append(btn(d.e + ' ' + d.n, () => { setStance(a, k); drawSide(); }, 'sm' + ((a.st || 'bal') === k ? ' on' : ''), '', 'Postura: ' + d.n + '\n' + d.d + (d.beats ? '\nVence ' + STANCES[d.beats].n.toLowerCase() + ' (+15% de dano)' : ''))); });
+  sd.append(el('small', 'dim', 'Postura'), rs);
+  const rsu = el('div', 'row'); Object.keys(SUPPORT).forEach(k => { if (a.sup && a.sup[k]) return; rsu.append(btn(SUPPORT[k].e + ' ' + supName(n, k) + ' (💰' + supCost(n, k) + ')', () => { const e = addSupport(n, a, k); if (e) say(e, 'bad'); drawSide(); }, 'sm', !supOk(n, k) ? 'Exige ' + TECH[SUPPORT[k].tech].n : n.money < supCost(n, k) ? 'Sem dinheiro' : '', SUPPORT[k].d + '\nManutenção 💰' + (SUPPORT[k].up * eraScale()).toFixed(1) + '/mês · consome ' + Object.keys(SUPPORT[k].need).map(g => GOODS[g].n.toLowerCase()).join(', ') + '\nCompra só em território próprio')); });
+  if (rsu.children.length) sd.append(el('small', 'dim', 'Companhias de apoio'), rsu);
   const r0 = el('div', 'row');
-  r0.append(btn(a.gen ? '★ Trocar general' : '★ Nomear general', () => genPick(a), 'sm', n.money < genCost() ? 'Sem dinheiro' : '', 'Escolha entre 3 candidatos (💰' + genCost() + ').\nMarcial e traços mudam a força em batalha e nos cercos.'));
+  r0.append(btn(a.gen ? '★ Trocar general' : '★ Nomear general', () => genPick(a), 'sm', n.money < genCost() ? 'Sem dinheiro' : '', 'Escolha entre 3 candidatos (💰' + genCost() + ').\nMarcial e traços mudam a força em batalha e nos cercos; o general melhor ganha bônus no dado.'));
+  r0.append(btn(a.drill ? '🎯 Treinando' : '🎯 Treinar', () => { a.drill = !a.drill; drawSide(); }, 'sm' + (a.drill ? ' on' : ''), '', 'Em paz, parado em território próprio: +1,5% de experiência por mês até ' + VET[2].n + '.\nManutenção +50% enquanto treina.'));
   r0.append(btn(a.exp ? 'Parar exploração' : '🧭 Explorar', () => { a.exp = !a.exp; a.path = []; drawSide(); }, 'sm' + (a.exp ? ' on' : ''), a.exp ? '' : expWhy(a), 'Modo explorador: só tropa barata (infantaria, até 5 regimentos).\nAnda sozinha até a terra incógnita mais próxima, passando por qualquer território, e revela o mapa.\nEm terra de nativos perde um pouco de gente.'));
   sd.append(r0);
+  const fs = frontsOf(n.id); if (fs.length) { const rf = el('div', 'row'); fs.forEach(f => rf.append(btn('🚩 ' + frontName(f), () => { a.front = a.front === f.id ? null : f.id; a.path = []; drawSide(); }, 'sm' + (a.front === f.id ? ' on' : ''), '', 'Atribuir a este front (clique de novo para liberar).\nO exército segue a ordem do front: defender a linha ou avançar concentrado.'))); sd.append(el('small', 'dim', 'Front'), rf); }
   const r = el('div', 'row');
-  r.append(btn('Parar', () => { a.path = []; drawSide(); }, 'sm'));
-  r.append(btn('Dividir', () => { const b = addArmy(a.o, a.p, { inf: a.inf / 2, cav: a.cav / 2, art: a.art / 2, vrt: a.vrt / 2 }); ['inf', 'cav', 'art', 'vrt'].forEach(t => a[t] /= 2); a.max = regs(a); b.max = regs(b); select('armies', [a.id, b.id]); }, 'sm', regs(a) < 1 ? 'Pequeno demais' : ''));
+  r.append(btn('Parar', () => { a.path = []; if (a.inv) cancelInvasion(a); drawSide(); }, 'sm'));
+  r.append(btn('Dividir', () => { const b = splitArmy(a, .5); select('armies', [a.id, b.id]); }, 'sm', regs(a) < 1 ? 'Pequeno demais' : a.inv ? 'Em invasão' : ''));
   const here = S.armies.filter(b => b !== a && b.o === a.o && b.p === a.p);
   r.append(btn('Mesclar', () => merge([a, ...here]), 'sm', here.length ? '' : 'Nenhum outro exército aqui'));
-  r.append(btn('Desmobilizar', () => { n.manpower += regs(a); a.inf = a.cav = a.art = a.vrt = 0; S.armies = S.armies.filter(b => regs(b) > .08); select(null); drawOutl(); }, 'sm red', '', 'Os homens voltam para a reserva (contingente)'));
+  r.append(btn('Desmobilizar', () => { n.manpower += regs(a); UT.forEach(t => a[t] = 0); S.armies = S.armies.filter(b => regs(b) > .08); select(null); drawOutl(); }, 'sm red', a.inv ? 'Em invasão' : '', 'Os homens voltam para a reserva (contingente)'));
   sd.append(r);
 }
-function merge(list) { const a = list[0]; list.slice(1).forEach(b => { if (b.p !== a.p) return; ['inf', 'cav', 'art', 'vrt'].forEach(t => { a[t] += b[t]; b[t] = 0; }); a.mor = Math.min(a.mor, b.mor || 1); if (!a.gen && b.gen) a.gen = b.gen; a.exp = false; }); S.armies = S.armies.filter(b => regs(b) > .08); select('army', a.id); }
+function merge(list) { const a = list[0]; list.slice(1).forEach(b => { if (b.p !== a.p || b.inv || a.inv) return; mergeInto(a, b); a.exp = false; }); S.armies = S.armies.filter(b => regs(b) > .08); select('army', a.id); }
 function sideArmies(sd, ids) {
   const list = S.armies.filter(a => ids.includes(a.id)), P = WD.provs.length; if (!list.length) { select(null); return; }
   sd.append(el('h2', '', list.length + (list.length === 1 ? ' exército · ' : ' exércitos · ') + fmtK(list.reduce((s, a) => s + regs(a), 0))));
@@ -315,7 +344,7 @@ function sideFleet(sd, id) {
   if (f.o !== S.player) return;
   sd.append(tip(el('p', 'dim', f.auto ? 'Explorando sozinha.' : f.path.length ? 'Navegando.' : 'Botão direito num mar para navegar' + (seaExploreOk(n) ? ', até mares desconhecidos.' : '.')), seaExploreOk(n) ? 'Com Bússola, a frota navega por clique até mares desconhecidos e revela o caminho.' : 'Sem Bússola, só navega por clique em mares já conhecidos; use 🧭 Explorar para descobrir novos.'));
   const r = el('div', 'row'); r.append(btn(f.auto ? 'Parar exploração' : '🧭 Explorar', () => { f.auto = !f.auto; if (!f.auto) f.path = []; drawSide(); }, 'sm' + (f.auto ? ' on' : ''), '', 'Vai sozinha para os mares de fronteira mais próximos (desconhecidos ou com costa desconhecida) e revela o litoral'), btn('Parar', () => { f.path = []; f.auto = false; drawSide(); }, 'sm'));
-  sd.append(r, tip(el('p', 'dim', 'Transporte: ' + transport(f.o) + ' regimentos'), 'Cada navio leva 3 regimentos pelo mar. Exércitos só cruzam o mar se a soma das frotas der conta.'));
+  sd.append(r, tip(el('p', 'dim', 'Capacidade: ' + Math.floor(fleetCap(f)) + ' regimentos (' + shipCap(n) + ' por navio)' + (carriedRegs(f) ? ' · a bordo: ' + fmtK(carriedRegs(f)) : '')), 'Tropas de terra só cruzam um mar sozinhas (barcos locais, ' + FERRY_DAYS + ' dias) e se ele estiver livre de navios inimigos.\nMais longe que isso, é preciso uma invasão: o exército embarca nesta frota num porto, navega e desembarca. Se a frota perder no caminho, volta com o que sobrar.'));
   sd.append(tip(el('p', 'dim', n.fx.sea >= 2 ? '🌊 Navegação oceânica' : '🌊 Navegação costeira: o oceano só perto da costa'), 'Sem Caravela, a frota só entra em oceano que encosta em mar raso, e perde 2% dos navios a cada trecho de oceano em tempestades.\nCom Caravela (navegação oceânica) cruza qualquer oceano.'));
 }
 
@@ -657,17 +686,52 @@ function techBox(n, t) {
   if (!s) d.onclick = () => { n.res = t.id; drawWin(); drawTop(); };
   return d;
 }
+function milFronts(b, n) {
+  const fs = frontsOf(n.id);
+  if (!fs.length) { b.append(el('p', 'dim', warsOf(n.id).length ? 'Nenhuma linha de contato com o inimigo: a guerra é além-mar ou longe. Use invasões navais.' : 'Em paz: sem fronts.')); return; }
+  b.append(tip(el('p', 'dim', 'Atribua exércitos a um front e dê a ordem: defender espalha as tropas pelos pontos mais ameaçados; avançar concentra tudo no ponto mais fraco do inimigo.'), 'Os fronts são as linhas de contato entre os lados de cada guerra. Mudam sozinhos conforme o território muda de mão.'));
+  for (const f of fs) {
+    const w = S.wars.find(x => x.id === f.w), foe = nat(f.side === 'A' ? w.d : w.a), list = S.armies.filter(a => a.o === n.id && a.front === f.id);
+    const ours = list.reduce((s, a) => s + armyPower(a), 0), theirs = f.foe.reduce((s, q) => s + threatAt(q).filter(x => atWar(n.id, x.o)).reduce((t, x) => t + armyPower(x), 0), 0), ord = fordOf(n.id, f.id);
+    const c = el('div', 'card'); c.style.marginTop = '10px';
+    c.append(el('h4', '', '🚩 ' + frontName(f) + ' · contra ' + natName(foe)), el('div', 'dim', f.provs.length + ' províncias na linha · ' + list.length + ' exército' + (list.length === 1 ? '' : 's') + ' (' + fmtK(list.reduce((s, a) => s + regs(a), 0)) + ')'));
+    c.append(tip(el('div', '', 'Força: ' + Math.round(ours) + ' × ' + Math.round(theirs)), 'Força estimada dos exércitos atribuídos contra os inimigos vistos junto à linha (tipos, tecnologia, veterania, suprimento, cansaço e moral).'), bar(ours / Math.max(1, ours + theirs), ours >= theirs ? '#8fd17f' : '#e5636b'));
+    const r = el('div', 'row');
+    r.append(btn('🛡️ Defender', () => { setFord(n.id, f.id, 'hold'); frontOrders(n); drawWin(); }, 'sm' + (ord === 'hold' ? ' on' : '')), btn('⚔️ Avançar', () => { setFord(n.id, f.id, 'adv'); frontOrders(n); drawWin(); }, 'sm' + (ord === 'adv' ? ' on' : ''), '', 'Ataca quando a força concentrada passa de 1,2× a defesa do alvo'));
+    const sel = R.selArmies.filter(a => a.o === n.id && S.armies.includes(a));
+    r.append(btn('➕ Atribuir selecionados (' + sel.length + ')', () => { sel.forEach(a => { if (!a.inv && !a.exp) { a.front = f.id; a.path = []; } }); frontOrders(n); drawWin(); }, 'sm', sel.length ? '' : 'Selecione exércitos no mapa'));
+    r.append(btn('➕ Todos os livres', () => { S.armies.filter(a => a.o === n.id && a.front == null && !a.inv && !a.exp && a.p < WD.provs.length).forEach(a => a.front = f.id); frontOrders(n); drawWin(); }, 'sm'));
+    r.append(btn('Liberar', () => { list.forEach(a => a.front = null); drawWin(); }, 'sm', list.length ? '' : 'Nenhum exército'));
+    c.append(r); b.append(c);
+  }
+}
+function milUnits(b, n) {
+  const t = el('table', 't'); const h = t.insertRow(); ['Tropa', 'Fogo', 'Choque', 'Defesa', 'Moral', 'Letal.', 'Mov.', 'Consome'].forEach(x => h.append(el('th', '', x)));
+  UT.filter(ty => ty !== 'vrt' || n.vert).forEach(ty => { const r = t.insertRow(), u = r.insertCell(); u.append(tip(el('span', '', unitName(n, ty)), unitTip(n, ty)));
+    ['fire', 'shock', 'def'].forEach(k => { const c = r.insertCell(); c.className = 'n'; c.textContent = (unitStat(n, ty, k) * n.up[ty]).toFixed(2); });
+    ['mor', 'kill', 'spd'].forEach(k => { const c = r.insertCell(); c.className = 'n'; c.textContent = unitStat(n, ty, k).toFixed(2); });
+    const nd = unitNeeds(n, ty); r.insertCell().textContent = Object.keys(nd).map(g => GOODS[g].e).join(' '); });
+  b.append(t);
+  const c = el('div', 'cols'); c.style.marginTop = '12px';
+  const v = el('div', 'card'); v.append(el('h4', '', '🎖️ Veterania')); VET.forEach((x, i) => v.append(tip(el('div', 'brow', x.n + ' · dano ×' + x.m + ' · moral ×' + x.mo), 'A partir de ' + pct(x.x) + ' de experiência'))); v.append(tip(el('small', 'dim', 'Recrutas saem melhores com academias no estado e com recrutamento voluntário.'), 'Lei de recrutamento: voluntários +8% de experiência inicial; mobilização total −6%.')); c.append(v);
+  const s2 = el('div', 'card'); s2.append(el('h4', '', '🧰 Apoio')); Object.keys(SUPPORT).forEach(k => s2.append(tip(el('div', 'brow' + (supOk(n, k) ? '' : ' dim'), SUPPORT[k].e + ' ' + supName(n, k) + (supOk(n, k) ? '' : ' (exige ' + TECH[SUPPORT[k].tech].n + ')')), SUPPORT[k].d))); c.append(s2);
+  const s3 = el('div', 'card'); s3.append(el('h4', '', '📐 Posturas')); Object.keys(STANCES).forEach(k => s3.append(tip(el('div', 'brow', STANCES[k].e + ' ' + STANCES[k].n), STANCES[k].d + (STANCES[k].beats ? '\nVence ' + STANCES[STANCES[k].beats].n.toLowerCase() : '')))); c.append(s3);
+  b.append(c);
+  b.append(tip(el('p', 'dim', 'Largura de combate ' + (WIDTH_BASE + n.fx.width) + ' (× terreno) · linha de suprimento ' + logiRange(n) + ' províncias · ' + shipCap(n) + ' regimento(s) por navio'), 'Largura e logística sobem com tecnologias militares e de transporte.'));
+}
 function winMil(b) {
-  const n = me(), P = WD.provs.length, msg = el('div', 'msg');
+  const n = me(), P = WD.provs.length, msg = el('div', 'msg'), tab = tabs(b, 'milTab', [['army', '⚔️ Exército'], ['fronts', '🚩 Fronts'], ['units', '📋 Tropas e doutrina']]);
+  if (tab === 'fronts') { milFronts(b, n); return; }
+  if (tab === 'units') { milUnits(b, n); return; }
   const c = el('div', 'cols');
   const pw = el('div', 'card'); pw.append(el('h4', '', 'Exército'));
-  const t = el('table', 't'); const h = t.insertRow(); ['Tipo', 'Unidade', 'Força', 'Custo', ''].forEach(x => h.append(el('th', '', x)));
-  ['inf', 'cav', 'art', 'vrt'].filter(ty => ty !== 'vrt' || n.vert).forEach(ty => { const r = t.insertRow(); r.insertCell().textContent = { inf: 'Infantaria', cav: 'Cavalaria', art: 'Artilharia', vrt: 'Vertente' }[ty]; const u = r.insertCell(); u.textContent = unitName(n, ty); tip(u, unitTip(n, ty)); const f = r.insertCell(); f.className = 'n'; f.textContent = (n.up[ty] * UNIT_BASE[ty].a).toFixed(2); const co = r.insertCell(); co.className = 'n'; co.textContent = '💰' + recCost(n, ty); r.insertCell().append(btn('+1 na capital', () => { msg.textContent = recruit(n, ty, 1); refresh(); }, 'sm', canRecruit(n, ty, 1))); });
+  const t = el('table', 't'); const h = t.insertRow(); ['Tipo', 'Unidade', 'Fogo / choque', 'Custo', ''].forEach(x => h.append(el('th', '', x)));
+  ['inf', 'cav', 'art', 'vrt'].filter(ty => ty !== 'vrt' || n.vert).forEach(ty => { const r = t.insertRow(); r.insertCell().textContent = { inf: 'Infantaria', cav: 'Cavalaria', art: 'Artilharia', vrt: 'Vertente' }[ty]; const u = r.insertCell(); u.textContent = unitName(n, ty); tip(u, unitTip(n, ty)); const f = r.insertCell(); f.className = 'n'; f.textContent = (n.up[ty] * unitStat(n, ty, 'fire')).toFixed(1) + ' / ' + (n.up[ty] * unitStat(n, ty, 'shock')).toFixed(1); const co = r.insertCell(); co.className = 'n'; co.textContent = '💰' + recCost(n, ty); r.insertCell().append(btn('+1 na capital', () => { msg.textContent = recruit(n, ty, 1); refresh(); }, 'sm', canRecruit(n, ty, 1))); });
   pw.append(t, msg); c.append(pw);
   const st = el('div', 'card'); st.append(el('h4', '', 'Forças'), kv([['Regimentos', fmtK(S.armies.filter(a => a.o === n.id).reduce((s, a) => s + regs(a), 0))], ['Contingente', Math.floor(n.manpower) + 'k / ' + Math.floor(n.mpMax || 0) + 'k'], ['Navegação', n.fx.sea === 2 ? 'Oceânica' : n.fx.sea ? 'Costeira' : 'Nenhuma', 'Costeira: mares junto à terra. Oceânica (Caravela): mar aberto.'], ['Cerco', '×' + n.up.siege.toFixed(1)]]), modChips({ army: n.m.army, manpower: n.m.manpower, speed: n.m.speed })); c.append(st);
   const nv = el('div', 'card'); nv.append(el('h4', '', 'Marinha · ' + shipName(n)));
   const ports = provsOf(n.id).filter(p => WD.provs[p].coast && S.ctrl[p] === n.id).sort((a, b) => (S.bld[WD.provs[b].state].port || 0) - (S.bld[WD.provs[a].state].port || 0));
-  nv.append(kv([['Navios', Math.ceil(S.fleets.filter(f => f.o === n.id).reduce((s, f) => s + f.ships, 0)) + ''], ['Transporte', transport(n.id) + ' regimentos', '3 regimentos por navio'], ['Força por navio', n.fx.ship.toFixed(1)], ['Custo', '💰' + shipCost(n) + ' por navio']]));
+  nv.append(kv([['Navios', Math.ceil(S.fleets.filter(f => f.o === n.id).reduce((s, f) => s + f.ships, 0)) + ''], ['Transporte', Math.floor(transportCap(n.id)) + ' regimentos', shipCap(n) + ' regimento(s) por navio; sobe com Coca, Galeão, Vapor, Dreadnought...'], ['Força por navio', n.fx.ship.toFixed(1)], ['Custo', '💰' + shipCost(n) + ' por navio']]));
   if (ports.length && n.fx.sea) {
     const sel = el('select'); ports.slice(0, 60).forEach(p => sel.append(new Option(WD.provs[p].n + ' (' + WD.states[WD.provs[p].state].n + ')', p)));
     const row = el('div', 'row'); [1, 3, 10].forEach(k => row.append(btn('+' + k + ' ' + shipName(n), () => { const e = buildShips(n, k, +sel.value); msg.textContent = e; if (!e) refresh(); }, 'sm', n.money < shipCost(n) * k ? 'Sem dinheiro' : '', 'Prontos em 4 meses no mar ao lado do estaleiro')));
@@ -676,13 +740,15 @@ function winMil(b) {
   c.append(nv);
   b.append(c);
   const sup = el('div', 'card'); sup.style.marginTop = '12px'; const asat = n.armySat == null ? 1 : n.armySat;
-  sup.append(tip(el('h4', '', '📦 Suprimentos do exército · ' + pct(asat)), 'Os regimentos consomem armas (principal), um pouco de ferramentas, roupas e comida processada.\nSem suprimentos a força em batalha cai até 30%.'), bar(asat, asat < .8 ? '#e5636b' : '#8fd17f'));
-  const sr = el('div', 'chips'); ['arms', 'tools', 'clothes', 'pfood'].forEach(g => sr.append(tip(el('span', 'chip ' + ((n.mk.sat[g] ?? 1) < .8 ? 'n' : 'p'), GOODS[g].e + ' ' + GOODS[g].n + ' ' + pct(n.mk.sat[g] ?? 1)), GOODS[g].n + ': atendido ' + pct(n.mk.sat[g] ?? 1) + '\n' + goodUsers(g)))); sup.append(sr); b.append(sup);
-  const at = el('table', 't'); at.style.marginTop = '12px'; const hh = at.insertRow(); [['Força', ''], ['Local', ''], ['Tropas', ''], ['General', 'Cada exército pode ter um general: marcial e traços mudam a força em batalha e nos cercos.'], ['Moral', 'Cai em batalha; recupera fora de combate'], ['', '']].forEach(([x, t]) => hh.append(tip(el('th', '', x), t)));
+  sup.append(tip(el('h4', '', '📦 Suprimentos do exército · ' + pct(asat)), 'Cada tipo de tropa consome os próprios bens (armas, comida, roupas, cavalos, ferro, aço, petróleo...) e as companhias de apoio também.\nSem suprimentos a força em batalha cai até 40%; longe da linha de suprimento, só metade chega.'), bar(asat, asat < .8 ? '#e5636b' : '#8fd17f'));
+  const tsr = el('div', 'chips'); UT.filter(t => t !== 'vrt' || n.vert).forEach(t => { const v = (n.tsat || {})[t] ?? 1; tsr.append(tip(el('span', 'chip ' + (v < .8 ? 'n' : 'p'), unitName(n, t) + ' ' + pct(v)), unitTip(n, t))); }); sup.append(tsr);
+  const AD = armyDemand(n).d, sr = el('div', 'chips'); Object.keys(AD).forEach(g => sr.append(tip(el('span', 'chip ' + ((n.mk.sat[g] ?? 1) < .8 ? 'n' : 'p'), GOODS[g].e + ' ' + GOODS[g].n + ' ' + pct(n.mk.sat[g] ?? 1)), GOODS[g].n + ': atendido ' + pct(n.mk.sat[g] ?? 1) + '\n' + goodUsers(g)))); sup.append(sr); b.append(sup);
+  const at = el('table', 't'); at.style.marginTop = '12px'; const hh = at.insertRow(); [['Força', ''], ['Local', ''], ['Tropas', ''], ['Veterania', 'Recruta, Regular, Veterano, Experiente e Elite'], ['General', 'Cada exército pode ter um general: marcial e traços mudam a força em batalha e nos cercos.'], ['Moral', 'Cai em batalha; recupera fora de combate'], ['', '']].forEach(([x, t]) => hh.append(tip(el('th', '', x), t)));
   S.armies.filter(a => a.o === n.id).forEach((a, i) => { const r = at.insertRow(); r.insertCell().textContent = (a.exp ? '🧭 ' : '⚔️ ') + (i + 1); r.insertCell().textContent = a.p < P ? WD.provs[a.p].n : WD.seas[a.p - P].n; r.insertCell().textContent = ['inf', 'cav', 'art', 'vrt'].filter(t => a[t] > .05).map(t => fmtK(a[t]) + ' ' + unitName(n, t)).join(', ');
+    const vc = r.insertCell(); vc.append(tip(el('span', '', VET[vetLv(a)].n + (Object.keys(a.sup || {}).length ? ' ' + Object.keys(a.sup).map(k => SUPPORT[k].e).join('') : '')), vetTip(a)));
     const g = r.insertCell(); if (a.gen) { g.append(tip(el('span', 'gold', '★ ' + charName(a.gen) + ' (' + sgn(genMul(a.gen) - 1) + ')'), genTip(a.gen))); } g.append(btn(a.gen ? 'Trocar' : 'Nomear', () => genPick(a), 'sm', n.money < genCost() ? 'Sem dinheiro' : '', 'Escolha entre 3 candidatos (💰' + genCost() + ')'));
     const m = r.insertCell(); m.style.width = '90px'; m.append(bar(a.mor, '#7fe08a')); r.insertCell().append(btn('Ver', () => { closeWin(); select('army', a.id); centerOn(...armyXY(a)); }, 'sm')); });
-  S.fleets.filter(f => f.o === n.id).forEach((f, i) => { const r = at.insertRow(); r.insertCell().textContent = '⛵ ' + (i + 1); r.insertCell().textContent = WD.seas[f.z].n; r.insertCell().textContent = Math.ceil(f.ships) + ' ' + shipName(n); r.insertCell().textContent = f.auto ? '🧭' : ''; r.insertCell().append(btn('Ver', () => { closeWin(); select('fleet', f.id); centerOn(...fleetXY(f)); }, 'sm')); });
+  S.fleets.filter(f => f.o === n.id).forEach((f, i) => { const r = at.insertRow(); r.insertCell().textContent = '⛵ ' + (i + 1); r.insertCell().textContent = WD.seas[f.z].n; r.insertCell().textContent = Math.ceil(f.ships) + ' ' + shipName(n) + ' · leva ' + Math.floor(fleetCap(f)) + 'k'; r.insertCell(); r.insertCell().textContent = f.auto ? '🧭' : f.inv ? '⚓' : ''; r.insertCell(); r.insertCell().append(btn('Ver', () => { closeWin(); select('fleet', f.id); centerOn(...fleetXY(f)); }, 'sm')); });
   b.append(at);
 }
 /* espaço: foguete da vertente, satélites, missões à lua e civilizações alienígenas */
@@ -818,8 +884,9 @@ function rightClick(sx, sy) {
   const mine = R.selArmies.filter(a => a.o === n.id && S.armies.includes(a));
   if (mine.length) {
     let to = WD.prov[i]; if (to < 0 && WD.sea[i] >= 0) to = P + WD.sea[i]; if (to < 0) return;
-    let fail = 0; mine.forEach(a => { if (!orderArmy(a, to)) fail++; });
-    if (fail) say('Sem caminho até lá para ' + fail + ' exército' + (fail > 1 ? 's' : '') + (n.fx.sea ? ' (faltam navios para o transporte?)' : '') + '.', 'bad'); drawSide();
+    let fail = 0, inv = 0, why = ''; mine.forEach(a => { if (a.inv) cancelInvasion(a); if (orderArmy(a, to)) { a.front = null; return; } if (to < P && WD.provs[to].coast) { const e = planInvasion(n, a, to); if (!e) { inv++; return; } why = e; } fail++; });
+    if (inv) say('Invasão planejada: o exército marcha ao porto, embarca e navega até ' + WD.provs[to].n + '.', 'good');
+    if (fail) say('Sem caminho até lá para ' + fail + ' exército' + (fail > 1 ? 's' : '') + (why ? ' (' + why + ')' : '') + '.', 'bad'); drawSide();
   } else if (R.selFleet && R.selFleet.o === n.id) {
     const z = WD.sea[i]; if (z < 0) return; R.selFleet.auto = false; if (!orderFleet(R.selFleet, z)) say(!n.exZ[z] && !seaExploreOk(n) ? 'Navegar até mares desconhecidos exige Bússola.' : n.fx.sea < 2 && WD.seas[z].deep ? 'Oceano aberto exige Caravela.' : 'Sem rota até esse mar.', 'bad'); drawSide();
   } else if (WD.prov[i] >= 0) ctxMenu(sx, sy, WD.prov[i]);
@@ -860,7 +927,7 @@ function loop(now) {
 }
 initRender(cv); menu(); requestAnimationFrame(loop);
 
-/* depuração: #dbg&seed=N&days=D&win=tech&mode=pol&z=2&war=D&prov=1&setup=1&chron=1&ctx=1&council=1&vert=steam&ev=comet abre direto numa partida (testes e screenshots) */
+/* depuração: #dbg&seed=N&days=D&win=tech&mode=pol&z=2&war=D&prov=1&setup=1&chron=1&ctx=1&council=1&vert=steam&ev=comet&front=adv&army=1 abre direto numa partida (testes e screenshots) */
 (() => {
   const q = new URLSearchParams(location.hash.slice(1)); if (!q.has('dbg')) return;
   newGame(+q.get('seed') || 7, +q.get('start') || START_YEAR); const main = S.nations.filter(n => n.kind === (q.get('kind') || 'main')).sort((a, b) => provsOf(b.id).length - provsOf(a.id).length)[0];
@@ -869,7 +936,8 @@ initRender(cv); menu(); requestAnimationFrame(loop);
   if (q.has('war')) {
     const nb = new Set(); provsOf(main.id).forEach(p => WD.provs[p].adj.forEach(o => { if (S.own[o] >= 0 && S.own[o] !== main.id) nb.add(S.own[o]); }));
     const t = nat(nb.size ? [...nb][0] : S.nations.filter(x => x.alive && x.id !== main.id && x.kind === 'main')[0].id); declareWar(main, t, null); S.calls = [];
-    S.armies.filter(a => a.o === main.id).forEach(a => orderArmy(a, provsOf(t.id).find(p => WD.provs[p].adj.some(o => S.own[o] === main.id))));
+    if (q.get('front')) { frontsTick(); S.t += 0; for (let d = 0; d < 6; d++) advanceDay(); const f = frontsOf(main.id)[0]; if (f) { S.armies.filter(a => a.o === main.id).forEach(a => { a.front = f.id; a.sup = { recon: 1, med: 1 }; }); setFord(main.id, f.id, q.get('front')); } }
+    else S.armies.filter(a => a.o === main.id).forEach(a => orderArmy(a, provsOf(t.id).find(p => WD.provs[p].adj.some(o => S.own[o] === main.id))));
     for (let d = 0; d < +q.get('war'); d++) advanceDay();
   }
   if (q.get('plague')) { const y0 = S.t; S.t = 360 * (1361 - START_YEAR); for (let d = 0; d < +q.get('plague'); d++) advanceDay(); }
@@ -877,6 +945,7 @@ initRender(cv); menu(); requestAnimationFrame(loop);
   startPlay(false); if (q.get('mode')) { R.mode = q.get('mode'); drawModes($('#modes'), true); if (R.mode === 'res') select('res'); }
   if (q.get('z')) { R.cam.z = +q.get('z'); centerOn(WD.provs[main.capital].cx * K, WD.provs[main.capital].cy * K); }
   if (q.get('tab')) UI[q.get('win') + 'Tab'] = q.get('tab');
+  if (q.get('army')) { const a = S.armies.find(a => a.o === main.id); if (a) { select('army', a.id); centerOn(...armyXY(a)); } }
   if (q.get('win')) openWin(q.get('win'), q.get('win') === 'peace' && warsOf(main.id)[0] ? warsOf(main.id)[0].id : undefined);
   if (q.get('prov')) select('prov', main.capital);
   if (q.get('box')) select('armies', S.armies.filter(a => a.o === main.id).map(a => a.id));

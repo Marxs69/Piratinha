@@ -24,6 +24,8 @@ const GOODS = {
   goods:   { n: 'Bens de consumo', p: 8, c: 'ind', e: '🏺' },
   tools:   { n: 'Ferramentas', p: 7, c: 'ind', e: '🔨' },
   arms:    { n: 'Armas', p: 9, c: 'ind', e: '🗡️' },
+  horses:  { n: 'Cavalos', p: 6, c: 'raw', e: '🐎' },
+  meds:    { n: 'Remédios', p: 10, c: 'ind', e: '💊' },
   steel:   { n: 'Aço', p: 8, c: 'ind', e: '🔩' },
   elec:    { n: 'Eletrônicos', p: 25, c: 'ind', e: '📟' },
   lux:     { n: 'Luxo', p: 20, c: 'lux', e: '💎' },
@@ -79,6 +81,9 @@ const BUILDINGS = {
   tailor:      { n: 'Alfaiataria', e: '👕', cost: 70, w: 1, in: { cloth: 1 }, out: { clothes: 1.2 }, tl: .03 },
   bakery:      { n: 'Padaria e salgadeira', e: '🥫', cost: 60, w: 1, in: { grain: 1.4, fish: .4 }, out: { pfood: 1.5 }, tl: .02 },
   workshop:    { n: 'Oficina de artesãos', e: '🏺', cost: 80, w: 1, in: { wood: 1, cloth: .3 }, out: { goods: .85 }, tl: .05 },
+  stud:        { n: 'Haras', e: '🐎', cost: 70, w: 1, in: { grain: .6 }, out: { horses: 1.2 }, req: 'arable', tl: .02 },
+  apothecary:  { n: 'Botica', e: '⚗️', cost: 90, w: .6, in: { fiber: .4, grain: .2 }, out: { meds: .5 }, tech: 'soc_universities' },
+  pharma:      { n: 'Indústria farmacêutica', e: '💊', cost: 450, w: 2, in: { oil: .4, power: .4 }, out: { meds: 5 }, tech: 'soc_germ' },
   smithy:      { n: 'Ferraria', e: '🔨', cost: 90, w: 1, in: { iron: 1, wood: .6 }, out: { tools: .5, arms: .45 } },
   jeweler:     { n: 'Ourivesaria', e: '💎', cost: 120, w: .6, in: { gold: .2, cloth: .2 }, out: { lux: .42 }, tech: 'eco_guilds' },
   market:      { n: 'Mercado', e: '🏪', cost: 90, w: .5, fx: { tax: .06 }, tech: 'eco_trade_fairs', max: 3 },
@@ -173,45 +178,45 @@ T('mil_arquebus', 'mil', 1450, 'Arcabuz', ['mil_bombard', 'mil_pike'], { u: { in
 T('mil_bastion', 'mil', 1520, 'Fortificação abaluartada', ['mil_bombard'], { fort: 1 });
 T('mil_musket', 'mil', 1580, 'Mosquete', ['mil_arquebus'], { u: { inf: .35 } });
 T('mil_surgeons', 'mil', 1550, 'Cirurgiões de campanha', ['mil_arquebus'], { med: .05 });
-T('mil_drill', 'mil', 1620, 'Exército permanente', ['mil_musket'], { m: { army: .1 }, b: ['academy'] });
+T('mil_drill', 'mil', 1620, 'Exército permanente', ['mil_musket'], { m: { army: .1 }, b: ['academy'], width: 2, logi: 1 });
 T('mil_bayonet', 'mil', 1690, 'Baioneta', ['mil_drill'], { u: { inf: .4, cav: .2 } });
 T('mil_fieldart', 'mil', 1720, 'Artilharia de campanha', ['mil_bayonet'], { u: { art: .6 } });
-T('mil_conscription', 'mil', 1790, 'Conscrição em massa', ['mil_fieldart', 'soc_nationalism'], { m: { manpower: .3 } });
+T('mil_conscription', 'mil', 1790, 'Conscrição em massa', ['mil_fieldart', 'soc_nationalism'], { m: { manpower: .3 }, width: 4 });
 T('mil_rifle', 'mil', 1840, 'Fuzil raiado', ['mil_conscription'], { u: { inf: .6 } });
 T('mil_breech', 'mil', 1865, 'Retrocarga', ['mil_rifle'], { u: { inf: .5, art: .6 } });
-T('mil_machinegun', 'mil', 1885, 'Metralhadora', ['mil_breech'], { u: { inf: .9 } });
+T('mil_machinegun', 'mil', 1885, 'Metralhadora', ['mil_breech'], { u: { inf: .9 }, width: 4 });
 T('mil_trench', 'mil', 1910, 'Guerra de trincheiras', ['mil_machinegun'], { u: { inf: .5 }, fort: 1 });
 T('mil_aircraft', 'mil', 1915, 'Aviação militar', ['mil_machinegun', 'eco_assembly'], { u: { inf: .4, cav: .4, art: .4 }, b: ['airbase'] });
 T('mil_tank', 'mil', 1916, 'Tanques', ['mil_trench', 'eco_oil'], { u: { cav: 1.5 } });
-T('mil_blitz', 'mil', 1937, 'Guerra mecanizada', ['mil_tank', 'mil_aircraft'], { u: { cav: 1.2, inf: .6 }, m: { speed: .3 } });
+T('mil_blitz', 'mil', 1937, 'Guerra mecanizada', ['mil_tank', 'mil_aircraft'], { u: { cav: 1.2, inf: .6 }, m: { speed: .3 }, width: 4, logi: 1 });
 T('mil_jet', 'mil', 1950, 'Caças a jato', ['mil_blitz'], { u: { inf: .6, cav: .6, art: .6 } });
 T('mil_nuclear', 'mil', 1950, 'Armas nucleares', ['mil_blitz', 'eco_electricity'], { u: { art: 2 }, m: { stab: .05 } });
 T('mil_missile', 'mil', 1965, 'Mísseis guiados', ['mil_jet', 'eco_computers'], { u: { art: 1.5 } });
 T('mil_stealth', 'mil', 1985, 'Furtividade', ['mil_missile'], { u: { cav: 1, art: 1 } });
-T('mil_drones', 'mil', 2010, 'Drones de combate', ['mil_stealth', 'eco_internet'], { u: { inf: 1.2, art: 1.2 } });
+T('mil_drones', 'mil', 2010, 'Drones de combate', ['mil_stealth', 'eco_internet'], { u: { inf: 1.2, art: 1.2 }, width: 4 });
 T('mil_exo', 'mil', 2050, 'Exoesqueletos', ['mil_drones'], { u: { inf: 2 } });
 T('mil_railgun', 'mil', 2080, 'Canhões eletromagnéticos', ['mil_exo', 'eco_fusion'], { u: { art: 2.5 } });
-T('mil_swarm', 'mil', 2120, 'Enxames autônomos', ['mil_railgun', 'eco_ai'], { u: { inf: 2.5, cav: 2.5 } });
+T('mil_swarm', 'mil', 2120, 'Enxames autônomos', ['mil_railgun', 'eco_ai'], { u: { inf: 2.5, cav: 2.5 }, width: 4 });
 T('mil_orbital', 'mil', 2170, 'Bombardeio orbital', ['mil_swarm'], { u: { art: 4, siege: 3 } });
 // naval
 T('nav_longship', 'nav', 860, 'Barcos longos', [], { sea: 1 });
 T('nav_raids', 'nav', 900, 'Expedições de saque', ['nav_longship'], { m: { speed: .05 }, ship: .15 });
 T('nav_knarr', 'nav', 1000, 'Knarr mercante', ['nav_raids'], { m: { trade: .05 } });
-T('nav_cog', 'nav', 1150, 'Coca', ['nav_knarr'], { m: { trade: .05 }, ship: .3 });
+T('nav_cog', 'nav', 1150, 'Coca', ['nav_knarr'], { m: { trade: .05 }, ship: .3, cap: .25 });
 T('nav_compass', 'nav', 1250, 'Bússola', ['nav_cog'], { m: { speed: .05 }, ship: .2 });
 T('nav_caravel', 'nav', 1430, 'Caravela', ['nav_compass'], { sea: 2, ship: .3 });
 T('nav_astrolabe', 'nav', 1460, 'Astrolábio náutico', ['nav_caravel'], { col: 1, m: { colon: .1 } });
-T('nav_galleon', 'nav', 1530, 'Galeão', ['nav_astrolabe'], { ship: .5, m: { trade: .05 } });
+T('nav_galleon', 'nav', 1530, 'Galeão', ['nav_astrolabe'], { ship: .5, m: { trade: .05 }, cap: .25 });
 T('nav_lineship', 'nav', 1640, 'Navio de linha', ['nav_galleon'], { ship: .6 });
-T('nav_steamship', 'nav', 1820, 'Navio a vapor', ['nav_lineship', 'eco_steam'], { ship: .6, m: { speed: .1, trade: .05 } });
+T('nav_steamship', 'nav', 1820, 'Navio a vapor', ['nav_lineship', 'eco_steam'], { ship: .6, m: { speed: .1, trade: .05 }, cap: .5 });
 T('nav_ironclad', 'nav', 1860, 'Encouraçado', ['nav_steamship'], { ship: 1 });
-T('nav_dreadnought', 'nav', 1906, 'Dreadnought', ['nav_ironclad', 'eco_bessemer'], { ship: 1.5 });
+T('nav_dreadnought', 'nav', 1906, 'Dreadnought', ['nav_ironclad', 'eco_bessemer'], { ship: 1.5, cap: .5 });
 T('nav_submarine', 'nav', 1914, 'Submarino', ['nav_dreadnought'], { ship: 1 });
-T('nav_carrier', 'nav', 1925, 'Porta-aviões', ['nav_submarine', 'mil_aircraft'], { ship: 1.5 });
+T('nav_carrier', 'nav', 1925, 'Porta-aviões', ['nav_submarine', 'mil_aircraft'], { ship: 1.5, cap: .5 });
 T('nav_nuclearsub', 'nav', 1955, 'Submarino nuclear', ['nav_carrier', 'mil_nuclear'], { ship: 2 });
 T('nav_container', 'nav', 1960, 'Navios porta-contêineres', ['nav_carrier'], { m: { trade: .15 } });
 T('nav_aegis', 'nav', 1985, 'Destróier de mísseis', ['nav_nuclearsub', 'mil_missile'], { ship: 2 });
-T('nav_autonomous', 'nav', 2040, 'Frotas autônomas', ['nav_aegis', 'eco_ai'], { ship: 3 });
+T('nav_autonomous', 'nav', 2040, 'Frotas autônomas', ['nav_aegis', 'eco_ai'], { ship: 3, cap: 1 });
 T('spc_rockets', 'nav', 2050, 'Programa espacial', ['nav_autonomous'], { b: ['launch_site'], m: { research: .03 } });
 T('spc_sat', 'nav', 2055, 'Satélites', ['spc_rockets'], {});
 T('spc_probe', 'nav', 2065, 'Sondas lunares', ['spc_sat'], {});
@@ -242,7 +247,7 @@ T('eco_textile', 'eco', 1780, 'Maquinário têxtil', ['eco_steam'], { b: ['texti
 T('eco_factory', 'eco', 1800, 'Sistema fabril', ['eco_textile'], { b: ['goods_factory', 'garment_factory'] });
 T('eco_mechanization', 'eco', 1820, 'Mecanização', ['eco_factory'], { b: ['tool_factory', 'food_factory'] });
 T('eco_interchangeable', 'eco', 1830, 'Peças intercambiáveis', ['eco_mechanization'], { b: ['arms_factory'] });
-T('eco_railways', 'eco', 1830, 'Ferrovias', ['eco_steam'], { b: ['railway'], slots: 1 });
+T('eco_railways', 'eco', 1830, 'Ferrovias', ['eco_steam'], { b: ['railway'], slots: 1, logi: 2 });
 T('eco_bessemer', 'eco', 1856, 'Processo Bessemer', ['eco_railways'], { b: ['steel_mill'] });
 T('eco_oil', 'eco', 1870, 'Perfuração de petróleo', ['eco_bessemer'], { b: ['oil_well'] });
 T('eco_electricity', 'eco', 1885, 'Eletricidade', ['eco_oil'], { b: ['power_plant', 'hydro', 'uranium_mine'], m: { research: .05 } });
@@ -250,7 +255,7 @@ T('eco_oil_power', 'eco', 1900, 'Termelétricas a óleo', ['eco_electricity'], {
 T('eco_pipelines', 'eco', 1905, 'Oleodutos e gasodutos', ['eco_oil'], { b: ['pipeline'], m: { trade: .03 } });
 T('eco_fertilizer', 'eco', 1910, 'Fertilizantes químicos', ['eco_electricity'], { bo: { farm: .35 }, m: { growth: .1 } });
 T('eco_assembly', 'eco', 1913, 'Linha de montagem', ['eco_electricity'], { b: ['rare_mine'], m: { prod: .12 }, slots: 1 });
-T('eco_highways', 'eco', 1920, 'Rodovias', ['eco_assembly'], { b: ['highway'] });
+T('eco_highways', 'eco', 1920, 'Rodovias', ['eco_assembly'], { b: ['highway'], logi: 1 });
 T('eco_nuclear', 'eco', 1955, 'Energia nuclear', ['eco_assembly', 'eco_electricity'], { b: ['nuclear'] });
 T('eco_hsr', 'eco', 1965, 'Trem de alta velocidade', ['eco_highways'], { b: ['hsr'] });
 T('eco_transistor', 'eco', 1950, 'Transistor', ['eco_assembly'], { b: ['electronics'] });
@@ -273,7 +278,7 @@ T('soc_monasteries', 'soc', 900, 'Mosteiros', ['soc_feudal'], { m: { stab: .03, 
 T('soc_vassalage', 'soc', 940, 'Vassalagem', ['soc_feudal'], { m: { manpower: .1 } });
 T('soc_chancery', 'soc', 950, 'Chancelaria', ['soc_feudal'], { m: { tax: .05 } });
 T('soc_charters', 'soc', 1080, 'Cartas municipais', ['soc_chancery'], { g: ['merchant', 'oligarchic'] });
-T('soc_universities', 'soc', 1100, 'Universidades', ['soc_chancery'], { b: ['university'] });
+T('soc_universities', 'soc', 1100, 'Universidades', ['soc_chancery'], { b: ['university', 'apothecary'] });
 T('soc_orders', 'soc', 1120, 'Ordens militares', ['soc_feudal'], { g: ['military_order', 'theocracy'], m: { army: .05 } });
 T('soc_scholastic', 'soc', 1200, 'Escolástica', ['soc_universities'], { m: { research: .08 }, g: ['sages'] });
 T('soc_common_law', 'soc', 1250, 'Direito comum', ['soc_charters'], { m: { stab: .05 }, g: ['khanate'] });
@@ -289,7 +294,7 @@ T('soc_nationalism', 'soc', 1800, 'Nacionalismo', ['soc_constitution'], { g: ['f
 T('soc_socialism', 'soc', 1848, 'Socialismo', ['soc_nationalism', 'eco_factory'], { g: ['peoples', 'commune'], i: ['socialism', 'anarchism'] });
 T('soc_unions', 'soc', 1880, 'Sindicatos', ['soc_socialism'], { g: ['syndicalist'], i: ['syndicalism'] });
 T('soc_mass_politics', 'soc', 1890, 'Política de massas', ['soc_unions'], { i: ['socdem', 'natpop', 'agrarian'] });
-T('soc_germ', 'soc', 1870, 'Teoria dos germes', ['soc_vaccine'], { med: .15, m: { growth: .03 } });
+T('soc_germ', 'soc', 1870, 'Teoria dos germes', ['soc_vaccine'], { med: .15, m: { growth: .03 }, b: ['pharma'] });
 T('soc_antibiotics', 'soc', 1940, 'Antibióticos', ['soc_germ', 'eco_assembly'], { med: .15, m: { growth: .05 } });
 T('soc_mass_media', 'soc', 1920, 'Comunicação de massa', ['soc_mass_politics', 'eco_electricity'], { g: ['one_party', 'totalitarian'], i: ['totalism', 'futurism'] });
 T('soc_technocracy', 'soc', 1930, 'Tecnocracia', ['soc_mass_media'], { g: ['technate'], i: ['technocrat'] });
@@ -476,22 +481,66 @@ const UNITS = {
   cav: [['mil_levy', 'Cavaleiros leves'], ['mil_stirrup', 'Cavaleiros'], ['mil_plate', 'Cavaleiros de placas'], ['mil_musket', 'Dragões'], ['mil_bayonet', 'Couraceiros'], ['mil_tank', 'Tanques'], ['mil_blitz', 'Divisões blindadas'], ['mil_stealth', 'Blindados modernos'], ['mil_exo', 'Mechas'], ['mil_swarm', 'Enxames blindados']],
   art: [['mil_trebuchet', 'Máquinas de cerco'], ['mil_bombard', 'Bombardas'], ['mil_bastion', 'Canhões'], ['mil_fieldart', 'Artilharia de campanha'], ['mil_breech', 'Artilharia raiada'], ['mil_trench', 'Artilharia pesada'], ['mil_missile', 'Baterias de mísseis'], ['mil_railgun', 'Canhões eletromagnéticos'], ['mil_orbital', 'Plataformas orbitais']],
 };
-const UNIT_BASE = { inf: { a: 1, d: 1.1, c: 8 }, cav: { a: 1.6, d: .9, c: 16 }, art: { a: 1.4, d: .5, c: 20 }, vrt: { a: 2.4, d: 2, c: 40 } };
+/* atributos por regimento (1k homens): fire/shock = dano nas fases de fogo e choque; def = resistência; mor = moral; kill = letalidade;
+   spd = movimento; sw = peso no suprimento; back = luta da segunda linha (com metade do dano); a/d = força resumida (IA e listas); c = custo */
+const UNIT_BASE = {
+  inf: { a: 1, d: 1.1, c: 8, fire: .6, shock: 1.2, def: 1.1, mor: 1, kill: 1, spd: 1, sw: 1 },
+  cav: { a: 1.6, d: .9, c: 16, fire: .4, shock: 2.2, def: .9, mor: 1.1, kill: 1, spd: 1.5, sw: 2 },
+  art: { a: 1.4, d: .5, c: 20, fire: 2.2, shock: .4, def: .6, mor: .8, kill: 1.6, spd: .8, sw: 1.5, back: 1 },
+  vrt: { a: 2.4, d: 2, c: 40, fire: 2, shock: 2, def: 2, mor: 1.2, kill: 1.3, spd: 1.1, sw: 1.5 },
+};
+/* mudanças de papel com a tecnologia (a última pesquisada vale): pólvora faz a infantaria atirar, tanques blindam a cavalaria */
+const UNIT_ERA = {
+  inf: [['mil_arquebus', { fire: 1.2, shock: .9 }], ['mil_machinegun', { fire: 1.8, shock: .8 }]],
+  cav: [['mil_musket', { fire: .7, shock: 1.9 }], ['mil_tank', { fire: 1.6, shock: 2.4, def: 1.4, spd: 1.8 }]],
+  art: [['mil_breech', { fire: 2.6, kill: 1.8 }]],
+};
+/* necessidades por regimento por mês (a última faixa de tecnologia vale); a vertente usa o próprio bem */
+const UNIT_NEEDS = {
+  inf: [[null, { arms: .025, grain: .02, clothes: .01 }], ['mil_crossbow', { arms: .04, grain: .02, clothes: .015 }], ['mil_musket', { arms: .05, grain: .02, clothes: .02 }], ['mil_rifle', { arms: .06, pfood: .02, clothes: .02 }], ['mil_drones', { arms: .06, pfood: .02, clothes: .02, elec: .01 }]],
+  cav: [[null, { arms: .03, grain: .04, horses: .02 }], ['mil_plate', { arms: .05, grain: .04, horses: .02, iron: .01 }], ['mil_tank', { arms: .04, oil: .15, steel: .03, tools: .01 }], ['mil_stealth', { arms: .04, oil: .15, steel: .03, elec: .02 }]],
+  art: [[null, { arms: .03, wood: .03, tools: .01 }], ['mil_gunpowder', { arms: .06, iron: .02, tools: .01 }], ['mil_breech', { arms: .07, steel: .03, tools: .01 }], ['mil_missile', { arms: .06, steel: .02, elec: .03 }], ['mil_railgun', { arms: .05, power: .05, elec: .03 }]],
+  vrt: [[null, { arms: .03, pfood: .01 }]],
+};
+const VERT_UNIT_NEED = { atom: { uranium: .02 }, steam: { coal: .03 }, diesel: { oil: .05 }, tesla: { copper: .02 }, clock: { tools: .02 }, cyber: { elec: .03 }, nano: { rare: .01 }, space: { power: .03 }, solar: {}, bio: { pfood: .02 } };
+/* veterania: xp de 0 a 1 */
+const VET = [
+  { n: 'Recruta', x: 0, m: .85, mo: .85 }, { n: 'Regular', x: .2, m: 1, mo: 1 }, { n: 'Veterano', x: .45, m: 1.1, mo: 1.1 },
+  { n: 'Experiente', x: .7, m: 1.2, mo: 1.2 }, { n: 'Elite', x: .9, m: 1.3, mo: 1.3 },
+];
+/* companhias de apoio (uma de cada por exército) */
+const SUPPORT = {
+  recon: { e: '🔭', names: [[null, 'Batedores'], ['mil_aircraft', 'Reconhecimento aéreo'], ['mil_drones', 'Drones de reconhecimento']], c: 15, up: 1, need: { horses: .01 },
+           d: '+1 no dado contra quem não tem reconhecimento · perseguição +30% · atrito −10%' },
+  eng:   { e: '⛏️', tech: 'mil_trebuchet', names: [[null, 'Sapadores'], ['mil_trench', 'Engenheiros de combate']], c: 25, up: 1.5, need: { tools: .02 },
+           d: 'Cercos +40% · na defesa, baixas −10% · metade da penalidade de terreno e de desembarque · atrito −10%' },
+  med:   { e: '⚕️', tech: 'mil_surgeons', names: [[null, 'Cirurgiões'], ['soc_germ', 'Hospital de campanha'], ['soc_antibiotics', 'Batalhão médico']], c: 25, up: 1.5, need: { meds: .03 },
+           d: 'Baixas −25% (um quarto dos feridos volta ao contingente) · atrito −30% · doenças −50%' },
+};
+/* posturas de combate: def vence agg, agg vence pur, pur vence def (+15% de dano para quem vence) */
+const STANCES = {
+  bal: { n: 'Equilibrada', e: '⚖️', dmg: 1, take: 1, mor: 1, fat: 1, pur: 1, d: 'Sem bônus nem penalidade' },
+  agg: { n: 'Ataque agressivo', e: '⚔️', dmg: 1.2, take: 1.15, mor: 1.1, fat: 1.3, pur: 1, beats: 'pur', d: 'Dano +20%, moral do inimigo cai 10% mais rápido; baixas próprias +15% e cansa mais' },
+  def: { n: 'Defensiva', e: '🛡️', dmg: .85, take: .8, mor: 1, fat: .8, pur: .5, beats: 'agg', d: 'Baixas −20%, cansa menos; dano −15% e persegue mal' },
+  pur: { n: 'Perseguição', e: '🐎', dmg: .95, take: 1.05, mor: 1, fat: 1.1, pur: 2, beats: 'def', d: 'Depois de vencer, mata o dobro dos que fogem (melhor com cavalaria)' },
+};
+const WIDTH_BASE = 12, LOGI_BASE = 2, SHIP_CAP = 1;          // largura de combate, alcance da linha de suprimento (províncias), regimentos por navio
 
 /* ---------- terrenos ---------- */
+/* width = largura de combate; att = dado de quem ataca; cav = eficácia da cavalaria; sup = suprimento; attr = atrito mensal do próprio terreno */
 const TERRAIN = {
-  plains:   { n: 'Planície', col: [148, 178, 92], move: 1, def: 0, food: 1.2, pop: 1.2 },
-  grass:    { n: 'Campos', col: [176, 190, 104], move: 1, def: 0, food: 1.1, pop: 1.1 },
-  forest:   { n: 'Floresta', col: [70, 120, 62], move: 1.3, def: .15, food: .8, pop: .8 },
-  taiga:    { n: 'Taiga', col: [76, 104, 78], move: 1.4, def: .15, food: .5, pop: .5 },
-  jungle:   { n: 'Selva', col: [48, 110, 54], move: 1.8, def: .25, food: .7, pop: .6 },
-  hills:    { n: 'Colinas', col: [150, 140, 96], move: 1.5, def: .25, food: .8, pop: .8 },
-  mountain: { n: 'Montanhas', col: [128, 116, 104], move: 2.2, def: .45, food: .3, pop: .35 },
-  desert:   { n: 'Deserto', col: [222, 198, 138], move: 1.4, def: .05, food: .25, pop: .3 },
-  savanna:  { n: 'Savana', col: [196, 180, 98], move: 1.1, def: 0, food: .9, pop: .8 },
-  marsh:    { n: 'Pântano', col: [96, 120, 92], move: 1.7, def: .2, food: .6, pop: .5 },
-  tundra:   { n: 'Tundra', col: [168, 170, 150], move: 1.3, def: .05, food: .25, pop: .25 },
-  ice:      { n: 'Gelo', col: [232, 238, 242], move: 2, def: .1, food: 0, pop: .05 },
+  plains:   { n: 'Planície', col: [148, 178, 92], move: 1, def: 0, food: 1.2, pop: 1.2, width: 1, att: 0, cav: 1, sup: 1, attr: 0 },
+  grass:    { n: 'Campos', col: [176, 190, 104], move: 1, def: 0, food: 1.1, pop: 1.1, width: 1, att: 0, cav: 1, sup: 1, attr: 0 },
+  forest:   { n: 'Floresta', col: [70, 120, 62], move: 1.3, def: .15, food: .8, pop: .8, width: 0.8, att: -1, cav: 0.6, sup: 0.8, attr: 0 },
+  taiga:    { n: 'Taiga', col: [76, 104, 78], move: 1.4, def: .15, food: .5, pop: .5, width: 0.8, att: -1, cav: 0.6, sup: 0.6, attr: 0.01 },
+  jungle:   { n: 'Selva', col: [48, 110, 54], move: 1.8, def: .25, food: .7, pop: .6, width: 0.6, att: -1, cav: 0.4, sup: 0.6, attr: 0.01 },
+  hills:    { n: 'Colinas', col: [150, 140, 96], move: 1.5, def: .25, food: .8, pop: .8, width: 0.85, att: -1, cav: 0.8, sup: 0.8, attr: 0 },
+  mountain: { n: 'Montanhas', col: [128, 116, 104], move: 2.2, def: .45, food: .3, pop: .35, width: 0.6, att: -2, cav: 0.4, sup: 0.5, attr: 0.01 },
+  desert:   { n: 'Deserto', col: [222, 198, 138], move: 1.4, def: .05, food: .25, pop: .3, width: 1, att: 0, cav: 1, sup: 0.4, attr: 0.01 },
+  savanna:  { n: 'Savana', col: [196, 180, 98], move: 1.1, def: 0, food: .9, pop: .8, width: 1, att: 0, cav: 1, sup: 0.9, attr: 0 },
+  marsh:    { n: 'Pântano', col: [96, 120, 92], move: 1.7, def: .2, food: .6, pop: .5, width: 0.6, att: -1, cav: 0.5, sup: 0.6, attr: 0.01 },
+  tundra:   { n: 'Tundra', col: [168, 170, 150], move: 1.3, def: .05, food: .25, pop: .25, width: 0.9, att: 0, cav: 0.8, sup: 0.4, attr: 0.01 },
+  ice:      { n: 'Gelo', col: [232, 238, 242], move: 2, def: .1, food: 0, pop: .05, width: 0.5, att: -1, cav: 0.5, sup: 0.1, attr: 0.03 },
 };
 
 /* ---------- traços de personagens (m: modificadores da nação enquanto governa) ---------- */
@@ -589,15 +638,14 @@ const ROCKETS = { none: 'Foguete químico', clock: 'Foguete de corda', steam: 'F
 const MOON_TYPES = [['Rochosa', '#9a9890'], ['Gelada', '#cfe6f2'], ['Oceânica', '#3f78b8'], ['Vulcânica', '#a5452c'], ['Desértica', '#cfa96a'], ['Selvagem', '#4f8a43']];
 const ALIEN_ERAS = ['Idade da Pedra', 'Idade do Bronze', 'Idade Média', 'Renascimento', 'Era Industrial', 'Era Atômica', 'Era Digital', 'Era Interestelar'];
 /* grupos de prédios (painel do estado e janela de construção) */
-const BGROUPS = [['prod', '🌾 Produção e extração', ['farm', 'mill', 'fishery', 'lumber', 'quarry', 'plantation', 'iron_mine', 'coal_mine', 'gold_mine', 'copper_mine', 'uranium_mine', 'rare_mine', 'oil_well']],
-  ['ind', '🏭 Indústria', ['weaver', 'textile_manuf', 'tailor', 'bakery', 'garment_factory', 'food_factory', 'workshop', 'smithy', 'foundry', 'blast_furnace', 'jeweler', 'manufactory', 'textile_mill', 'goods_factory', 'tool_factory', 'arms_factory', 'steel_mill', 'electronics']],
+const BGROUPS = [['prod', '🌾 Produção e extração', ['farm', 'stud', 'mill', 'fishery', 'lumber', 'quarry', 'plantation', 'iron_mine', 'coal_mine', 'gold_mine', 'copper_mine', 'uranium_mine', 'rare_mine', 'oil_well']],
+  ['ind', '🏭 Indústria', ['apothecary', 'pharma', 'weaver', 'textile_manuf', 'tailor', 'bakery', 'garment_factory', 'food_factory', 'workshop', 'smithy', 'foundry', 'blast_furnace', 'jeweler', 'manufactory', 'textile_mill', 'goods_factory', 'tool_factory', 'arms_factory', 'steel_mill', 'electronics']],
   ['energy', '⚡ Energia', ['power_plant', 'oil_plant', 'hydro', 'nuclear', 'wind', 'solar_plant', 'fusion']],
   ['infra', '🛤️ Transporte e comércio', ['road', 'railway', 'highway', 'hsr', 'maglev', 'tubes', 'portal', 'pipeline', 'port', 'market']],
   ['svc', '🏛️ Serviços públicos', ['hospital', 'school', 'office', 'guard', 'university', 'temple']],
   ['mil', '⚔️ Militar', ['castle', 'shipyard', 'barracks', 'academy', 'airbase', 'launch_site']],
   ['vert', '✨ Vertente', []]];
 const bGroupOf = b => (BGROUPS.find(g => g[2].includes(b)) || BGROUPS[6])[0];
-/* doenças menores, aleatórias ao longo do jogo */
 /* ---------- doenças ----------
    le = parte da população que morre por mês numa província doente; sp = chance de passar para cada vizinha por mês; mar = chance de saltar pelo mar;
    dur = meses doente; y = época; terr = surge mais nesses terrenos; war = nasce em cercos e acampamentos; urb = precisa de gente amontoada; vert = só existe se alguém seguir a vertente.

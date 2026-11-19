@@ -8,7 +8,7 @@ function newGame(seed, y0 = START_YEAR) {
   WD = generateWorld(seed); ownCache = null; warSet = null;
   const P = WD.provs.length, r = mkRng(seed ^ 0x5eed);
   S = { v: 2, rs: (seed ^ 0x2545F491) | 0, moon: null, seed, y0, t: 360 * (y0 - START_YEAR), player: -1, nations: [], own: new Int16Array(P).fill(-1), ctrl: new Int16Array(P).fill(-1), pop: new Float32Array(P), bld: WD.states.map(() => ({})),
-        armies: [], fleets: [], wars: [], cols: [], sieges: {}, log: [], news: [], id: 1, wp: {}, over: false };
+        armies: [], fleets: [], wars: [], cols: [], sieges: {}, battles: {}, log: [], news: [], id: 1, wp: {}, over: false };
   GOOD_IDS.forEach(g => S.wp[g] = GOODS[g].p);
   const stAdj = WD.states.map(() => new Set());
   WD.provs.forEach(p => p.adj.forEach(o => { const a = p.state, b = WD.provs[o].state; if (a !== b) stAdj[a].add(b); }));
@@ -73,7 +73,7 @@ function newGame(seed, y0 = START_YEAR) {
     });
     const pop = provsOf(n.id).reduce((a, p) => a + S.pop[p], 0);
     const regs = Math.max(2, Math.round(pop * (n.kind === 'cold' ? .012 : .005)));
-    addArmy(n.id, n.capital, { inf: Math.ceil(regs * .75), cav: Math.floor(regs * .25) });
+    addArmy(n.id, n.capital, { inf: Math.ceil(regs * .75), cav: Math.floor(regs * .25) }, .25);
     n.manpower = pop * .01; n.mpMax = pop * .03;
     const coastal = provsOf(n.id).find(p => WD.provs[p].coast);
     if (n.techs.nav_longship && coastal != null) addFleet(n.id, WD.provs[coastal].seas[0], n.kind === 'cold' ? 10 : n.kind === 'main' ? 3 : 2);
@@ -135,7 +135,7 @@ function dropVert(n) {
 /* começo em era avançada: vertentes, governos da época, prédios, colônias e mapa conhecido */
 const govYear = g => BASE_GOVS.includes(g) ? 860 : (TECHS.find(t => (t.fx.g || []).includes(g)) || { y: 860 }).y;
 function advanceStart(Y, r) {
-  const devPick = ['farm', 'fishery', 'lumber', 'iron_mine', 'quarry', 'plantation', 'smithy', 'weaver', 'tailor', 'bakery', 'workshop', 'temple', 'mill', 'market', 'road', 'hospital', 'school', 'office', 'guard', 'port', 'university', 'jeweler', 'coal_mine', 'gold_mine', 'copper_mine', 'foundry', 'manufactory', 'textile_manuf', 'blast_furnace', 'barracks', 'shipyard', 'academy',
+  const devPick = ['farm', 'stud', 'apothecary', 'fishery', 'lumber', 'iron_mine', 'quarry', 'plantation', 'smithy', 'weaver', 'tailor', 'bakery', 'workshop', 'temple', 'mill', 'market', 'road', 'hospital', 'school', 'office', 'guard', 'port', 'university', 'jeweler', 'coal_mine', 'gold_mine', 'copper_mine', 'foundry', 'manufactory', 'textile_manuf', 'blast_furnace', 'barracks', 'shipyard', 'academy',
     'railway', 'textile_mill', 'goods_factory', 'garment_factory', 'food_factory', 'tool_factory', 'arms_factory', 'steel_mill', 'power_plant', 'hydro', 'oil_well'];
   S.pandDone = {}; for (const id in PANDEMICS) if (Y >= PANDEMICS[id].y[1]) S.pandDone[id] = { done: {} };   // pandemias de antes do início já passaram
   S.nations.forEach(n => {

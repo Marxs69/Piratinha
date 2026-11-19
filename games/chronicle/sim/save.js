@@ -15,7 +15,7 @@ function loadGame() {
   WD = generateWorld(o.seed);
   o.own = unb64(o.own, Int16Array); o.ctrl = unb64(o.ctrl, Int16Array); o.pop = unb64(o.pop, Float32Array);
   o.nations.forEach(n => { n.exP = unb64(n.exP); n.exZ = unb64(n.exZ); });
-  S = o; if (!Number.isInteger(S.rs)) S.rs = (S.seed ^ S.t) | 0; if (S.plague !== undefined || S.plagueDone !== undefined) { S.pands = S.plague ? [Object.assign({ id: 'black', warned: {} }, S.plague)] : []; S.pandDone = S.plagueDone ? { black: S.plagueDone } : {}; delete S.plague; delete S.plagueDone; } (S.epis || []).forEach(E => { if (!E.d) E.d = 'fever'; });   // saves antigos S.news = []; S.rebels = S.rebels || {}; if (o.culg) S.culg = unb64(o.culg); else initCul(); if (o.relg) S.relg = unb64(o.relg); else initRelig();
+  S = o; if (!Number.isInteger(S.rs)) S.rs = (S.seed ^ S.t) | 0; if (S.plague !== undefined || S.plagueDone !== undefined) { S.pands = S.plague ? [Object.assign({ id: 'black', warned: {} }, S.plague)] : []; S.pandDone = S.plagueDone ? { black: S.plagueDone } : {}; delete S.plague; delete S.plagueDone; } (S.epis || []).forEach(E => { if (!E.d) E.d = 'fever'; });   // saves antigos S.news = []; S.rebels = S.rebels || {}; S.battles = S.battles || {}; S.armies.forEach(a => { if (a.xp == null) a.xp = .2; a.fat = a.fat || 0; a.st = a.st || 'bal'; a.sup = a.sup || {}; }); if (o.culg) S.culg = unb64(o.culg); else initCul(); if (o.relg) S.relg = unb64(o.relg); else initRelig();
   GOOD_IDS.forEach(g => { if (!(S.wp[g] > 0)) S.wp[g] = GOODS[g].p; });   // saves antigos: bens novos sem preço davam −NaN/mês
   ownChanged(); warsChanged(); S.nations.forEach(n => { if (n.alive) calcMods(n); }); econAll(); return true;
 }

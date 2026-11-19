@@ -223,7 +223,16 @@ function drawFrame() {
     if (a.exp || a.gen) { c.font = '10px serif'; c.textAlign = 'left'; c.fillText(a.exp ? '🧭' : '★', sx + 27, sy + 1); c.textAlign = 'center'; }
   }
   // batalhas
-  const bt = new Set(); for (const a of S.armies) if (a.inBattle && a.p < P) bt.add(a.p);
+  // fronts do jogador: um traço em cada fronteira de contato (vermelho = avançar, azul = defender), mais grosso onde há exércitos atribuídos
+  if (typeof frontsOf === 'function' && S.player >= 0) for (const f of frontsOf(S.player)) {
+    const adv = fordOf(S.player, f.id) === 'adv', has = S.armies.some(a => a.o === S.player && a.front === f.id), foe = new Set(f.foe);
+    c.strokeStyle = adv ? 'rgba(235,80,70,.95)' : 'rgba(90,160,240,.95)'; c.lineWidth = Math.max(2, (has ? 3.5 : 2) * Math.min(1.5, R.cam.z / 2)); c.lineCap = 'round'; c.beginPath();
+    for (const p of f.provs) { const a = WD.provs[p]; for (const q of a.adj) { if (!foe.has(q)) continue; const b = WD.provs[q];
+      const mx = (a.cx + b.cx) / 2 * K + K / 2, my = (a.cy + b.cy) / 2 * K + K / 2, dx = b.cx - a.cx, dy = b.cy - a.cy, L = Math.hypot(dx, dy) || 1, h = Math.min(6, L * .35) * K;
+      const [x0, y0] = toScreen(mx - dy / L * h, my + dx / L * h), [x1, y1] = toScreen(mx + dy / L * h, my - dx / L * h); c.moveTo(x0, y0); c.lineTo(x1, y1); } }
+    c.stroke();
+  }
+  const bt = new Set(Object.keys(S.battles || {}).map(Number));
   bt.forEach(p => { const q = WD.provs[p]; const [sx, sy] = toScreen(q.cx * K + K / 2, q.cy * K + K / 2); c.font = '18px serif'; c.fillText('⚔️', sx + 30, sy - 4); });
   if (R.box) { const b = R.box; c.fillStyle = 'rgba(255,210,87,.12)'; c.strokeStyle = '#ffd257'; c.lineWidth = 1; c.fillRect(b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0); c.strokeRect(b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0); }
 }

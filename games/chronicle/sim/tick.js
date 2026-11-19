@@ -15,7 +15,7 @@ function worksTick(n) {                                         // obras conclu�
   n.rec.filter(r => r.m <= 0).forEach(r => {
     if (r.type === 'ship') { const pr = WD.provs[r.at]; if (S.own[r.at] === n.id) { const z = pr.seas[0], f = S.fleets.find(f => f.o === n.id && f.z === z && !f.path.length); if (f) f.ships += r.k; else addFleet(n.id, z, r.k); } return; }
     const at = S.own[r.at] === n.id && S.ctrl[r.at] === n.id ? r.at : n.capital; const ex = S.armies.find(a => a.o === n.id && a.p === at && !a.path.length);
-    if (ex) ex[r.type] += r.k; else addArmy(n.id, at, { [r.type]: r.k });
+    const x = r.x ?? .1; if (ex) addMen(ex, r.type, r.k, x); else addArmy(n.id, at, { [r.type]: r.k }, x);
   });
   n.rec = n.rec.filter(r => r.m > 0);
 }
@@ -46,7 +46,7 @@ function reinforce() {                                           // exércitos p
   for (const a of S.armies) {
     const n = nat(a.o), r = regs(a); a.max = Math.max(a.max || 0, r);
     if (a.path.length || a.inBattle || a.p >= WD.provs.length || S.own[a.p] !== a.o || S.ctrl[a.p] !== a.o || r >= a.max - .05 || n.manpower < .5) continue;
-    const add = Math.min(n.manpower, (a.max - r) * .2), k = add / Math.max(.01, r); ['inf', 'cav', 'art', 'vrt'].forEach(t => a[t] += a[t] * k); n.manpower -= add;
+    const add = Math.min(n.manpower, (a.max - r) * .2), k = add / Math.max(.01, r), x0 = a.xp || 0; ['inf', 'cav', 'art', 'vrt'].forEach(t => a[t] += a[t] * k); a.xp = (x0 * r + recruitXp(n, a.p) * add) / (r + add); n.manpower -= add;
   }
 }
 function capitalOccupied() {
@@ -71,7 +71,7 @@ function warsTick() { S.wars.slice().forEach(w => { w.score = warScore(w); aiPea
 function yearTick() { if (S.t % 360 === 0) { relDrift(); religTick(); } }
 function endCheck() { if (curYear() >= END_YEAR && !S.over) { S.over = 'end'; log('O ano ' + END_YEAR + ' chegou. A crônica termina.', 'world'); } }
 /* o mundo, todo mês */
-const WORLD_MONTH = [plagueTick, alienTick, nanGuard, econAll, mineStates, nationsMonth, rebelTick, generalsDie, reinforce, capitalOccupied, popTick, colonyTick, warsTick, yearTick, endCheck];
+const WORLD_MONTH = [plagueTick, alienTick, nanGuard, econAll, mineStates, nationsMonth, rebelTick, generalsDie, attritionTick, reinforce, capitalOccupied, popTick, colonyTick, warsTick, yearTick, endCheck];
 function monthTick() { for (const f of WORLD_MONTH) f(); }
 
 /* fatores da estabilidade (alvo para onde ela anda até 2 pontos por mês) */
@@ -88,7 +88,7 @@ function stabParts(n) {
 function mergeIdle(id) {                                      // junta exércitos parados na mesma província
   const by = new Map(); let k = 0;
   S.armies.forEach(a => { if (a.o !== id || a.exp || a.path.length || a.inBattle || a.p >= WD.provs.length) return; const l = by.get(a.p); if (l) l.push(a); else by.set(a.p, [a]); });
-  by.forEach(l => { if (l.length < 2) return; const m = l[0]; l.slice(1).forEach(a => { m.inf += a.inf; m.cav += a.cav; m.art += a.art; m.vrt += a.vrt; m.mor = Math.min(m.mor, a.mor); m.gen = m.gen || a.gen; a.inf = a.cav = a.art = a.vrt = 0; k++; }); m.max = regs(m); });
+  by.forEach(l => { if (l.length < 2) return; const m = l[0]; l.slice(1).forEach(a => { mergeInto(m, a); k++; }); });
   if (k) S.armies = S.armies.filter(a => regs(a) > .08); return k;
 }
 function repairGame(full) {
@@ -112,7 +112,7 @@ function repairGame(full) {
 /* ---------- avanço do tempo ---------- */
 function advanceDay() {
   if (S.over) return;
-  S.t++; dayTick();
+  S.t++; dayTick(); invasionTick(); frontsTick();
   if (S.t % 30 === 0) monthTick();
 }
 function score(n) { return Math.round((n.popT || 0) / 100 + (n.gdp || 0) / 50 + techCount(n) * 5 + provsOf(n.id).length * 2); }

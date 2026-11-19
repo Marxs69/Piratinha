@@ -5,24 +5,21 @@
 let enterC = null;                                          // memória de canEnter por nação (refeita por mês, guerra ou mudança de dono)
 function canEnter(o, p) { if (!enterC) enterC = new Map(); let a = enterC.get(o); if (!a) { a = new Int8Array(S.own.length).fill(-1); enterC.set(o, a); } if (a[p] < 0) a[p] = canEnter0(o, p) ? 1 : 0; return a[p] === 1; }
 function canEnter0(o, p) { const ow = S.own[p], ct = S.ctrl[p]; return ow === o || ct === o || ow === -1 || atWar(o, ow) || atWar(o, ct); }
-function transport(o) { let s = 0; S.fleets.forEach(f => { if (f.o === o) s += f.ships; }); return s * 3; }
+/* caminho de um exército: só por terra, mais travessias de um único mar livre de inimigos (barcos locais, FERRY_DAYS).
+   Mais de um mar exige invasão com frota (planInvasion). Sem exército (consultas), usa as mesmas regras. */
 function findPath(n, from, to, army) {
-  const P = WD.provs.length, Z = WD.seas.length, dist = new Float32Array(P + Z).fill(1e9), prev = new Int32Array(P + Z).fill(-1), hp = new Heap();
-  const canSail = n.fx.sea >= 1 && (!army || transport(n.id) >= regs(army));
+  const P = WD.provs.length; if (from >= P) return null;
+  const dist = new Float32Array(P).fill(1e9), prev = new Int32Array(P).fill(-1), hp = new Heap(), fz = new Map();
   dist[from] = 0; hp.push(0, from);
-  const speed = 1 + Math.max(-.5, n.m.speed || 0);
+  const speed = (1 + Math.max(-.5, n.m.speed || 0)) * (army ? armySpeed(army) : 1);
+  const ferry = n.fx.sea >= 1;
   while (hp.size) {
     const u = hp.pop(); if (u === to) break; const du = dist[u];
     const relax = (v, c) => { if (du + c < dist[v]) { dist[v] = du + c; prev[v] = u; hp.push(du + c, v); } };
-    if (u < P) {
-      const pr = WD.provs[u];
-      for (const v of pr.adj) if (n.exP[v] && (v === to || canEnter(n.id, v))) relax(v, edgeDays(n, u, v) / speed);
-      if (canSail) for (const z of pr.seas) if (n.exZ[z] && seaOk(n, z)) relax(P + z, 4);
-    } else {
-      const z = WD.seas[u - P];
-      for (const w of z.adj) if (n.exZ[w] && seaOk(n, w)) relax(P + w, 5 / speed);
-      for (const p of z.provs) if (n.exP[p] && (p === to || canEnter(n.id, p))) relax(p, 4);
-    }
+    const pr = WD.provs[u];
+    for (const v of pr.adj) if (n.exP[v] && (v === to || canEnter(n.id, v))) relax(v, edgeDays(n, u, v) / speed);
+    if (ferry && pr.coast) for (const z of pr.seas) { if (!fz.has(z)) fz.set(z, canFerry(n, z)); if (!fz.get(z)) continue;
+      for (const v of WD.seas[z].provs) if (v !== u && n.exP[v] && !pr.adj.includes(v) && (v === to || canEnter(n.id, v))) relax(v, FERRY_DAYS); }
   }
   if (dist[to] >= 1e9) return null;
   const path = []; for (let v = to; v !== from; v = prev[v]) path.unshift(v); return path;
@@ -58,12 +55,13 @@ function dayTick() {
     if (!a.path.length) continue;
     const n = nat(a.o), next = a.path[0];
     if (!a.need) {
-      if (next < P && a.p < P) a.need = edgeDays(n, a.p, next) / (1 + Math.max(-.5, n.m.speed || 0));
-      else a.need = 4;
+      if (a.p >= P || next >= P) { a.path = []; continue; }
+      if (WD.provs[a.p].adj.includes(next)) a.need = edgeDays(n, a.p, next) / (1 + Math.max(-.5, n.m.speed || 0)) / armySpeed(a);
+      else { const z = sharedSea(a.p, next); if (z == null || !canFerry(n, z)) { a.path = []; continue; } a.need = FERRY_DAYS * (a.sup && a.sup.eng ? .75 : 1); a.ferry = 1; }   // travessia: o mar precisa estar livre
       if (next < P && !a.retreat && !a.exp && !canEnter(a.o, next)) { a.path = []; a.need = 0; continue; }
     }
-    a.prog += 1;
-    if (a.prog >= a.need) { a.p = next; a.path.shift(); a.prog = 0; a.need = 0; explore(n, a.p); if (!a.path.length) a.retreat = false; }
+    a.prog += 1; a.fat = Math.min(1, (a.fat || 0) + .006 * (next < P ? TERRAIN[WD.provs[next].terr].move : 1));   // marchar cansa (mais em terreno difícil)
+    if (a.prog >= a.need) { a.p = next; a.path.shift(); a.prog = 0; a.need = 0; a.arr = S.t; if (a.ferry) { a.ferry = 0; if (S.armies.some(b => b.p === next && atWar(a.o, b.o)) || atWar(a.o, S.ctrl[next])) a.amph = S.t + 15; } explore(n, a.p); if (!a.path.length) a.retreat = false; }
   }
   for (const f of S.fleets) {
     if (!f.path.length) { if (f.auto) autoExplore(f); continue; }
@@ -74,41 +72,28 @@ function dayTick() {
   at.forEach((list, p) => {
     const owners = [...new Set(list.map(a => a.o))];
     let fought = false;
-    for (let i = 0; i < owners.length && !fought; i++) for (let j = i + 1; j < owners.length && !fought; j++) if (atWar(owners[i], owners[j])) { const ok = a => !a.retreat && !(a.sh > S.t), A = list.filter(a => a.o === owners[i] && ok(a)), B = list.filter(a => a.o === owners[j] && ok(a)); if (A.length && B.length) { battle(p, A, B); fought = true; } }
+    for (let i = 0; i < owners.length && !fought; i++) for (let j = i + 1; j < owners.length && !fought; j++) if (atWar(owners[i], owners[j])) {
+      const ok = a => !a.retreat && !(a.sh > S.t) && !a.exp, x = owners[i], y = owners[j];      // cada lado junta todos os que estão contra o outro e não entre si
+      const A = list.filter(a => ok(a) && !atWar(a.o, x) && atWar(a.o, y)), B = list.filter(a => ok(a) && !atWar(a.o, y) && atWar(a.o, x));
+      if (A.length && B.length) { battleDay(p, A, B); fought = true; } }
     if (!fought) siegeAt(p, list);
   });
   // batalhas navais
   const zs = new Map(); for (const f of S.fleets) { if (!zs.has(f.z)) zs.set(f.z, []); zs.get(f.z).push(f); }
   zs.forEach(list => { if (list.length < 2) return; for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) if (atWar(list[i].o, list[j].o) && list[i].ships > 0 && list[j].ships > 0) navalBattle(list[i], list[j]); });
   S.fleets = S.fleets.filter(f => f.ships > .2);
-  // moral se recupera fora de combate
-  for (const a of S.armies) if (!a.inBattle) a.mor = Math.min(1, a.mor + (S.own[a.p] === a.o ? .03 : .015)); else a.inBattle = false;
+  for (const k in S.battles) if (S.battles[k].seen !== S.t) delete S.battles[k];   // batalha acabou sem vencedor (alguém saiu)
+  // moral se recupera fora de combate (devagar se cansado; sem suprimento, quase nada e com teto); descanso tira o cansaço
+  for (const a of S.armies) {
+    if (a.inBattle) { a.inBattle = false; continue; }
+    const home = a.p < P && friendsOf(a.o).has(S.ctrl[a.p]), sup = a.supOk !== false;
+    a.mor = Math.min(sup ? 1 : .6, a.mor + (home ? .03 : .015) * (1 - .6 * (a.fat || 0)) * (sup ? 1 : .3));
+    if (!a.path.length) a.fat = Math.max(0, (a.fat || 0) - (sup ? (home ? .02 : .01) : 0));
+  }
   S.armies = S.armies.filter(a => regs(a) > .08);
 }
-function power(list, def, p) {
-  let s = 0, r = 0;
-  for (const a of list) { const n = nat(a.o), u = n.up; const pw = (a.inf * u.inf * UNIT_BASE.inf.a + a.cav * u.cav * UNIT_BASE.cav.a + a.art * u.art * UNIT_BASE.art.a + a.vrt * u.vrt * UNIT_BASE.vrt.a) * (1 + n.m.army); s += pw * (.25 + .75 * a.mor) * genMul(a.gen) * (.7 + .3 * (n.armySat == null ? 1 : n.armySat)); r += regs(a); }
-  if (def) s *= 1 + TERRAIN[WD.provs[p].terr].def + fortOf(p) * .1;
-  return [s, r];
-}
-function battle(p, A, B) {
-  if (!A.length || !B.length) return;
-  const ownerP = S.ctrl[p], aDef = A[0].o === ownerP, [pa, ra] = power(A, aDef, p), [pb, rb] = power(B, !aDef, p);
-  const lossB = pb > 0 ? pa * .016 * rand(.75, 1.25) : rb, lossA = pb * .016 * rand(.75, 1.25);
-  const hit = (list, loss, tot) => { for (const a of list) { const f = Math.min(1, loss / Math.max(.01, tot)); a.inf -= a.inf * f; a.cav -= a.cav * f; a.art -= a.art * f; a.vrt -= a.vrt * f; a.mor = Math.max(0, a.mor - (loss / Math.max(1, tot)) * 2.6 - .025); a.inBattle = true; a.path = []; } };
-  hit(A, lossA, ra); hit(B, lossB, rb);
-  const w = S.wars.find(w => (w.A.includes(A[0].o) && w.D.includes(B[0].o)) || (w.A.includes(B[0].o) && w.D.includes(A[0].o)));
-  if (w) { w.loss = w.loss || {}; w.loss[A[0].o] = (w.loss[A[0].o] || 0) + lossA; w.loss[B[0].o] = (w.loss[B[0].o] || 0) + lossB; }
-  const brokeA = A.every(a => a.mor < .08 || regs(a) < .3), brokeB = B.every(a => a.mor < .08 || regs(a) < .3);
-  if (brokeA || brokeB) {
-    const lose = brokeA ? A : B, win = brokeA ? B : A;
-    if (w) { w.bp = w.bp || {}; w.bp[win[0].o] = (w.bp[win[0].o] || 0) + clamp(Math.round((brokeA ? ra : rb) * .5), 1, 10); }
-    const ln = nat(lose[0].o), wn = nat(win[0].o);
-    lose.forEach(a => { if (a.gen && chance(.06)) { if (a.o === S.player) log('O general ' + charName(a.gen) + ' morreu em ' + WD.provs[p].n + '.', 'bad', [S.player]); a.gen = null; } });
-    if (lose[0].o === S.player || win[0].o === S.player) log('Batalha em ' + WD.provs[p].n + ': ' + natName(wn) + ' venceu ' + natName(ln) + '.', win[0].o === S.player ? 'good' : 'bad', [S.player]);
-    lose.forEach(a => retreat(a));
-  }
-}
+/* marcha: o exército anda no passo do tipo mais lento que tiver */
+function armySpeed(a) { const n = nat(a.o); let v = 9; UT.forEach(t => { if (a[t] > .05) v = Math.min(v, unitStat(n, t, 'spd')); }); return v === 9 ? 1 : v; }
 function retreat(a) {
   const n = nat(a.o), P = WD.provs.length, seen = new Set([a.p]), q = [[a.p, []]];
   for (let h = 0; h < q.length && h < 400; h++) {
@@ -119,16 +104,13 @@ function retreat(a) {
   a.inf = a.cav = a.art = a.vrt = 0;                         // cercado: o exército se rende
   if (a.o === S.player) log('Um exército seu foi cercado e se rendeu.', 'bad', [S.player]);
 }
-function navalBattle(f, g) {
-  const pf = f.ships * nat(f.o).fx.ship, pg = g.ships * nat(g.o).fx.ship;
-  f.ships -= pg * .04 * rand(.7, 1.3); g.ships -= pf * .04 * rand(.7, 1.3);
-}
+
 function siegeAt(p, list) {
   const ct = S.ctrl[p], own = S.own[p], reb = ct === -1 && own >= 0 && S.rebels ? S.rebels[p] : null;
   const besiegers = list.filter(a => !a.path.length && !a.exp && !(a.sh > S.t) && (atWar(a.o, ct) || (own === a.o && ct !== a.o && (reb || atWar(a.o, ct)))));
   if (!besiegers.length) { delete S.sieges[p]; return; }
   const o = besiegers[0].o, n = nat(o), sg = S.sieges[p] && S.sieges[p].o === o ? S.sieges[p] : (S.sieges[p] = { o, v: 0 });
-  let force = 0; besiegers.filter(a => a.o === o).forEach(a => { force += (regs(a) + a.art * 3 * n.up.siege) * genMul(a.gen); });
+  let force = 0; besiegers.filter(a => a.o === o).forEach(a => { force += (regs(a) + a.art * 3 * n.up.siege) * genMul(a.gen) * (a.sup && a.sup.eng ? 1.4 : 1); });
   const f = reb ? 0 : fortOf(p) + (ct >= 0 ? Math.floor(nat(ct).fx.fort / 2) * (fortOf(p) > 0 ? 1 : 0) : 0);
   sg.v += force / (95 * Math.pow(1 + f, 2)) / (reb ? Math.max(.5, reb.s / 4) : 1);   // conquista lenta: cada cerco leva meses
   if (reb) besiegers.forEach(a => { const k = Math.min(.012, reb.s * .0006); a.inf *= 1 - k; a.cav *= 1 - k; a.art *= 1 - k; a.vrt *= 1 - k; a.inBattle = true; });   // os rebeldes resistem

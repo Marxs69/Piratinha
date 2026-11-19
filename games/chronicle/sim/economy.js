@@ -70,10 +70,9 @@ function econAll() {
     if (S.moon && S.moon.base[n.id]) sup.he3 += 2;
     const fs = sup.grain + sup.fish || 1; dem.grain += food * Math.max(.3, sup.grain / fs); dem.fish += food * Math.min(.7, sup.fish / fs);
     // exército: armas sempre, um pouco de ferramentas, roupas e comida processada
-    let R = { inf: 0, cav: 0, art: 0, vrt: 0 }; S.armies.forEach(a => { if (a.o === n.id) { R.inf += a.inf; R.cav += a.cav; R.art += a.art; R.vrt += a.vrt; } });
-    const totR = R.inf + R.cav + R.art + R.vrt;
-    dem.arms += totR * (hasT(n, 'mil_crossbow') ? .045 : .025); dem.tools += totR * .006; dem.clothes += totR * .02; dem.pfood += totR * .012;
-    if (hasT(n, 'mil_tank')) dem.oil += R.cav * .15; if (n.vert) dem[VERT[n.vert].good] += R.vrt * .25 + provsOf(n.id).length * .01 * n.vlv;
+    // exército: cada tipo de tropa e cada companhia de apoio tem as próprias necessidades (UNIT_NEEDS, SUPPORT)
+    const AD = armyDemand(n), R = AD.R; for (const g in AD.d) dem[g] += AD.d[g];
+    if (n.vert) dem[VERT[n.vert].good] += provsOf(n.id).length * .01 * n.vlv;
     // comércio com o mercado mundial: exporta o excedente; importa o que falta dentro de um orçamento, comida primeiro
     const embs = S.nations.filter(o => o.alive && (o.emb || []).includes(n.id)).length;
     const eff = clamp(.35 - (n.quar > S.t ? .3 : 0) + Math.min(5, ports) * .08 + n.m.trade + Math.min(.3, (n.trade || []).length * .07) - Math.min(.4, embs * .08), .1, 1.4);
@@ -92,7 +91,7 @@ function econAll() {
     const s2 = {}; GOOD_IDS.forEach(g => { s2[g] = dem[g] > 0 ? Math.min(1, (sup[g] + n.mk.imp[g]) / dem[g]) : 1; });
     n.mk.sup = sup; n.mk.dem = dem; n.mk.sat = s2;
     if (n.vert) n.vsat = s2[VERT[n.vert].good];
-    n.armySat = totR > .5 ? s2.arms * .6 + s2.clothes * .2 + s2.pfood * .2 : 1;
+    armySats(n, R);
     // receitas e despesas
     for (const k in cov) cov[k] = popT ? cov[k] / popT : 0; n.cov = cov; n.bfx = bfx;
     n.foodSat = Math.min(1, (sup.grain + sup.fish + n.mk.imp.grain + n.mk.imp.fish) / Math.max(1, food));
@@ -108,7 +107,7 @@ function econAll() {
     n.csat = cs;
     const stabE = .55 + n.stab / 200, taxM = 1 + n.m.tax + Math.min(.3, mkts * .015);
     const tax = gdp * ECON.taxBase * Math.max(.1, taxM) * stabE;
-    let upk = 0; S.armies.forEach(a => { if (a.o === n.id) upk += (a.inf * UNIT_BASE.inf.c + a.cav * UNIT_BASE.cav.c + a.art * UNIT_BASE.art.c + a.vrt * UNIT_BASE.vrt.c) * ECON.upkeep; });
+    let upk = 0; S.armies.forEach(a => { if (a.o === n.id) upk += armyUpkeep(a); });
     upk *= eraScale() * .5;
     let navy = 0; S.fleets.forEach(f => { if (f.o === n.id) navy += f.ships * .6 * eraScale(); });
     const admin = (popT * .01 + provsOf(n.id).length * .05) * (1 - .3 * cov.adm), interest = n.money < 0 ? -n.money * .01 : 0, corrupt = n.money > 2000 ? (n.money - 2000) * .01 * (1 - .6 * cov.adm) : 0;
@@ -224,6 +223,8 @@ const slotCost = n => Math.round(150 * eraScale() * (1 + (n.xslots || 0) * .5));
 function buySlot(n) { const c = slotCost(n); if (n.money < c) return 'Sem dinheiro'; n.money -= c; n.xslots = (n.xslots || 0) + 1; return ''; }
 function build(n, s, b) { const e = canBuild(n, s, b); if (e) return e; n.money -= bCost(n, b); n.cons.push({ s, b, m: bMonths(b), tot: bMonths(b) }); return ''; }
 
+/* manutenção mensal de um exército: regimentos, companhias de apoio e treinamento */
+const armyUpkeep = a => (UT.reduce((s, t) => s + a[t] * UNIT_BASE[t].c, 0) * ECON.upkeep + Object.keys(a.sup || {}).reduce((s, k) => s + SUPPORT[k].up * eraScale(), 0)) * (drillOk(a) ? 1.5 : 1);
 const recCost = (n, type, k = 1) => Math.round(UNIT_BASE[type].c * 3 * eraScale() * k);
 function canRecruit(n, type, k = 1) {
   if (type === 'art' && !canArt(n)) return 'Exige Trabuco';
@@ -232,7 +233,7 @@ function canRecruit(n, type, k = 1) {
   if (n.money < recCost(n, type, k)) return 'Sem dinheiro';
   return '';
 }
-function recruit(n, type, k, at) { const e = canRecruit(n, type, k); if (e) return e; n.money -= recCost(n, type, k); n.manpower -= k; const at2 = at != null ? at : n.capital; n.rec.push({ type, k, m: (type === 'vrt' ? 5 : 3) - (S.bld[WD.provs[at2].state].barracks ? 1 : 0), at: at2 }); return ''; }
+function recruit(n, type, k, at) { const e = canRecruit(n, type, k); if (e) return e; n.money -= recCost(n, type, k); n.manpower -= k; const at2 = at != null ? at : n.capital; n.rec.push({ type, k, m: (type === 'vrt' ? 5 : 3) - (S.bld[WD.provs[at2].state].barracks ? 1 : 0), at: at2, x: recruitXp(n, at2) }); return ''; }
 const shipCost = n => Math.round(30 * ECON.costMul * eraScale());
 function buildShips(n, k, p) {
   const pr = WD.provs[p]; if (!pr || !pr.coast || S.own[p] !== n.id) return 'Exige litoral próprio';
@@ -261,7 +262,7 @@ function exploreStep(a) {
   a.exp = false; if (a.o === S.player) log('Seus exploradores não acham mais terra incógnita ao alcance a pé.', 'info', [a.o]);
   else { n.manpower += regs(a); a.inf = a.cav = a.art = a.vrt = 0; }   // IA: a expedição volta para casa e debanda
 }
-function addArmy(o, p, u) { const a = { id: S.id++, o, p, inf: u.inf || 0, cav: u.cav || 0, art: u.art || 0, vrt: u.vrt || 0, mor: 1, path: [], prog: 0, need: 0 }; S.armies.push(a); return a; }
+function addArmy(o, p, u, xp = .1) { const a = { id: S.id++, o, p, inf: u.inf || 0, cav: u.cav || 0, art: u.art || 0, vrt: u.vrt || 0, mor: 1, xp, fat: 0, st: 'bal', sup: {}, path: [], prog: 0, need: 0, arr: S.t }; S.armies.push(a); return a; }
 function addFleet(o, z, ships) { const f = { id: S.id++, o, z, ships, path: [], prog: 0, need: 0, auto: false }; S.fleets.push(f); return f; }
 
 /* ---------- pesquisa ---------- */
