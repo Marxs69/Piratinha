@@ -1,5 +1,5 @@
 /* Grand Chronicle — dados do jogo: bens, prédios, tecnologias, vertentes, governos, ideologias, unidades, traços e nomes.
-   Tudo aqui é tabela; a lógica fica em sim.js. Para equilibrar, mexa nos números daqui. */
+   Tudo aqui é tabela; a lógica fica em sim/ (um arquivo por sistema; fases do mês em sim/tick.js). Para equilibrar, mexa nos números daqui. */
 'use strict';
 
 const START_YEAR = 860, END_YEAR = 2200;

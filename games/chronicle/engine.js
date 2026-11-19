@@ -1,6 +1,6 @@
 /* Grand Chronicle — engine de regras: condições, efeitos e eventos descritos como dados.
    Toda regra nova (eventos, decisões, exigências) deve usar COND e EFF: o mesmo dado serve para checar, aplicar e explicar.
-   Carregado antes de sim.js; só usa as funções da simulação quando chamado (já com S e WD prontos). */
+   Carregado antes de sim/; só usa as funções da simulação quando chamado (já com S e WD prontos). */
 'use strict';
 
 const arr = v => Array.isArray(v) ? v : [v];
