@@ -190,13 +190,15 @@ img.mini { width: 21px; height: 14px; border-radius: 1px; flex: none; }
 #mapbox { position: absolute; right: 10px; bottom: 8px; width: 272px; padding: 6px; display: flex; flex-direction: column; gap: 6px; }
 #mapbox #mini { position: static; width: 100%; height: auto; aspect-ratio: 16 / 9; }
 #mapbox #modes { position: relative; right: auto; bottom: auto; padding: 0; border: 0; background: none; }
-#mapbox #modes.grid { grid-template-columns: repeat(7, 1fr); }
-#mapbox #chron { position: static; width: auto; max-height: min(320px, 40vh); display: flex; flex-direction: column; border-bottom: 1px solid var(--line); }
+#mapbox #modes.grid { grid-template-columns: repeat(7, minmax(0, 1fr)); } #mapbox #modes .btn { padding: 4px 0; font-size: 15px; min-width: 0; }
+#mapbox #chron { position: absolute; right: 0; bottom: calc(100% + 6px); width: 380px; max-height: min(360px, 45vh); display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 10px 30px rgba(0,0,0,.5); }
 #chronbar { width: 100%; text-align: left; font: 700 13px var(--title); letter-spacing: 1px; }
-#mapbox:has(#chron:not([hidden])) { width: 380px; }
 #outl { max-height: calc(100% - 330px); }
 .res b { font-size: 16px; } .res small { font-size: 12.5px; color: #cdbf9f; }
 h4.bgrp { font: 700 11px var(--title); color: var(--dim); letter-spacing: 1px; margin: 8px 0 2px; text-transform: uppercase; }
 .bgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 10px; margin-top: 10px; align-items: start; }
 .bstate .bsh { display: flex; flex-direction: column; cursor: pointer; } .bstate .bsh:hover b { color: var(--gold-2); }
 .res small.incg { color: #9fe08f; font-weight: 700; font-size: 13.5px; } .res small.incb { color: #ff7b82; font-weight: 700; font-size: 13.5px; }
+
+#wm { position: fixed; left: 50%; bottom: 6px; transform: translateX(-50%); z-index: 40; font: 700 12px var(--title); letter-spacing: 2px; color: rgba(255,240,210,.28); pointer-events: none; text-transform: uppercase; }
+.tsearch { width: 100%; margin: 10px 0 4px; font: inherit; font-size: 14px; color: var(--text); background: #120e09; border: 1px solid var(--line); border-radius: 4px; padding: 7px 10px; }

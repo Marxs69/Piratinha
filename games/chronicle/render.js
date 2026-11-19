@@ -49,7 +49,7 @@ function provColors() {
     else if (mode === 'cont') c = contCol[WD.provs[p].cont];
     else if (mode.startsWith('svc:')) { const st = WD.provs[p].state, cv = S.scov && S.scov[st] && stateOwnerOf(st) === o ? S.scov[st][mode.slice(4)] : 0; c = o < 0 ? null : [200 - cv * 160, 70 + cv * 150, 70 + cv * 40]; }
     else if (mode === 'plague') { const P = S.plague, D = P ? P.done : (S.plagueDone || {}).done || {}; c = P && P.inf[p] != null ? [30, 70, 20] : D[p] ? [150, 150, 140] : o >= 0 ? [205, 200, 180] : null; }
-    else if (mode === 'res') { const r = resVisible(p) ? provRes(p) : null; c = r === 'iron' ? [150, 150, 170] : r === 'coal' ? [50, 50, 50] : r === 'gold' ? [240, 200, 40] : r === 'oil' ? [30, 20, 40] : r === 'copper' ? [214, 110, 40] : r === 'uranium' ? [110, 230, 60] : r === 'rare' ? [190, 70, 220] : [200, 190, 160]; }
+    else if (mode === 'res') { const r = resVisible(p) ? provRes(p) : null, nr = natRes(p); if (!r && nr.length) { c = NATRES[['fiber', 'farm', 'wood', 'stone', 'fish'].find(k => nr.includes(k))][2]; } else c = r === 'iron' ? [150, 150, 170] : r === 'coal' ? [50, 50, 50] : r === 'gold' ? [240, 200, 40] : r === 'oil' ? [30, 20, 40] : r === 'copper' ? [214, 110, 40] : r === 'uranium' ? [110, 230, 60] : r === 'rare' ? [190, 70, 220] : [200, 190, 160]; }
     if (c) { col[p * 3] = c[0]; col[p * 3 + 1] = c[1]; col[p * 3 + 2] = c[2]; } else { col[p * 3] = 255; col[p * 3 + 1] = 0; col[p * 3 + 2] = 255; }   // magenta = sem cor (mostra terreno)
   }
   return col;

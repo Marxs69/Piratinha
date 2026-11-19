@@ -171,7 +171,7 @@ function calcMods(n) {
   if (C.steward) m.tax += (C.steward.st.adm - 8) * .006; if (C.scholar) m.research += (C.scholar.st.lea - 8) * .006; if (C.marshal) m.army += (C.marshal.st.mar - 8) * .006; if (C.chancellor) m.stab += (C.chancellor.st.dip - 8) * .003;
   if (C.spymaster) m.coup -= (C.spymaster.st.int - 8) * .04; if (R) m.coup -= (R.st.int - 8) * .02;
   const gd = GOVS[n.gov]; if (gd.until && curYear() > gd.until) m.stab -= .1; if (gd.minRank && (n.rank || 0) < gd.minRank) m.stab -= .1;
-  n.laws = Object.assign({}, LAW_DEF, n.laws || {}); for (const k in LAWS) add((LAWS[k].o[n.laws[k]] || {}).m || {});
+  n.laws = Object.assign({}, LAW_DEF, n.laws || {}); for (const k in LAWS) { if (!LAWS[k].o[n.laws[k]]) n.laws[k] = LAW_DEF[k]; add(LAWS[k].o[n.laws[k]].m); }
   const cv = n.cov || {}; m.growth += (cv.health || 0) * .5; m.research += (cv.edu || 0) * .3; m.tax += (cv.adm || 0) * .15; m.coup -= (cv.sec || 0) * .6;
   const bf = n.bfx || {}; m.army += Math.min(.3, bf.army || 0); m.manpower += Math.min(.4, bf.mp || 0);
   if (n.sats) { m.research += Math.min(20, n.sats) * .01; m.trade += Math.min(20, n.sats) * .005; }
@@ -216,7 +216,7 @@ function econAll() {
           if (d.fx) { const f = d.fx; if (f.svc) { sc[f.svc] = Math.min(1, L * capSvc * svcMul / sp); svcLv += L; } if (f.army) bfx.army += L * f.army; if (f.mp) bfx.mp += L * f.mp; if (f.launch) bfx.launch += L; }
           let inSat = 1; if (d.in) for (const g in d.in) { if (g === 'power' && year < 1885) continue; inSat = Math.min(inSat, sat[g] == null ? 1 : sat[g]); dem[g] += L * d.in[g] * e; }
           if (d.out) {
-            let mult = prodM + (bo[b] || 0) + stBonus; if (b === 'farm' || b === 'fishery') mult += n.m.food; if (b === 'farm') mult *= .55 + fert * .45; if (b === 'oil_well' && B.pipeline) mult += .3;
+            let mult = prodM + (bo[b] || 0) + stBonus; if (b === 'farm' || b === 'fishery') mult += n.m.food; if (b === 'farm') mult = (mult + (B.mill || 0) * .15) * (.55 + fert * .45); if (b === 'oil_well' && B.pipeline) mult += .3;
             for (const g in d.out) sup[g] += L * d.out[g] * e * Math.max(.1, inSat) * Math.max(.2, mult);
           }
         }
@@ -226,7 +226,8 @@ function econAll() {
       // subsistência dos não empregados (grãos e um pouco de bens)
       const fertS = st.fert;
       const roomy = clamp(1.35 - sp / st.capK * .6, .92, 1.35);   // terra pouco povoada rende mais comida por pessoa
-      sup.grain += (sp - used * .6) * (.72 + .4 * fertS) * roomy * (1 + n.m.food * .5);   // quem trabalha nos prédios ainda planta um pouco
+      const mill = stateOwnerOf(st.id) === n.id ? (S.bld[st.id].mill || 0) * .05 : 0;
+      sup.grain += (sp - used * .6) * (.72 + .4 * fertS) * roomy * (1 + n.m.food * .5 + mill);   // quem trabalha nos prédios ainda planta um pouco
       if (st.coast) sup.fish += (sp - used) * .08;
       sup.wood += (sp - used) * .02; sup.goods += (sp - used) * .012; sup.cloth += (sp - used) * .034; sup.fiber += (sp - used) * .01;
     });
@@ -277,6 +278,9 @@ function econAll() {
 const bCost = (n, b) => Math.round(BUILDINGS[b].cost * ECON.costMul * (1 - Math.min(.5, n.m.admin || 0)) * (1 + (curYear() - 860) / 600));
 const bMonths = b => Math.max(3, Math.round(BUILDINGS[b].cost / 25));
 const HIDDEN = ['oil', 'uranium', 'rare'], RES_MULT = { iron: 3, coal: 3, gold: 2, oil: 3, copper: 3, uranium: 2, rare: 2 };
+const natRes = p => { const pr = WD.provs[p], T = TERRAIN[pr.terr], o = [];   // recursos naturais da província (além dos minerais)
+  if (T.food >= 1) o.push('farm'); if (pr.temp > .55 && T.food >= .7) o.push('fiber'); if (['forest', 'taiga', 'jungle'].includes(pr.terr)) o.push('wood'); if (['hills', 'mountain', 'desert'].includes(pr.terr)) o.push('stone'); if (pr.coast) o.push('fish'); return o; };
+const NATRES = { farm: ['🌾', 'Terra cultivável', [222, 200, 90]], fiber: ['🧶', 'Fibras', [245, 243, 232]], wood: ['🪵', 'Floresta', [40, 110, 50]], stone: ['🪨', 'Pedra', [150, 140, 120]], fish: ['🐟', 'Peixe', [80, 160, 210]] };
 const provRes = p => (S.newRes && S.newRes[p]) || WD.provs[p].res;
 const resVisible = p => { const r = provRes(p); return !!r && (!HIDDEN.includes(r) || !!(S.found && S.found[p])); };
 const resCount = (st, r) => st.provs.filter(p => provRes(p) === r && resVisible(p)).length * RES_MULT[r];
@@ -345,7 +349,9 @@ function setCapital(n, p) {
   if (n.money < capCost()) return 'Sem dinheiro'; n.money -= capCost(); n.capital = p; n.capCd = S.t + 360 * 10; n.stab = Math.max(0, n.stab - 5); S.mapDirty = true;
   log('A capital de ' + natName(n) + ' agora é ' + WD.provs[p].n + '.', n.id === S.player ? 'good' : 'none', [n.id]); return '';
 }
-const consSlots = n => n.fx.slots + Math.floor((n.popT || 0) / 1000) + Math.floor(Math.max(0, n.money) / 2500);
+const consSlots = n => n.fx.slots + Math.floor((n.popT || 0) / 1000) + Math.floor(Math.max(0, n.money) / 2500) + (n.xslots || 0);
+const slotCost = n => Math.round(150 * eraScale() * (1 + (n.xslots || 0) * .5));
+function buySlot(n) { const c = slotCost(n); if (n.money < c) return 'Sem dinheiro'; n.money -= c; n.xslots = (n.xslots || 0) + 1; return ''; }
 function build(n, s, b) { const e = canBuild(n, s, b); if (e) return e; n.money -= bCost(n, b); n.cons.push({ s, b, m: bMonths(b), tot: bMonths(b) }); return ''; }
 
 const recCost = (n, type, k = 1) => Math.round(UNIT_BASE[type].c * 3 * eraScale() * k);
@@ -1082,7 +1088,7 @@ function ai(n) {
     for (const b of avail) {                                    // valor de cada prédio para o país (não depende do estado)
       const d = BUILDINGS[b];
       let v = 0; if (d.out) for (const g in d.out) v += d.out[g] * S.wp[g] * (n.mk.sat[g] < 1 ? 1.6 : 1); if (d.in) for (const g in d.in) v -= d.in[g] * S.wp[g] * (n.mk.sat[g] < .8 ? 2 : 1);
-      if (d.fx) v += (d.fx.svc ? (1 - ((n.cov || {})[d.fx.svc] || 0)) * 50 : 0) + (d.fx.speed || 0) * 8 + (d.fx.army ? (atW ? 30 : 8) : 0) + (d.fx.mp ? 10 : 0) + (d.fx.launch && hasT(n, 'spc_rockets') && !launchOk(n) ? 300 : 0) + (d.fx.pipe ? 15 : 0) + (d.fx.yard ? 4 : 0) + (d.fx.research || 0) * 4 + (d.fx.tax || 0) * (n.gdp || 0) * .15 + (d.fx.prod || 0) * Math.max(60, stGdp) + (d.fx.fort ? (atW ? 25 : 4) : 0) + (d.fx.port ? 8 : 0) + (d.fx.stab ? (n.stab < 45 ? 20 : 3) : 0);
+      if (d.fx) v += (d.fx.svc ? (1 - ((n.cov || {})[d.fx.svc] || 0)) * 50 : 0) + (d.fx.speed || 0) * 8 + (d.fx.army ? (atW ? 30 : 8) : 0) + (d.fx.mp ? 10 : 0) + (d.fx.launch && hasT(n, 'spc_rockets') && !launchOk(n) ? 300 : 0) + (d.fx.pipe ? 15 : 0) + (d.fx.mill ? (n.foodSat < 1.05 ? 80 : 10) : 0) + (d.fx.yard ? 4 : 0) + (d.fx.research || 0) * 4 + (d.fx.tax || 0) * (n.gdp || 0) * .15 + (d.fx.prod || 0) * Math.max(60, stGdp) + (d.fx.fort ? (atW ? 25 : 4) : 0) + (d.fx.port ? 8 : 0) + (d.fx.stab ? (n.stab < 45 ? 20 : 3) : 0);
       if (d.out && (d.out.goods || d.out.cloth) && ((n.mk.sat.goods || 1) < .85 || (n.mk.sat.cloth || 1) < .85)) v += 70;
       if ((b === 'farm' || b === 'fishery') && n.foodSat < 1.05) v += 120; else if (n.foodSat < .95 && d.w > 1) v -= 40;
       if (b === 'university' && tr.includes('scholar')) v += 40; if (b === 'temple' && tr.includes('zealous')) v += 40; if (b === 'temple' && tr.includes('cynical')) v -= 30; if (b === 'market' && tr.includes('greedy')) v += 40;

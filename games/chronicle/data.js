@@ -67,6 +67,10 @@ const BUILDINGS = {
   port:        { n: 'Porto', e: '⚓', cost: 120, w: .6, fx: { port: 1, trade: .04 }, req: 'coast', max: 3 },
   university:  { n: 'Universidade', e: '🎓', cost: 160, w: .4, fx: { research: 2.5 }, tech: 'soc_universities', max: 3 },
   temple:      { n: 'Templo', e: '⛪', cost: 100, w: .3, fx: { stab: .5 }, max: 2 },
+  mill:        { n: 'Moinho e celeiro', e: '🥖', cost: 90, w: .5, fx: { mill: .15 }, tech: 'eco_watermill', max: 2 },
+  foundry:     { n: 'Fundição', e: '🔥', cost: 160, w: 1.5, in: { iron: 2, coal: 1 }, out: { tools: 1.2, arms: 1.1 }, tech: 'eco_foundry' },
+  blast_furnace:{ n: 'Alto-forno', e: '🏗️', cost: 220, w: 2, in: { iron: 2.5, coal: 1.5 }, out: { steel: 1.4 }, tech: 'eco_blastfurnace' },
+  textile_manuf:{ n: 'Manufatura têxtil', e: '🧶', cost: 180, w: 2, in: { fiber: 3 }, out: { cloth: 3 }, tech: 'eco_manufactory' },
   manufactory: { n: 'Manufatura', e: '🏭', cost: 200, w: 2, in: { cloth: .8, wood: 1 }, out: { goods: 2.6 }, tech: 'eco_manufactory' },
   textile_mill:{ n: 'Fábrica têxtil', e: '🧵', cost: 320, w: 3, in: { fiber: 4, coal: .5, power: .3 }, out: { cloth: 8 }, tech: 'eco_textile' },
   goods_factory:{ n: 'Fábrica de bens', e: '🏭', cost: 380, w: 3, in: { cloth: 1, steel: .5, wood: 1, power: .5 }, out: { goods: 7 }, tech: 'eco_factory' },
@@ -197,16 +201,18 @@ T('nav_orbit', 'nav', 2150, 'Navegação orbital', ['nav_seastead'], { ship: 4, 
 // economia
 T('eco_heavyplough', 'eco', 900, 'Arado pesado', [], { bo: { farm: .15 } });
 T('eco_coinage', 'eco', 920, 'Cunhagem', [], { m: { tax: .05 } });
-T('eco_watermill', 'eco', 980, 'Moinho d’água', ['eco_heavyplough'], { m: { prod: .05 } });
+T('eco_watermill', 'eco', 980, 'Moinho d’água', ['eco_heavyplough'], { m: { prod: .05 }, b: ['mill'] });
 T('eco_three_field', 'eco', 1050, 'Rotação trienal', ['eco_heavyplough'], { bo: { farm: .2 }, m: { growth: .1 } });
 T('eco_trade_fairs', 'eco', 1100, 'Feiras comerciais', ['eco_watermill'], { b: ['market'], m: { trade: .05 } });
 T('eco_guilds', 'eco', 1180, 'Guildas', ['eco_trade_fairs'], { b: ['jeweler'], bo: { workshop: .2, smithy: .15 } });
 T('eco_deepmining', 'eco', 1200, 'Mineração profunda', ['eco_watermill'], { b: ['coal_mine'], bo: { iron_mine: .2, gold_mine: .2 } });
 T('eco_banking', 'eco', 1300, 'Bancos', ['eco_guilds'], { m: { tax: .08 } });
 T('eco_doubleentry', 'eco', 1450, 'Partidas dobradas', ['eco_banking'], { m: { tax: .06 }, slots: 1 });
+T('eco_foundry', 'eco', 1450, 'Fundição de ferro', ['eco_deepmining'], { b: ['foundry'] });
 T('eco_colonization', 'eco', 1490, 'Colonização', ['eco_doubleentry', 'nav_caravel'], { col: 1, m: { colon: .1 } });
 T('eco_mercantilism', 'eco', 1520, 'Mercantilismo', ['eco_doubleentry'], { i: ['mercant'], m: { trade: .1 } });
-T('eco_manufactory', 'eco', 1560, 'Manufaturas', ['eco_mercantilism'], { b: ['manufactory'] });
+T('eco_manufactory', 'eco', 1560, 'Manufaturas', ['eco_mercantilism'], { b: ['manufactory', 'textile_manuf'] });
+T('eco_blastfurnace', 'eco', 1600, 'Alto-forno', ['eco_foundry'], { b: ['blast_furnace'] });
 T('eco_companies', 'eco', 1600, 'Companhias de comércio', ['eco_colonization', 'eco_mercantilism'], { col: 1, m: { trade: .1, colon: .15 } });
 T('eco_agri_rev', 'eco', 1700, 'Revolução agrícola', ['eco_manufactory'], { bo: { farm: .3, plantation: .2 }, m: { growth: .15 } });
 T('eco_steam', 'eco', 1770, 'Máquina a vapor', ['eco_agri_rev'], { m: { prod: .08 }, slots: 1 });
@@ -491,7 +497,7 @@ const LAWS = {
   trade: { eco: 1, n: 'Comércio', o: { free: { n: 'Livre comércio', m: { trade: .15, prod: -.03 }, req: 'eco_mercantilism' }, normal: { n: 'Tarifas moderadas', m: {} }, protect: { n: 'Protecionismo', m: { trade: -.1, prod: .06 } }, autarky: { n: 'Autarquia', m: { trade: -.4, prod: .08, stab: .03 } } } },
   spend: { n: 'Gastos públicos', o: { austerity: { n: 'Austeridade', m: { stab: -.05 }, svc: .5 }, normal: { n: 'Equilibrados', m: {}, svc: 1 }, welfare: { n: 'Bem-estar social', m: { stab: .08, growth: .05 }, svc: 1.6, req: 'soc_welfare' } } },
   press: { n: 'Imprensa', o: { censored: { n: 'Censurada', m: { stab: .05, research: -.05 } }, regulated: { n: 'Regulada', m: {} }, free: { n: 'Livre', m: { research: .06, stab: -.03 }, req: 'soc_printing' } } },
-  currency: { eco: 1, n: 'Moeda', o: { metal: { n: 'Moeda metálica', m: {} }, paper: { n: 'Papel-moeda', m: { tax: .05, trade: .05, stab: -.02 }, req: 'eco_banking' }, gold: { n: 'Padrão-ouro', m: { trade: .1, stab: .03, prod: -.03 }, req: 'eco_steam' }, fiat: { n: 'Moeda fiduciária', m: { prod: .06, tax: .05, stab: -.03 }, req: 'soc_welfare' }, digital: { n: 'Moeda digital', m: { tax: .08, trade: .1 }, req: 'eco_internet' } } },
+  currency: { eco: 1, n: 'Moeda', o: { metal: { n: 'Metálica / padrão-ouro', m: { trade: .04, stab: .02 } }, paper: { n: 'Papel-moeda', m: { tax: .05, trade: .05, stab: -.02 }, req: 'eco_banking' }, fiat: { n: 'Moeda fiduciária', m: { prod: .06, tax: .05, stab: -.03 }, req: 'soc_welfare' }, digital: { n: 'Moeda digital', m: { tax: .08, trade: .1 }, req: 'eco_internet' } } },
   bank:  { eco: 1, n: 'Sistema bancário', o: { none: { n: 'Agiotas', m: {} }, private: { n: 'Bancos privados', m: { prod: .04, trade: .04, stab: -.02 }, req: 'eco_banking' }, central: { n: 'Banco central', m: { stab: .04, tax: .04 }, req: 'eco_doubleentry' }, state: { n: 'Banco estatal', m: { prod: .06, trade: -.06 }, req: 'soc_socialism' } } },
   labor: { n: 'Trabalho', o: { serfdom: { n: 'Servidão', m: { tax: .05, prod: -.05, stab: -.03 } }, free: { n: 'Trabalho livre', m: {} }, unions: { n: 'Sindicatos', m: { stab: .05, prod: -.03 }, req: 'soc_unions' }, collective: { n: 'Coletivizado', m: { prod: .08, stab: -.06 }, req: 'soc_socialism' } } },
   land:  { n: 'Terra', o: { feudal: { n: 'Feudal', m: { manpower: .1, prod: -.04 } }, private: { n: 'Propriedade privada', m: { prod: .05, food: .05 }, req: 'soc_common_law' }, reform: { n: 'Reforma agrária', m: { food: .1, stab: .04, tax: -.03 }, req: 'soc_mass_politics' }, collective: { n: 'Fazendas coletivas', m: { food: -.05, prod: .05 }, req: 'soc_socialism' } } },
@@ -507,8 +513,8 @@ const ROCKETS = { none: 'Foguete químico', clock: 'Foguete de corda', steam: 'F
 const MOON_TYPES = [['Rochosa', '#9a9890'], ['Gelada', '#cfe6f2'], ['Oceânica', '#3f78b8'], ['Vulcânica', '#a5452c'], ['Desértica', '#cfa96a'], ['Selvagem', '#4f8a43']];
 const ALIEN_ERAS = ['Idade da Pedra', 'Idade do Bronze', 'Idade Média', 'Renascimento', 'Era Industrial', 'Era Atômica', 'Era Digital', 'Era Interestelar'];
 /* grupos de prédios (painel do estado e janela de construção) */
-const BGROUPS = [['prod', '🌾 Produção e extração', ['farm', 'fishery', 'lumber', 'quarry', 'plantation', 'iron_mine', 'coal_mine', 'gold_mine', 'copper_mine', 'uranium_mine', 'rare_mine', 'oil_well']],
-  ['ind', '🏭 Indústria', ['weaver', 'workshop', 'smithy', 'jeweler', 'manufactory', 'textile_mill', 'goods_factory', 'tool_factory', 'arms_factory', 'steel_mill', 'electronics']],
+const BGROUPS = [['prod', '🌾 Produção e extração', ['farm', 'mill', 'fishery', 'lumber', 'quarry', 'plantation', 'iron_mine', 'coal_mine', 'gold_mine', 'copper_mine', 'uranium_mine', 'rare_mine', 'oil_well']],
+  ['ind', '🏭 Indústria', ['weaver', 'textile_manuf', 'workshop', 'smithy', 'foundry', 'blast_furnace', 'jeweler', 'manufactory', 'textile_mill', 'goods_factory', 'tool_factory', 'arms_factory', 'steel_mill', 'electronics']],
   ['energy', '⚡ Energia', ['power_plant', 'oil_plant', 'hydro', 'nuclear', 'wind', 'solar_plant', 'fusion']],
   ['infra', '🛤️ Transporte e comércio', ['road', 'railway', 'highway', 'hsr', 'maglev', 'tubes', 'portal', 'pipeline', 'port', 'market']],
   ['svc', '🏛️ Serviços públicos', ['hospital', 'school', 'office', 'guard', 'university', 'temple']],
