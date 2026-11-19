@@ -107,7 +107,15 @@ function councilCoup(n, d) {                                   // o conselheiro 
   calcMods(n);
 }
 const BASE_GOVS = ['tribal', 'tribal_conf', 'horde', 'feudal', 'elective', 'empire'];
-const govWhy = (n, g) => { const d = GOVS[g], r = n.rank || 0; if (!(n.fx.g.has(g) || BASE_GOVS.includes(g))) return 'Exige tecnologia'; if (d.minRank && r < d.minRank) return 'Exige o título de ' + RANK_N[d.minRank]; if (d.maxRank != null && r > d.maxRank) return 'Só até o título de ' + RANK_N[d.maxRank]; if (d.until && curYear() > d.until) return 'Obsoleto desde ' + d.until; return ''; };
+/* requisitos de uma forma de governo: tecnologia (fx.g) e condições (título e época) pela engine */
+const govWhen = g => { const d = GOVS[g], c = {}; if (d.minRank != null || d.maxRank != null) c.rank = [d.minRank ?? null, d.maxRank ?? null]; if (d.until) c.year = [null, d.until]; return c; };
+const govWhy = (n, g) => { if (!(n.fx.g.has(g) || BASE_GOVS.includes(g))) return 'Exige tecnologia'; const f = condFail(n, govWhen(g)); return f.length ? 'Exige ' + f.join(', ') : ''; };
+/* anos desde que a forma de governo ficou ultrapassada (0 = atual): a crise de legitimidade cresce com o tempo */
+const govAge = n => { const u = GOVS[n.gov].until; return u ? Math.max(0, curYear() - u) : 0; };
+function govNextOf(n) {                                         // a reforma natural; sem ela, outra do mesmo grupo; sem ela, qualquer uma possível
+  const d = GOVS[n.gov], all = [...n.fx.g, ...BASE_GOVS].filter(g => g !== n.gov && GOVS[g] && govOk(n, g));
+  return d.next && govOk(n, d.next) ? d.next : all.find(g => GOVS[g].cat === d.cat) || all[0] || null;
+}
 const govOk = (n, g) => !govWhy(n, g);
 function setGov(n, g) {
   const ok = govOk(n, g);

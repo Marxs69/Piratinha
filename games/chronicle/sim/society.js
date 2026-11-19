@@ -1,45 +1,62 @@
 /* Grand Chronicle — simulação: peste, escravos, revoltas, religião e minorias. */
 'use strict';
 
-/* ---------- a Grande Peste (fim da Idade Média) ----------
-   Surge entre 1340 e 1360 numa província de litoral do continente principal, passa para vizinhas e pelas rotas de mar.
-   Cada província doente perde ~2,5% da população por mês durante um ano; depois fica imune. Quarentena reduz o contágio. */
-function epiTick() {                                         // surtos menores: espalham pouco, matam menos e acabam logo
-  S.epis = S.epis || [];
-  if (curYear() > 900 && chance(.012)) { const ps = WD.provs.filter(p => S.own[p.id] >= 0 && S.pop[p.id] > 20); if (ps.length) { const p0 = pickR(ps); S.epis.push({ n: pickR(DISEASES) + ' de ' + p0.n, inf: { [p0.id]: 5 }, done: {} }); log('Surto de ' + S.epis[S.epis.length - 1].n.toLowerCase() + '.', S.own[p0.id] === S.player ? 'bad' : 'none', [S.own[p0.id]]); } }
-  S.epis = S.epis.filter(E => {
-    const add = {};
-    for (const k in E.inf) {
-      const p = +k, o = S.own[p], hp = o >= 0 ? ((nat(o).cov || {}).health || 0) : 0; S.pop[p] *= 1 - .012 * (1 - hp * .6);
-      WD.provs[p].adj.forEach(q => { if (E.inf[q] == null && add[q] == null && !E.done[q] && chance(.12 * (1 - hp * .6) * (o >= 0 && nat(o).quar > S.t ? .3 : 1))) add[q] = 5; });
-      if (--E.inf[k] <= 0) { delete E.inf[k]; E.done[p] = 1; }
-    }
-    Object.assign(E.inf, add); return Object.keys(E.inf).length > 0 && Object.keys(E.done).length < 60;
-  });
+/* ---------- doenças: surtos comuns o tempo todo e grandes pandemias em épocas marcadas ----------
+   Hospitais (cobertura de saúde) e medicina (técnicas com fx.med) reduzem letalidade e contágio, mas nunca zeram. Quarentena corta o contágio. */
+function diseaseProt(o) {                                     // [multiplicador de letalidade, multiplicador de contágio] para um dono
+  if (o < 0) return [1, 1]; const n = nat(o), hp = (n.cov || {}).health || 0, med = Math.min(.45, n.fx ? n.fx.med : 0);
+  return [Math.max(.2, (1 - .5 * hp) * (1 - med)), Math.max(.3, (1 - .35 * hp) * (1 - med / 2)) * (n.quar > S.t ? .3 : 1)];
+}
+const sickAt = p => (S.epis || []).some(E => E.inf[p] != null) || (S.pands || []).some(P => P.inf[p] != null);
+function diseaseLe(p) {                                       // letalidade mensal na província (soma de tudo o que está ativo lá)
+  let le = 0; for (const E of S.epis || []) if (E.inf[p] != null) le += DISEASES[E.d].le; for (const P of S.pands || []) if (P.inf[p] != null) le += PANDEMICS[P.id].le; return le;
+}
+/* espalha um surto (comum ou pandemia) por um mês */
+function spreadTick(E, D) {
+  const add = {}, hit = new Set();
+  for (const k in E.inf) {
+    const p = +k, pr = WD.provs[p], o = S.own[p], [le] = diseaseProt(o); S.pop[p] *= 1 - D.le * le; if (o >= 0) hit.add(o);
+    const go = (q, base) => { if (E.inf[q] != null || add[q] != null || E.done[q] || WD.provs[q].terr === 'ice') return; if (chance(base * diseaseProt(S.own[q])[1] * (D.urb ? Math.min(1.5, S.pop[q] / 40) : 1))) add[q] = D.dur; };
+    pr.adj.forEach(q => go(q, D.sp));
+    if (D.mar && pr.coast && chance(D.mar)) { const z = WD.seas[pickR(pr.seas)], far = z.provs.length ? pickR(z.provs) : null; if (far != null) go(far, .6); }
+    if (--E.inf[k] <= 0) { delete E.inf[k]; E.done[p] = 1; }
+  }
+  Object.assign(E.inf, add); return hit;
+}
+function diseaseOrigin(D) {                                   // onde um surto comum nasce: acampamentos, terrenos próprios, cidades cheias ou qualquer lugar povoado
+  if (D.war && chance(.7)) { const ps = Object.keys(S.sieges || {}).map(Number).concat(S.armies.filter(a => a.p < WD.provs.length && warsOf(a.o).length).map(a => a.p)); if (ps.length) return pickR(ps); }
+  const ok = p => S.own[p.id] >= 0 && S.pop[p.id] > (D.urb ? 40 : 15) && (!D.terr || D.terr.includes(p.terr));
+  for (let k = 0; k < 40; k++) { const p = WD.provs[rint(WD.provs.length)]; if (ok(p)) return p.id; }
+  return null;
+}
+function epiTick() {
+  S.epis = S.epis || []; const y = curYear();
+  if (S.epis.length < 8 && chance(.02 + Math.min(.03, S.wars.length * .003))) {
+    const pool = Object.keys(DISEASES).filter(k => { const D = DISEASES[k]; return y >= D.y[0] && y <= D.y[1] && (!D.vert || S.nations.some(n => n.alive && n.vert === D.vert)); });
+    const tot = pool.reduce((a, k) => a + DISEASES[k].w, 0); let x = rnd() * tot, d = pool[0]; for (const k of pool) { x -= DISEASES[k].w; if (x < 0) { d = k; break; } }
+    const p0 = d ? diseaseOrigin(DISEASES[d]) : null;
+    if (p0 != null) { const E = { d, n: DISEASES[d].n + ' em ' + WD.provs[p0].n, inf: { [p0]: DISEASES[d].dur }, done: {} }; S.epis.push(E); log('Surto de ' + E.n.toLowerCase().replace(' em ', ' em ') + '.', S.own[p0] === S.player ? 'bad' : 'none', [S.own[p0]]); }
+  }
+  S.epis = S.epis.filter(E => { spreadTick(E, DISEASES[E.d]); return Object.keys(E.inf).length > 0 && Object.keys(E.done).length < 60; });
+}
+function pandStart(id) {
+  const D = PANDEMICS[id], main = WD.conts.find(c => c.main);
+  const cands = WD.provs.filter(p => (!D.cont || p.cont === main.id) && p.coast && S.own[p.id] >= 0 && S.pop[p.id] > 10);
+  if (!cands.length) { S.pandDone[id] = { done: {} }; return; }
+  const p0 = pickR(cands); S.pands.push({ id, inf: { [p0.id]: D.dur }, done: {}, start: S.t, warned: {} });
+  log(D.n + ': surgiu em ' + p0.n + '!', 'world'); notify(S.player, D.e + ' ' + D.n, D.m.replace('{p}', p0.n));
 }
 function plagueTick() {
   epiTick();
-  const y = curYear(), P = S.plague;
-  if (!P) {
-    if (y >= 1340 && !S.plagueDone && chance(y >= 1360 ? 1 : .02)) {
-      const main = WD.conts.find(c => c.main), cands = WD.provs.filter(p => p.cont === main.id && p.coast && S.own[p.id] >= 0);
-      const p0 = pickR(cands); S.plague = { inf: { [p0.id]: 12 }, done: {}, start: S.t };
-      log('A Grande Peste surgiu em ' + p0.n + '!', 'world'); notify(S.player, '☠️ A Grande Peste', 'Uma praga mortal surgiu em ' + p0.n + ' e se espalha pelas estradas e pelos portos. Quem adoecer perde parte da população por um ano.');
-    }
-    return;
-  }
-  const inf = P.inf, newInf = {}, hit = new Set();
-  const spread = (q, base) => { if (inf[q] != null || newInf[q] != null || P.done[q]) return; const o = S.own[q], qq = (o >= 0 && nat(o).quar > S.t ? .3 : 1) * (o >= 0 ? 1 - ((nat(o).cov || {}).health || 0) * .6 : 1); if (chance(base * qq)) newInf[q] = 12; };
-  for (const k in inf) {
-    const p = +k, pr = WD.provs[p]; S.pop[p] *= .965; if (S.own[p] >= 0) hit.add(S.own[p]);
-    pr.adj.forEach(q => spread(q, .3));
-    if (pr.coast && chance(.08)) { const z = WD.seas[pickR(pr.seas)], far = z.provs.length ? pickR(z.provs) : null; if (far != null) spread(far, .6); }
-    if (--inf[k] <= 0) { delete inf[k]; P.done[p] = 1; }
-  }
-  Object.assign(inf, newInf);
-  hit.forEach(o => { const n = nat(o); n.stab = Math.max(0, n.stab - .8); if (o === S.player && !P.warned) { P.warned = true; notify(S.player, '☠️ A Peste chegou', 'A praga chegou às terras de ' + natName(n) + '. Uma quarentena fecha portos e estradas: o contágio cai muito, mas o comércio também.', { quar: true }); log('A Peste chegou a ' + natName(n) + '.', 'bad', [o]); } });
+  S.pands = S.pands || []; S.pandDone = S.pandDone || {}; const y = curYear();
+  for (const id in PANDEMICS) { const D = PANDEMICS[id]; if (S.pandDone[id] || S.pands.some(P => P.id === id) || y < D.y[0]) continue; if (y >= D.y[1] || chance(1 / ((D.y[1] - D.y[0]) * 12))) pandStart(id); }
+  S.pands = S.pands.filter(P => {
+    const D = PANDEMICS[P.id], hit = spreadTick(P, D);
+    hit.forEach(o => { const n = nat(o); n.stab = Math.max(0, n.stab - .8); if (o === S.player && !P.warned[o]) { P.warned[o] = 1; notify(S.player, D.e + ' ' + D.n + ' chegou', 'A doença chegou às terras de ' + natName(n) + '. Uma quarentena fecha portos e estradas: o contágio cai muito, mas o comércio também.', { quar: true }); log(D.n + ' chegou a ' + natName(n) + '.', 'bad', [o]); } });
+    if (Object.keys(P.inf).length) return true;
+    S.pandDone[P.id] = { done: P.done }; log(D.n + ' terminou depois de ' + Math.max(1, Math.round((S.t - P.start) / 360)) + ' anos.', 'world'); return false;
+  });
   S.mapDirty = R_PLAGUE();
-  if (!Object.keys(inf).length) { S.plague = null; S.plagueDone = { done: P.done }; log('A Grande Peste terminou depois de ' + Math.round((S.t - P.start) / 360) + ' anos.', 'world'); }
 }
 const R_PLAGUE = () => S.mapDirty || (typeof R !== 'undefined' && R.mode === 'plague');
 const quarCost = n => Math.round(60 * eraScale());

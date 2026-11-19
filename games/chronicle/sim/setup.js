@@ -137,7 +137,7 @@ const govYear = g => BASE_GOVS.includes(g) ? 860 : (TECHS.find(t => (t.fx.g || [
 function advanceStart(Y, r) {
   const devPick = ['farm', 'fishery', 'lumber', 'iron_mine', 'quarry', 'plantation', 'smithy', 'weaver', 'tailor', 'bakery', 'workshop', 'temple', 'mill', 'market', 'road', 'hospital', 'school', 'office', 'guard', 'port', 'university', 'jeweler', 'coal_mine', 'gold_mine', 'copper_mine', 'foundry', 'manufactory', 'textile_manuf', 'blast_furnace', 'barracks', 'shipyard', 'academy',
     'railway', 'textile_mill', 'goods_factory', 'garment_factory', 'food_factory', 'tool_factory', 'arms_factory', 'steel_mill', 'power_plant', 'hydro', 'oil_well'];
-  S.plagueDone = Y >= 1340 ? { done: {} } : null;
+  S.pandDone = {}; for (const id in PANDEMICS) if (Y >= PANDEMICS[id].y[1]) S.pandDone[id] = { done: {} };   // pandemias de antes do início já passaram
   S.nations.forEach(n => {
     if (n.kind === 'main' && chance(n.vpref ? .7 : .3)) { const o = vertStartOpts(n); if (o.length) { const v = o.find(x => x.id === n.vpref) || pickR(o); setVertStart(n, v.id); } }
     calcMods(n);

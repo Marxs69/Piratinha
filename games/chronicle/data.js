@@ -172,6 +172,7 @@ T('mil_bombard', 'mil', 1400, 'Bombardas', ['mil_gunpowder'], { u: { art: .5, si
 T('mil_arquebus', 'mil', 1450, 'Arcabuz', ['mil_bombard', 'mil_pike'], { u: { inf: .3 } });
 T('mil_bastion', 'mil', 1520, 'Fortificação abaluartada', ['mil_bombard'], { fort: 1 });
 T('mil_musket', 'mil', 1580, 'Mosquete', ['mil_arquebus'], { u: { inf: .35 } });
+T('mil_surgeons', 'mil', 1550, 'Cirurgiões de campanha', ['mil_arquebus'], { med: .05 });
 T('mil_drill', 'mil', 1620, 'Exército permanente', ['mil_musket'], { m: { army: .1 }, b: ['academy'] });
 T('mil_bayonet', 'mil', 1690, 'Baioneta', ['mil_drill'], { u: { inf: .4, cav: .2 } });
 T('mil_fieldart', 'mil', 1720, 'Artilharia de campanha', ['mil_bayonet'], { u: { art: .6 } });
@@ -283,10 +284,13 @@ T('soc_scientific', 'soc', 1620, 'Revolução científica', ['soc_humanism'], { 
 T('soc_glorious', 'soc', 1680, 'Revolução parlamentar', ['soc_scientific', 'soc_absolutism'], { g: ['parl_monarchy', 'company', 'protectorate'], m: { stab: .03 } });
 T('soc_enlightenment', 'soc', 1700, 'Iluminismo', ['soc_scientific'], { g: ['enlightened', 'constitutional'], i: ['liberal'] });
 T('soc_constitution', 'soc', 1780, 'Constitucionalismo', ['soc_enlightenment'], { g: ['parliamentary', 'presidential'], i: ['conservative', 'radical'] });
+T('soc_vaccine', 'soc', 1796, 'Vacinação', ['soc_enlightenment'], { med: .15, m: { growth: .03 } });
 T('soc_nationalism', 'soc', 1800, 'Nacionalismo', ['soc_constitution'], { g: ['federal', 'junta', 'caudillo'], m: { manpower: .15 } });
 T('soc_socialism', 'soc', 1848, 'Socialismo', ['soc_nationalism', 'eco_factory'], { g: ['peoples', 'commune'], i: ['socialism', 'anarchism'] });
 T('soc_unions', 'soc', 1880, 'Sindicatos', ['soc_socialism'], { g: ['syndicalist'], i: ['syndicalism'] });
 T('soc_mass_politics', 'soc', 1890, 'Política de massas', ['soc_unions'], { i: ['socdem', 'natpop', 'agrarian'] });
+T('soc_germ', 'soc', 1870, 'Teoria dos germes', ['soc_vaccine'], { med: .15, m: { growth: .03 } });
+T('soc_antibiotics', 'soc', 1940, 'Antibióticos', ['soc_germ', 'eco_assembly'], { med: .15, m: { growth: .05 } });
 T('soc_mass_media', 'soc', 1920, 'Comunicação de massa', ['soc_mass_politics', 'eco_electricity'], { g: ['one_party', 'totalitarian'], i: ['totalism', 'futurism'] });
 T('soc_technocracy', 'soc', 1930, 'Tecnocracia', ['soc_mass_media'], { g: ['technate'], i: ['technocrat'] });
 T('soc_welfare', 'soc', 1945, 'Estado de bem-estar', ['soc_mass_media'], { m: { stab: .1, growth: .05 }, g: ['peoples_dem', 'mil_regime', 'social_state'] });
@@ -594,7 +598,31 @@ const BGROUPS = [['prod', '🌾 Produção e extração', ['farm', 'mill', 'fish
   ['vert', '✨ Vertente', []]];
 const bGroupOf = b => (BGROUPS.find(g => g[2].includes(b)) || BGROUPS[6])[0];
 /* doenças menores, aleatórias ao longo do jogo */
-const DISEASES = ['Febre', 'Tosse', 'Varíola', 'Febre amarela', 'Disenteria', 'Cólera', 'Gripe', 'Sarampo', 'Febre das águas', 'Peste suína', 'Febre dos pântanos'];
+/* ---------- doenças ----------
+   le = parte da população que morre por mês numa província doente; sp = chance de passar para cada vizinha por mês; mar = chance de saltar pelo mar;
+   dur = meses doente; y = época; terr = surge mais nesses terrenos; war = nasce em cercos e acampamentos; urb = precisa de gente amontoada; vert = só existe se alguém seguir a vertente.
+   Hospitais e medicina reduzem a letalidade e o contágio, mas nunca zeram (ver diseaseProt). */
+const DISEASES = {
+  fever:     { n: 'Febre', y: [860, 2200], le: .008, sp: .10, dur: 4, w: 3 },
+  smallpox:  { n: 'Varíola', y: [860, 1980], le: .02, sp: .14, mar: .03, dur: 6, w: 2 },
+  measles:   { n: 'Sarampo', y: [860, 2200], le: .008, sp: .16, dur: 4, w: 2 },
+  dysentery: { n: 'Disenteria', y: [860, 2200], le: .012, sp: .08, dur: 4, w: 2, war: 1 },
+  marsh:     { n: 'Febre dos pântanos', y: [860, 1950], le: .014, sp: .06, dur: 6, w: 2, terr: ['marsh', 'jungle'] },
+  typhus:    { n: 'Tifo', y: [1400, 1950], le: .016, sp: .10, dur: 5, w: 2, war: 1 },
+  flu:       { n: 'Gripe', y: [1500, 2200], le: .006, sp: .20, mar: .05, dur: 3, w: 3 },
+  yellow:    { n: 'Febre amarela', y: [1600, 1950], le: .02, sp: .10, mar: .05, dur: 5, w: 1, terr: ['jungle', 'savanna'] },
+  tb:        { n: 'Tuberculose', y: [1750, 1960], le: .006, sp: .08, dur: 10, w: 2, urb: 1 },
+  cholera:   { n: 'Cólera', y: [1815, 1960], le: .02, sp: .12, mar: .06, dur: 4, w: 2, urb: 1 },
+  synth:     { n: 'Praga sintética', y: [1985, 2200], le: .02, sp: .14, mar: .06, dur: 6, w: 2, vert: 'bio' },
+  grey:      { n: 'Febre cinzenta', y: [2100, 2200], le: .015, sp: .12, mar: .05, dur: 5, w: 2, vert: 'nano' },
+};
+/* grandes pandemias: no máximo uma vez por partida, dentro da janela (o fim da janela garante que acontece) */
+const PANDEMICS = {
+  black:   { n: 'Grande Peste', e: '☠️', y: [1340, 1360], le: .035, sp: .3, mar: .6, dur: 12, cont: 'main', m: 'Uma praga mortal surgiu em {p} e se espalha pelas estradas e pelos portos. Quem adoecer perde parte da população por um ano.' },
+  cholera: { n: 'Pandemia de cólera', e: '🦠', y: [1817, 1835], le: .02, sp: .25, mar: .5, dur: 8, m: 'O cólera saiu de {p} pelos portos. As cidades sem saneamento serão as mais atingidas.' },
+  flu:     { n: 'Grande Gripe', e: '🤧', y: [1916, 1922], le: .022, sp: .4, mar: .7, dur: 6, war: 1, m: 'Uma gripe devastadora surgiu em {p}. Tropas e navios a levam para todo o mundo.' },
+  synth:   { n: 'Pandemia sintética', e: '🧬', y: [2030, 2120], le: .02, sp: .35, mar: .7, dur: 8, m: 'Um patógeno criado em laboratório escapou em {p}.' },
+};
 const COUNCIL = [['chancellor', 'Chanceler', 'dip'], ['marshal', 'Marechal', 'mar'], ['steward', 'Tesoureiro', 'adm'], ['spymaster', 'Mestre espião', 'int'], ['scholar', 'Erudito', 'lea']];
 
 /* ---------- culturas: sílabas para nomes de lugares, pessoas e dinastias ---------- */

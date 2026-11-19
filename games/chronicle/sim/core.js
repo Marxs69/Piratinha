@@ -51,13 +51,13 @@ const vertLen = v => VERT[v].len;
 /* ---------- modificadores ---------- */
 /* efeitos de tecnologia que não são modificadores (prédios, governos, mares...) e normalização das leis */
 function calcFx(n) {
-  const fx = { sea: 0, col: 0, fort: 0, slots: 1, ship: 1, bo: {}, up: { inf: 1, cav: 1, art: 1, siege: 1 }, b: new Set(Object.keys(BUILDINGS).filter(b => !BUILDINGS[b].tech && !BUILDINGS[b].vert)), g: new Set(), i: new Set(['trad', 'warrior']) };
+  const fx = { sea: 0, col: 0, fort: 0, med: 0, cap: 0, logi: 0, width: 0, slots: 1, ship: 1, bo: {}, up: { inf: 1, cav: 1, art: 1, siege: 1 }, b: new Set(Object.keys(BUILDINGS).filter(b => !BUILDINGS[b].tech && !BUILDINGS[b].vert)), g: new Set(), i: new Set(['trad', 'warrior']) };
   const eff = new Set(Object.keys(n.techs)); let vl = 0;
   for (const id in n.techs) { const t = TECH[id]; if (t && t.v) { vl++; (t.src || []).forEach(x => eff.add(x)); } }
   n.eff = eff; n.vlv = vl;
   for (const id of eff) {
     const t = TECH[id]; if (!t) continue; const f = t.fx;
-    if (f.sea) fx.sea = Math.max(fx.sea, f.sea); if (f.col) fx.col += f.col; if (f.fort) fx.fort += f.fort; if (f.slots) fx.slots += f.slots; if (f.ship) fx.ship += f.ship;
+    if (f.sea) fx.sea = Math.max(fx.sea, f.sea); if (f.col) fx.col += f.col; if (f.fort) fx.fort += f.fort; if (f.slots) fx.slots += f.slots; if (f.ship) fx.ship += f.ship; if (f.med) fx.med += f.med; if (f.cap) fx.cap += f.cap; if (f.logi) fx.logi += f.logi; if (f.width) fx.width += f.width;
     if (f.bo) for (const k in f.bo) fx.bo[k] = (fx.bo[k] || 0) + f.bo[k]; if (f.u) for (const k in f.u) fx.up[k] = (fx.up[k] || 0) + f.u[k];
     (f.b || []).forEach(b => fx.b.add(b)); (f.g || []).forEach(g => fx.g.add(g)); (f.i || []).forEach(i => fx.i.add(i));
   }
@@ -79,7 +79,9 @@ const MOD_SOURCES = [
     if (C.spymaster) out.push(['Conselho: ' + COUNCIL.find(x => x[0] === 'spymaster')[1], { coup: -(C.spymaster.st.int - 8) * .04 }]);
     if (R) out.push(['Atributos do governante', { coup: -(R.st.int - 8) * .02 }]);
     return out; },
-  n => { const gd = GOVS[n.gov], out = []; if (gd.until && curYear() > gd.until) out.push(['Governo ultrapassado', { stab: -.1 }]); if (gd.minRank && (n.rank || 0) < gd.minRank) out.push(['Título baixo para o governo', { stab: -.1 }]); return out; },
+  n => { const gd = GOVS[n.gov], out = [], age = govAge(n);       // instituições velhas perdem legitimidade com o tempo; título pequeno demais soa como pretensão
+    if (age > 0) out.push(['Governo ultrapassado há ' + age + ' anos', { stab: -Math.min(.25, .05 + age / 250), coup: Math.min(.5, age / 100) }]);
+    if (gd.minRank && (n.rank || 0) < gd.minRank) out.push(['Título pequeno para o governo', { stab: -.1 }]); return out; },
   n => Object.keys(LAWS).map(k => ['Lei: ' + LAWS[k].n + ' — ' + LAWS[k].o[n.laws[k]].n, LAWS[k].o[n.laws[k]].m]),
   n => { const cv = n.cov || {}; return [['Serviços públicos', { growth: (cv.health || 0) * .5, research: (cv.edu || 0) * .3, tax: (cv.adm || 0) * .15, coup: -(cv.sec || 0) * .6 }]]; },
   n => { const bf = n.bfx || {}; return [['Prédios', { army: Math.min(.3, bf.army || 0), manpower: Math.min(.4, bf.mp || 0) }]]; },

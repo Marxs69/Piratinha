@@ -43,5 +43,14 @@ const EVENTS = [
     m: 'O povo de {pais} celebra o herdeiro de {governante}.',
     opts: [{ n: 'Festa em todo o reino', fx: { money: -20, stab: 5 }, when: { money: [20, null] }, ai: 2 },
            { n: 'Uma missa discreta', fx: { stab: 2 }, ai: 1 }] },
+  { id: 'reform_clamor', e: '📣', t: 'Clamor por reforma', p: .02, cd: 8, when: { govOld: true },
+    m: 'As velhas instituições de {pais} já não convencem ninguém. Nas praças e na corte pede-se reforma.',
+    opts: [{ n: 'Reformar o governo', fx: { govNext: 1, stab: -8 }, ai: 3 },
+           { n: 'Manter a tradição', fx: { press: 15, stab: -2 }, ai: 1 }] },
+  { id: 'council_crisis', e: '🗡️', t: 'Crise no conselho', p: .08, cd: 4, when: { press: [70, null] },
+    m: 'O conselho de {governante} perdeu a paciência. Ou alguém cede, ou alguém cai.',
+    opts: [{ n: 'Ceder ao conselho', fx: { council: 'concede', press: -40 }, ai: 2 },
+           { n: 'Expurgar o mais exigente', fx: { council: 'purge', press: -50, stab: -6, roll: [[.2, { stab: -8 }]] }, ai: 1 },
+           { n: 'Comprar a calma', fx: { money: -60, press: -30 }, when: { money: [60, null] }, ai: 1 }] },
 ];
 const EVENT = Object.fromEntries(EVENTS.map(e => [e.id, e]));

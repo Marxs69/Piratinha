@@ -48,7 +48,7 @@ function provColors() {
     else if (mode === 'reg') c = regCol[WD.provs[p].region].map((v, i) => v * (.85 + (WD.provs[p].state % 3) * .08));
     else if (mode === 'cont') c = contCol[WD.provs[p].cont];
     else if (mode.startsWith('svc:')) { const st = WD.provs[p].state, cv = S.scov && S.scov[st] && stateOwnerOf(st) === o ? S.scov[st][mode.slice(4)] : 0; c = o < 0 ? null : [200 - cv * 160, 70 + cv * 150, 70 + cv * 40]; }
-    else if (mode === 'plague') { const P = S.plague, D = P ? P.done : (S.plagueDone || {}).done || {}; c = P && P.inf[p] != null ? [30, 70, 20] : D[p] ? [150, 150, 140] : o >= 0 ? [205, 200, 180] : null; }
+    else if (mode === 'plague') { const PS = S.pands || []; c = PS.some(P => P.inf[p] != null) ? [30, 70, 20] : (S.epis || []).some(E => E.inf[p] != null) ? [120, 150, 40] : PS.some(P => P.done[p]) ? [150, 150, 140] : o >= 0 ? [205, 200, 180] : null; }
     else if (mode === 'res') c = stateTone(WD.provs[p].state);   // todas as províncias do estado com a mesma cor
     else if (mode === 'cul') c = hsl(((S.culg ? S.culg[p] : WD.provs[p].cul) * .17) % 1, .45, .55);
     else if (mode === 'rel') { const R0 = RELIGIONS[REL_IDS[S.relg ? S.relg[p] : 0]]; c = R0 ? hexRGB(R0.col) : null; }

@@ -32,6 +32,8 @@ const COND = {
   trait:   { ok: (n, v) => !!n.ruler && arr(v).some(t => n.ruler.tr.includes(t)), txt: v => 'Governante ' + orTxt(arr(v).map(t => TRAITS[t].n.toLowerCase())), ids: v => arr(v).map(t => ['TRAITS', t]) },
   heir:    { ok: (n, v) => ((n.kids || []).length > 0) === v, txt: v => v ? 'Com herdeiro' : 'Sem herdeiro' },
   player:  { ok: (n, v) => (n.id === S.player) === v, txt: v => v ? 'Só o jogador' : 'Só a IA' },
+  govOld:  { ok: (n, v) => (govAge(n) > 0) === v, txt: v => v ? 'Governo ultrapassado' : 'Governo atual' },
+  press:   { ok: (n, v) => inR(n.press || 0, v), txt: v => rTxt('Pressão do conselho', v) },
   any:     { ok: (n, v) => v.some(c => condOk(n, c)), txt: v => 'Uma destas: ' + v.map(c => condTxt(c).join(', ')).join(' | '), sub: v => v },
   not:     { ok: (n, v) => !condOk(n, v), txt: v => 'Não: ' + condTxt(v).join(', '), sub: v => [v] },
 };
@@ -61,6 +63,12 @@ const EFF = {
               ids: v => Object.keys(v).flatMap(k => [['LAWS', k], ['LAWS.' + k + '.o', v[k]]]) },
   ruler:    { do: (n, v) => { if (v === 'die') { log(titleOf(n) + ' ' + charName(n.ruler) + ' de ' + natName(n) + ' morreu.', n.id === S.player ? 'bad' : 'info', [n.id]); succeed(n, true); } }, txt: v => v === 'die' ? 'O governante morre' : '' },
   log:      { do: (n, v) => log(fillTxt(n, v), 'world', [n.id]), txt: () => '' },
+  govNext:  { do: n => { const g = govNextOf(n); if (g && g !== n.gov) { applyGov(n, g); if (GOVS[g].succ !== 'hered') succeed(n, false); } }, txt: () => 'Reforma o governo para a forma seguinte' },
+  /* conselho: concede = atende a exigência mais pesada; purge = troca o conselheiro mais exigente */
+  council:  { do: (n, v) => { const d = demandsOf(n).filter(x => x.slot !== 'ruler').sort((a, b) => b.w - a.w);
+                if (v === 'concede' && d[0]) { const x = d[0]; if (x.ty === 'gov') applyGov(n, x.v); else if (x.ty === 'law') n.laws[x.k] = x.v; else n.ideo = x.v; calcMods(n); }
+                if (v === 'purge' && d[0]) n.council[d[0].slot] = mkChar(n, { boost: COUNCIL.find(c => c[0] === d[0].slot)[2], dyn: newDynasty(n) }); },
+              txt: v => v === 'concede' ? 'Atende a exigência mais forte do conselho' : 'Troca o conselheiro mais exigente' },
   /* sorteio: [[chance, efeitos], ...]; o que sobrar da chance não faz nada */
   roll:     { do: (n, v) => { let x = rnd(); for (const [p, fx] of v) { if (x < p) { applyFx(n, fx); return; } x -= p; } },
               txt: v => v.map(([p, fx]) => Math.round(p * 100) + '%: ' + (fxTxt(fx).join(', ') || 'nada')).join(' · '), sub: v => v.map(x => x[1]) },
