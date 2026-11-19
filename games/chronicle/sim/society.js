@@ -129,7 +129,7 @@ function religTick() {                                         // uma vez por an
     if (!n.alive) return; const L = LAWS.relig.o[n.laws.relig], k = n.laws.relig === 'state' ? 1 : n.laws.relig === 'tolerant' ? .5 : n.laws.relig === 'free' ? .2 : 0; if (n.relig == null) n.relig = S.relg[n.capital];
     const edu = (n.cov || {}).edu || 0;
     for (const p of provsOf(n.id)) {
-      if (S.relg[p] !== n.relig && k) { const t = S.bld[WD.provs[p].state].temple || 0, lv = CPOL[(n.rpol || {})[S.relg[p]] || 0]; if (chance(.025 * k * lv.as * (1 + t * .4))) S.relg[p] = n.relig; }
+      if (S.relg[p] !== n.relig && k) { const t = S.bld[WD.provs[p].state].temple || 0, lv = CPOL[(n.rpol || {})[S.relg[p]] || 0]; if (chance(.025 * k * lv.as * (1 + t * .4) * (n.ferv ?? 50) / 50 * (REFORMS.some(R0 => REL_IDS.indexOf(R0.to) === S.relg[p]) ? .3 : 1))) S.relg[p] = n.relig; }   // reformados resistem mais   // fé oficial converte mais com fervor alto
       if (S.culg[p] !== n.cul) { const lv = CPOL[(n.cpol || {})[S.culg[p]] || 0]; if (chance(.008 * lv.as * (1 + edu))) S.culg[p] = n.cul; }
     }
     const ps = provsOf(n.id); if (!ps.length) return;
@@ -161,6 +161,6 @@ function makeMain(n, kind, id) {                               // uma cultura ac
   if (n.money < mainCost()) return 'Sem dinheiro'; if ((n.mainCd || 0) > S.t) return 'Mudança recente (até ' + yearOf(n.mainCd) + ')';
   n.money -= mainCost(); n.stab = Math.max(0, n.stab - 15); n.mainCd = S.t + 360 * 20;
   const old = kind === 'cul' ? n.cul : n.relig; pol[old] = 2; delete pol[id];
-  if (kind === 'cul') n.cul = +id; else n.relig = +id; calcMods(n);
+  if (kind === 'cul') n.cul = +id; else { n.relig = +id; n.fav = 50; n.excom = false; } calcMods(n);
   log(natName(n) + (kind === 'cul' ? ' adotou a cultura ' + CULTURES[id].n + ' como principal.' : ' adotou ' + RELIGIONS[REL_IDS[id]].n + ' como fé oficial.'), n.id === S.player ? 'good' : 'world', [n.id]); return '';
 }

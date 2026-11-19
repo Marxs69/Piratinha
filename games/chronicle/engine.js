@@ -32,6 +32,11 @@ const COND = {
   trait:   { ok: (n, v) => !!n.ruler && arr(v).some(t => n.ruler.tr.includes(t)), txt: v => 'Governante ' + orTxt(arr(v).map(t => TRAITS[t].n.toLowerCase())), ids: v => arr(v).map(t => ['TRAITS', t]) },
   heir:    { ok: (n, v) => ((n.kids || []).length > 0) === v, txt: v => v ? 'Com herdeiro' : 'Sem herdeiro' },
   player:  { ok: (n, v) => (n.id === S.player) === v, txt: v => v ? 'Só o jogador' : 'Só a IA' },
+  faith:   { ok: (n, v) => arr(v).some(k => n.relig === REL_IDS.indexOf(k)), txt: v => 'Fé: ' + orTxt(arr(v).map(k => RELIGIONS[k].n)), ids: v => arr(v).map(k => ['RELIGIONS', k]) },
+  ferv:    { ok: (n, v) => inR(n.ferv ?? 50, v), txt: v => rTxt('Fervor', v) },
+  faithShare: { ok: (n, v) => { const r = REL_IDS.indexOf(v[0]), pt = Math.max(1, n.popT || 0); return inR(((n.rels || {})[r] || 0) / pt, v.slice(1)); }, txt: v => rTxt('Seguidores de ' + RELIGIONS[v[0]].n, v.slice(1), x => Math.round(x * 100) + '%'), ids: v => [['RELIGIONS', v[0]]] },
+  flag:    { ok: (n, v) => !!(n.flags || {})[v], txt: v => 'Marca: ' + v },
+  noFlag:  { ok: (n, v) => !(n.flags || {})[v], txt: v => 'Sem a marca: ' + v },
   govOld:  { ok: (n, v) => (govAge(n) > 0) === v, txt: v => v ? 'Governo ultrapassado' : 'Governo atual' },
   press:   { ok: (n, v) => inR(n.press || 0, v), txt: v => rTxt('Pressão do conselho', v) },
   any:     { ok: (n, v) => v.some(c => condOk(n, c)), txt: v => 'Uma destas: ' + v.map(c => condTxt(c).join(', ')).join(' | '), sub: v => v },
@@ -63,6 +68,14 @@ const EFF = {
               ids: v => Object.keys(v).flatMap(k => [['LAWS', k], ['LAWS.' + k + '.o', v[k]]]) },
   ruler:    { do: (n, v) => { if (v === 'die') { log(titleOf(n) + ' ' + charName(n.ruler) + ' de ' + natName(n) + ' morreu.', n.id === S.player ? 'bad' : 'info', [n.id]); succeed(n, true); } }, txt: v => v === 'die' ? 'O governante morre' : '' },
   log:      { do: (n, v) => log(fillTxt(n, v), 'world', [n.id]), txt: () => '' },
+  faith:    { do: (n, v) => { n.relig = REL_IDS.indexOf(v); n.fav = 50; n.excom = false; provsOf(n.id).forEach(p => { if (chance(.3)) S.relg[p] = n.relig; }); calcMods(n); }, txt: v => 'A fé oficial vira ' + RELIGIONS[v].n, ids: v => [['RELIGIONS', v]] },
+  ferv:     { do: (n, v) => { n.ferv = clamp((n.ferv ?? 50) + v, 0, 100); }, txt: v => '🙏 Fervor ' + sgnN(v) },
+  fav:      { do: (n, v) => { n.fav = clamp((n.fav ?? 50) + v, 0, 100); }, txt: v => 'Favor do chefe religioso ' + sgnN(v) },
+  pres:     { do: (n, v) => { n.pres = clamp((n.pres ?? 50) + v, 0, 100); }, txt: v => '👑 Prestígio ' + sgnN(v) },
+  flag:     { do: (n, v) => { (n.flags = n.flags || {})[v] = S.t; }, txt: () => '' },
+  unflag:   { do: (n, v) => { if (n.flags) delete n.flags[v]; }, txt: () => '' },
+  /* cadeia: agenda outro evento para este país daqui a 'mo' meses */
+  chain:    { do: (n, v) => { (n.evNext = n.evNext || []).push({ id: v.id, t: S.t + (v.mo || 1) * 30 }); }, txt: () => '', ids: v => [['EVENT', v.id]] },
   govNext:  { do: n => { const g = govNextOf(n); if (g && g !== n.gov) { applyGov(n, g); if (GOVS[g].succ !== 'hered') succeed(n, false); } }, txt: () => 'Reforma o governo para a forma seguinte' },
   /* conselho: concede = atende a exigência mais pesada; purge = troca o conselheiro mais exigente */
   council:  { do: (n, v) => { const d = demandsOf(n).filter(x => x.slot !== 'ruler').sort((a, b) => b.w - a.w);
@@ -91,15 +104,18 @@ function evReady(n, ev) {
   if (last != null && (ev.once || S.t - last < (ev.cd || 10) * 360)) return false;
   return condOk(n, ev.when) && evOpts(n, ev).length > 0;
 }
+function fireEvent(n, ev) {
+  (n.evd = n.evd || {})[ev.id] = S.t;
+  if (n.id === S.player) { n.evWait = ev.id; notify(n.id, ev.e + ' ' + ev.t, fillTxt(n, ev.m), { ev: ev.id }); return; }
+  const os = evOpts(n, ev), w = os.map(o => o.ai == null ? 1 : o.ai), tot = w.reduce((a, b) => a + b, 0); let x = rnd() * tot, k = 0; while (k < os.length - 1 && (x -= w[k]) >= 0) k++; applyFx(n, os[k].fx);
+}
 function eventsTick(n) {
   if (n.evWait) { if (n.id === S.player && (S.evq || []).some(e => e.ev === n.evWait)) return; chooseEvent(n, n.evWait, 0); }   // perdido (save antigo, troca de país): primeira escolha
-  for (const ev of EVENTS) {
-    if (!evReady(n, ev) || !chance(ev.p)) continue;
-    (n.evd = n.evd || {})[ev.id] = S.t;
-    if (n.id === S.player) { n.evWait = ev.id; notify(n.id, ev.e + ' ' + ev.t, fillTxt(n, ev.m), { ev: ev.id }); }
-    else { const os = evOpts(n, ev), w = os.map(o => o.ai == null ? 1 : o.ai), tot = w.reduce((a, b) => a + b, 0); let x = rnd() * tot, k = 0; while (k < os.length - 1 && (x -= w[k]) >= 0) k++; applyFx(n, os[k].fx); }
-    return;
+  if (n.evNext && n.evNext.length) {                          // cadeias: o que foi agendado vem antes do sorteio (some se a condição não valer mais)
+    const due = n.evNext.filter(x => x.t <= S.t); n.evNext = n.evNext.filter(x => x.t > S.t);
+    for (const x of due) { const ev = EVENT[x.id]; if (ev && condOk(n, ev.when) && evOpts(n, ev).length) { fireEvent(n, ev); return; } }
   }
+  for (const ev of EVENTS) { if (!ev.p || !evReady(n, ev) || !chance(ev.p)) continue; fireEvent(n, ev); return; }
 }
 /* resposta do jogador (índice na lista de escolhas disponíveis) */
 function chooseEvent(n, id, k) {
@@ -110,7 +126,7 @@ const tmodTick = n => { if (n.tmods && n.tmods.some(x => x.u <= S.t)) { n.tmods 
 
 /* ---------- validação dos dados (roda no carregamento; erros vão para o console e para validateData()) ---------- */
 function validateData() {
-  const err = [], tab = { TECH, GOVS, IDEOS, LAWS, VERT, TRAITS, RELIGIONS, GOVCAT: Object.fromEntries(Object.values(GOVS).map(g => [g.cat, 1])) };
+  const err = [], tab = { TECH, GOVS, IDEOS, LAWS, VERT, TRAITS, RELIGIONS, EVENT, GOVCAT: Object.fromEntries(Object.values(GOVS).map(g => [g.cat, 1])) };
   const has = (t, id) => { if (t.startsWith('LAWS.')) { const [, k] = t.split('.'); return !!(LAWS[k] && LAWS[k].o[id]); } return !!(tab[t] && tab[t][id]); };
   const chkC = (c, w) => { if (!c) return; for (const k in c) { const d = COND[k]; if (!d) { err.push(w + ': condição desconhecida ' + k); continue; }
     (d.ids ? d.ids(c[k]) : []).forEach(([t, id]) => { if (!has(t, id)) err.push(w + ': ' + t + ' sem ' + id); }); (d.sub ? d.sub(c[k]) : []).forEach(x => chkC(x, w)); } };
@@ -119,7 +135,7 @@ function validateData() {
     if (k === 'mod') Object.keys(fx[k].m).forEach(m => { if (!MODS[m] && m !== 'coup') err.push(w + ': modificador desconhecido ' + m); }); } };
   const ids = new Set();
   EVENTS.forEach(ev => { const w = 'evento ' + ev.id; if (ids.has(ev.id)) err.push(w + ': id repetido'); ids.add(ev.id);
-    ['t', 'e', 'm', 'p'].forEach(k => { if (ev[k] == null) err.push(w + ': falta ' + k); }); if (!(ev.opts || []).length) err.push(w + ': sem escolhas');
+    ['t', 'e', 'm'].forEach(k => { if (ev[k] == null) err.push(w + ': falta ' + k); }); if (ev.p == null) err.push(w + ': falta p (0 = só por cadeia)'); if (!(ev.opts || []).length) err.push(w + ': sem escolhas');
     chkC(ev.when, w); (ev.opts || []).forEach((o, i) => { chkC(o.when, w + ' escolha ' + i); chkF(o.fx, w + ' escolha ' + i); if (!o.n) err.push(w + ' escolha ' + i + ': sem nome'); }); });
   const modOk = (m, w) => Object.keys(m || {}).forEach(k => { if (!MODS[k] && k !== 'coup') err.push(w + ': modificador desconhecido ' + k); });
   for (const g in GOVS) modOk(GOVS[g].m, 'governo ' + g); for (const i in IDEOS) modOk(IDEOS[i].m, 'ideologia ' + i); for (const t in TRAITS) modOk(TRAITS[t].m, 'traço ' + t);

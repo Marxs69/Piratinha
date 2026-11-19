@@ -627,7 +627,33 @@ const RELIGIONS = {
   bon:       { n: 'Bön', e: '🏔️', col: '#b0705a', minor: 1 }, kamuy: { n: 'Fé Kamuy', e: '🐻', col: '#7d6a8f', minor: 1 },
   tengri:    { n: 'Tengrismo', e: '🐺', col: '#6f8fb5', minor: 1 }, gnostic: { n: 'Gnosticismo', e: '👁️', col: '#c8b7e8', minor: 1 },
   manich:    { n: 'Maniqueísmo', e: '🌗', col: '#9e9e6e', minor: 1 }, serpent: { n: 'Irmandade da Serpente', e: '🐍', col: '#5aa58a', minor: 1, fict: 1 },
+  // surgem no jogo (sempre no fim: S.relg guarda o índice)
+  protestant:{ n: 'Protestantismo', e: '📖', col: '#f2f2e6' },
 };
+/* fé com peso: grp = família (guerra santa só contra outra família); doc = doutrina (modificadores enquanto for a fé oficial);
+   head = [instituição, título] do chefe religioso (só fés organizadas); holy = nome da guerra santa */
+const FAITH = {
+  roman:      { grp: 'abr', doc: { stab: .03, research: .02 }, head: ['Papado', 'Papa'], holy: 'Cruzada', d: 'Igreja hierárquica e letrada: ordem e escolas monásticas.' },
+  orthodox:   { grp: 'abr', doc: { stab: .05, admin: .05 }, head: ['Patriarcado', 'Patriarca'], holy: 'Cruzada', d: 'Igreja unida ao trono: estabilidade e administração.' },
+  protestant: { grp: 'abr', doc: { research: .06, tax: .03, stab: -.02 }, holy: 'Guerra de religião', d: 'Fé lida por cada um: ciência e comércio, menos unidade.' },
+  islam:      { grp: 'abr', doc: { tax: .04, trade: .04 }, head: ['Califado', 'Califa'], holy: 'Jihad', d: 'Lei religiosa e rotas de caravana: impostos e comércio.' },
+  norse:      { grp: 'pagan', doc: { army: .06, speed: .05 }, holy: 'Grande saque', d: 'Glória em combate: exércitos fortes e rápidos.' },
+  slavic:     { grp: 'pagan', doc: { manpower: .1 }, holy: 'Guerra santa', d: 'Clãs guerreiros: mais contingente.' },
+  buddhism:   { grp: 'dharma', doc: { stab: .06, army: -.03 }, head: ['Sangha', 'Lama supremo'], d: 'Caminho do meio: paz interna, pouco gosto pela guerra.' },
+  confucian:  { grp: 'dharma', doc: { admin: .1, tax: .03 }, d: 'Burocracia de mérito: obras baratas e impostos bem cobrados.' },
+  ancestral:  { grp: 'pagan', doc: { growth: .05 }, d: 'Os ancestrais protegem a família: a população cresce.' },
+  fifthsun:   { grp: 'pagan', doc: { army: .05, stab: -.02 }, head: ['Templo do Sol', 'Grande sacerdote'], holy: 'Guerra florida', d: 'O sol exige sacrifício: guerra constante.' },
+  ocean:      { grp: 'pagan', doc: { trade: .06, colon: .05 }, d: 'O mar é sagrado: comércio e colonização.' },
+  zoroaster:  { grp: 'iran', doc: { research: .03, stab: .03 }, head: ['Fogo Sagrado', 'Mobed supremo'], holy: 'Guerra da luz', d: 'Luz contra trevas: saber e ordem.' },
+  aurora:     { grp: 'new', doc: { research: .05, stab: -.03 }, d: 'Heresia da renovação: ideias novas, unidade frágil.' },
+  machine:    { grp: 'new', doc: { prod: .08, stab: -.02 }, head: ['Sínodo da Máquina', 'Engenheiro-mor'], d: 'A fábrica é o templo: produção acima de tudo.' },
+};
+const faithOf = r => FAITH[REL_IDS[r]] || { grp: 'pagan', doc: {}, d: 'Fé local, sem doutrina organizada.' };
+/* reformas e cismas: numa janela de anos, uma fé se divide onde o fervor está baixo (e a condição vale) */
+const REFORMS = [
+  { id: 'reformation', n: 'Reforma', from: 'roman', to: 'protestant', y: [1480, 1600], when: { tech: 'soc_printing' }, ferv: 45, sp: .2 },
+];
+const FERV = { donate: 40, invest: 25, crusade: 40, excom: 15, lift: 35 };   // custo em favor/limites
 const REL_IDS = Object.keys(RELIGIONS);
 const CUL_MAJOR = 10;                                         // as 10 primeiras culturas podem ter nação; as outras são menores
 const CUL_REL = ['roman', 'roman', 'norse', 'slavic', 'islam', 'confucian', 'ancestral', 'fifthsun', 'ocean', 'zoroaster'];   // pelo índice de CULTURES

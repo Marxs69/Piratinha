@@ -90,7 +90,8 @@ const MOD_SOURCES = [
   n => n.alienTrade ? [['Comércio com a lua', { research: .05 * n.alienTrade }]] : [],
   n => { const cs = n.csat, cl = n.cls; if (!(cs && cl && n.popT)) return []; const mid = cl.mid / n.popT;   // a média pesquisa e paga impostos; a alta insatisfeita conspira
     return [['Classes sociais', { research: mid * .8 * cs.mid, tax: mid * .5 * cs.mid + (cs.high - .7) * .1, coup: Math.max(0, 1 - cs.high) * 1.2 }]]; },
-  n => (n.tmods || []).filter(x => x.u > S.t).map(x => ['Evento: ' + x.l, x.m]),          // modificadores temporários (EFF.mod)
+  n => (n.tmods || []).filter(x => x.u > S.t).map(x => ['Evento: ' + x.l, x.m]),
+  n => faithMods(n),                                                                       // doutrina, fervor e excomunhão (sim/faith.js)          // modificadores temporários (EFF.mod)
 ];
 const modList = n => MOD_SOURCES.flatMap(f => f(n)).filter(x => x[1]);
 /* de onde vem um modificador: [[rótulo, valor]] somando fontes com o mesmo rótulo */

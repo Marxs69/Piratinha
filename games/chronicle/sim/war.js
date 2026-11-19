@@ -160,16 +160,17 @@ function answerCall(c, yes) {
   if (yes) joinWar(w, S.player, c.side);
   else { breakTies(me, lead); lead.rel[me.id] = (lead.rel[me.id] || 0) - 60; me.stab = Math.max(0, me.stab - 5); log('Você recusou o chamado de ' + natName(lead) + '. A aliança acabou.', 'bad', [S.player]); }
 }
-function declareWar(n, t, s) {
+function declareWar(n, t, s, cb) {                           // cb 'holy' = guerra santa (pouca perda de estabilidade)
   if (atWar(n.id, t.id)) return 'Já em guerra'; if (n.truce[t.id] > S.t) return 'Trégua em vigor';
   if (n.senior != null && !(n.subj && SUBJECTS[n.subj.tier].dip)) return 'Súdito sem diplomacia própria não declara guerras';
   if (t.id === n.senior || t.senior === n.id) return 'É seu suserano ou súdito';
   if ((n.allies || []).includes(t.id)) return 'Rompa a aliança antes';
-  const claim = s != null && n.claims[s];
-  const w = { id: S.id++, A: [n.id], D: [t.id], a: n.id, d: t.id, goal: s, start: S.t, loss: {}, bp: {}, score: 0 };
+  if (cb === 'holy') { const e = holyWhy(n, t); if (e) return e; }
+  const claim = (s != null && n.claims[s]) || cb === 'holy';
+  const w = { id: S.id++, A: [n.id], D: [t.id], a: n.id, d: t.id, goal: s, start: S.t, loss: {}, bp: {}, score: 0, holy: cb === 'holy' ? n.relig : null };
   S.wars.push(w); warsChanged();
   n.stab = Math.max(0, n.stab - (claim ? 3 : 15)); t.rel[n.id] = -100; n.rel[t.id] = -100; breakTies(n, t);
-  log(natName(n) + ' declarou guerra a ' + natName(t) + '!', 'world', [n.id, t.id]);
+  log(natName(n) + (cb === 'holy' ? ' declarou ' + holyName(n.relig).toLowerCase() + ' contra ' : ' declarou guerra a ') + natName(t) + '!', 'world', [n.id, t.id]);
   callAllies(w, 'D'); callAllies(w, 'A');
   return '';
 }

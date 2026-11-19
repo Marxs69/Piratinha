@@ -64,6 +64,7 @@ function separatePeace(w, L, winner, t) {
   const sd = sideOf(w, L); if (!sd) return;
   const all = [...w.A, ...w.D], lead = leaderOf(w, sd) === L, ln = natName(nat(L));
   let parts = []; if (winner != null && t) parts = applyTerms(w, winner, L, t);
+  if (winner != null && w.holy != null) sideIds(w, sideOf(w, winner)).forEach(id => { const x = nat(id); if (x.relig === w.holy) { x.ferv = Math.min(100, (x.ferv ?? 50) + 15); x.fav = Math.min(100, (x.fav ?? 50) + 15); } });   // vitória na guerra santa
   const leaving = lead ? all : [L], enemies = lead ? [] : foesIn(w, L);
   // tréguas e devolução das ocupações entre quem sai e o outro lado
   const pairs = lead ? w.A.flatMap(x => w.D.map(y => [x, y])) : enemies.map(y => [L, y]);

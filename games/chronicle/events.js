@@ -52,5 +52,23 @@ const EVENTS = [
     opts: [{ n: 'Ceder ao conselho', fx: { council: 'concede', press: -40 }, ai: 2 },
            { n: 'Expurgar o mais exigente', fx: { council: 'purge', press: -50, stab: -6, roll: [[.2, { stab: -8 }]] }, ai: 1 },
            { n: 'Comprar a calma', fx: { money: -60, press: -30 }, when: { money: [60, null] }, ai: 1 }] },
+  // ---------- fé ----------
+  { id: 'reform_arrives', e: '📖', t: 'A Reforma chegou', p: .05, once: true, when: { faith: 'roman', faithShare: ['protestant', .08, null] },
+    m: 'Pregadores da Reforma enchem as praças de {pais}. Parte do povo já não reconhece o papa.',
+    opts: [{ n: 'Abraçar a Reforma', fx: { faith: 'protestant', stab: -10 }, ai: 1 },
+           { n: 'Contrarreforma', fx: { ferv: 15, money: -60, fav: 15, mod: { l: 'Contrarreforma', m: { stab: -.05 }, mo: 60 } }, when: { money: [60, null] }, ai: 2 },
+           { n: 'Tolerar as duas fés', fx: { law: { relig: 'tolerant' }, ferv: -5 }, when: { tech: 'soc_humanism' }, ai: 1 }] },
+  { id: 'miracle', e: '✨', t: 'Um milagre', p: .003, cd: 25, when: { ferv: [60, null] },
+    m: 'Fiéis juram ter visto um milagre em {pais}. Romeiros chegam de toda parte.',
+    opts: [{ n: 'Proclamar o milagre', fx: { ferv: 10, pres: 5 }, ai: 2 }, { n: 'Investigar com cautela', fx: { ferv: 3, rp: .1 }, ai: 1 }] },
+  { id: 'heresy_preacher', e: '🗣️', t: 'Pregador herético', p: .004, cd: 15, when: { ferv: [null, 35] },
+    m: 'Um pregador atrai multidões dizendo que a fé oficial se corrompeu.',
+    opts: [{ n: 'Prender o pregador', fx: { stab: -3, ferv: 6 }, ai: 2 }, { n: 'Debater em público', fx: { rp: .1, ferv: -3 }, ai: 1 }, { n: 'Ignorar', fx: { ferv: -6 }, ai: 1 }] },
+  { id: 'pilgrimage', e: '🛐', t: 'Peregrinação', p: .003, cd: 20, when: { ferv: [40, null] },
+    m: '{governante} é convidado a peregrinar à sede da fé.',
+    opts: [{ n: 'Ir com grande séquito', fx: { money: -30, fav: 15, pres: 5 }, when: { money: [30, null] }, ai: 2 }, { n: 'Mandar um emissário', fx: { fav: 5 }, ai: 1 }] },
+  { id: 'salons', e: '🕯️', t: 'Salões de debate', p: .004, cd: 20, when: { tech: 'soc_enlightenment' },
+    m: 'Nos salões de {pais}, filósofos zombam do clero e exaltam a razão.',
+    opts: [{ n: 'Proteger os filósofos', fx: { rp: .25, ferv: -8 }, ai: 1 }, { n: 'Censurar', fx: { ferv: 4, stab: -2 }, ai: 1 }] },
 ];
 const EVENT = Object.fromEntries(EVENTS.map(e => [e.id, e]));

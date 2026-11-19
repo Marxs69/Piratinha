@@ -281,7 +281,8 @@ function dipButtons(t) {
     const claims = WD.states.filter(s => n.claims[s.id] && s.provs.some(p => S.own[p] === t.id));
     const sel = el('select'); sel.append(new Option('Sem reivindicação (−15 estabilidade)', '')); claims.forEach(s => sel.append(new Option('Reivindicação: ' + s.n, s.id)));
     const allies = (t.allies || []).map(nat).filter(x => x.alive).map(x => x.name);
-    out.append(sel, btn('⚔️ Declarar guerra', () => { const e = declareWar(n, t, sel.value === '' ? null : +sel.value); msg.textContent = e; if (!e) { S.mapDirty = true; refresh(); } }, 'red', n.truce[t.id] > S.t ? 'Trégua até ' + yearOf(n.truce[t.id]) : has(n, 'allies', t.id) ? 'São aliados' : '', allies.length ? 'Aliados deles podem entrar: ' + allies.join(', ') : 'Eles não têm aliados'));
+    if (!holyWhy(n, t)) sel.append(new Option('⚔️ ' + holyName(n.relig) + ' (−3 estabilidade)', 'holy'));
+    out.append(sel, btn('⚔️ Declarar guerra', () => { const e = sel.value === 'holy' ? declareWar(n, t, null, 'holy') : declareWar(n, t, sel.value === '' ? null : +sel.value); msg.textContent = e; if (!e) { S.mapDirty = true; refresh(); } }, 'red', n.truce[t.id] > S.t ? 'Trégua até ' + yearOf(n.truce[t.id]) : has(n, 'allies', t.id) ? 'São aliados' : '', allies.length ? 'Aliados deles podem entrar: ' + allies.join(', ') : 'Eles não têm aliados'));
   }
   out.append(msg); return out;
 }
@@ -415,8 +416,31 @@ function modTable(b, n) {
     const r = el('div', 'brow'); r.append(el('span', 'nm', MODS[k] || 'Risco de golpe'), el('span', 'lv ' + ((k === 'coup' ? -v : v) >= 0 ? 'good' : 'bad'), sgn(v))); tip(r, modBreakTip(n, k)); c.append(r); });
   b.append(c);
 }
+/* fé oficial: doutrina, fervor, chefe religioso e guerra santa */
+function winFaith(b, n) {
+  const R0 = RELIGIONS[REL_IDS[n.relig]], F = faithOf(n.relig), h = headOf(n.relig), msg = el('div', 'msg'), c = el('div', 'cols');
+  const d = el('div', 'card'); d.append(el('h4', '', R0.e + ' ' + R0.n), el('div', 'dim', F.d || ''), modChips(F.doc)); c.append(d);
+  const fv = el('div', 'card'), v = n.ferv ?? 50; fv.append(tip(el('h4', '', '🙏 Fervor · ' + Math.round(v) + '% (alvo ' + Math.round(n.fervT ?? v) + '%)'), 'Anda 1 ponto por mês até o alvo:\n' + fervParts(n).map(([k, x]) => k + ' ' + (x > 0 ? '+' : '') + x).join('\n')), bar(v / 100, '#e8c25a'));
+  c.append(tip(fv, 'Alto: estabilidade e contingente, um pouco menos de pesquisa; a fé oficial converte mais rápido.\nBaixo: o contrário, e heresias e reformas se espalham.\nCada 10 pontos acima de 50: estabilidade +2%, contingente +1%, pesquisa −1%.'));
+  b.append(c);
+  if (h) { const hc = el('div', 'card'), seat = seatOf(n.relig), fav = n.fav ?? 50; hc.style.marginTop = '12px';
+    hc.append(el('h4', '', '⛪ ' + h[0] + (n.excom ? ' · ⛔ excomungado' : '')), el('div', 'dim', 'Sede: ' + (seat != null ? WD.provs[seat].n + ' (' + (S.own[seat] >= 0 ? natName(nat(S.own[seat])) : 'sem dono') + ')' + (seatLost(n.relig) ? ' — em mãos infiéis' : '') : '—')));
+    hc.append(tip(el('div', '', 'Favor do ' + h[1].toLowerCase() + ': ' + Math.round(fav)), 'Abaixo de ' + FERV.excom + ' pode haver excomunhão (−10% de estabilidade e −30 de relação com os da mesma fé); volta ao normal com ' + FERV.lift + '.\nSobe com doações, vitórias em guerras santas e peregrinações.'), bar(fav / 100, fav < FERV.excom ? '#e5636b' : '#7fb3d5'));
+    const r = el('div', 'row');
+    r.append(btn('💰 Doar (💰' + donateCost() + ')', () => { msg.textContent = faithAct(n, 'donate'); drawWin(); drawTop(); }, 'sm', n.money < donateCost() ? 'Sem dinheiro' : '', 'Favor +10'));
+    r.append(btn('👑 Pedir investidura (−' + FERV.invest + ' favor)', () => { msg.textContent = faithAct(n, 'invest'); drawWin(); }, 'sm', fav < FERV.invest ? 'Favor insuficiente' : n.investCd > S.t ? 'Investidura recente' : '', 'Estabilidade +5% por 10 anos e prestígio +5; uma vez a cada 10 anos'));
+    hc.append(r); b.append(hc); }
+  const tg = [...neighbors(n)].map(nat).concat(seatLost(n.relig) && S.own[seatOf(n.relig)] >= 0 ? [nat(S.own[seatOf(n.relig)])] : []).filter((t, i, a) => a.indexOf(t) === i && !holyWhy(n, t));
+  const hw = el('div', 'card'); hw.style.marginTop = '12px'; hw.append(tip(el('h4', '', '⚔️ ' + holyName(n.relig)), 'Contra vizinhos de outra família de fé ou contra quem tem a sede da sua fé.\nCusta só −3 de estabilidade; vencer dá +15 de fervor e de favor a todos do seu lado com a mesma fé.' + (h ? '\nConvocar como ' + holyName(n.relig).toLowerCase() + ' (−' + FERV.crusade + ' favor) chama os países da mesma fé com favor 50+.' : '')));
+  if (!tg.length) hw.append(el('div', 'dim', 'Nenhum alvo possível agora.'));
+  tg.slice(0, 12).forEach(t => { const r = el('div', 'brow'); r.append(flagImgEl(t.flag), el('span', 'nm', natName(t) + ' · ' + RELIGIONS[REL_IDS[t.relig]].e), btn('Declarar', () => { const e = declareWar(n, t, null, 'holy'); msg.textContent = e; if (!e) { closeWin(); refresh(); } }, 'sm red'));
+    if (h) r.append(btn('Convocar', () => { const e = faithAct(n, 'crusade', t); msg.textContent = e; if (!e) { closeWin(); refresh(); } }, 'sm red', (n.fav ?? 50) < FERV.crusade ? 'Favor insuficiente' : ''));
+    hw.append(r); });
+  b.append(hw, msg);
+}
 function winGov(b) {
-  const n = me(), msg = el('div', 'msg'), tab = tabs(b, 'govTab', [['gov', '🏛️ Governo'], ['ideo', '⚑ Ideologia'], ['laws', '📜 Leis'], ['mods', '📊 Modificadores']]);
+  const n = me(), msg = el('div', 'msg'), tab = tabs(b, 'govTab', [['gov', '🏛️ Governo'], ['ideo', '⚑ Ideologia'], ['faith', '🙏 Fé'], ['laws', '📜 Leis'], ['mods', '📊 Modificadores']]);
+  if (tab === 'faith') { winFaith(b, n); return; }
   if (tab === 'laws') { lawGrid(b, n, false, msg); return; }
   if (tab === 'mods') { modTable(b, n); return; }
   if (tab === 'ideo') {
