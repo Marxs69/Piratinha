@@ -19,6 +19,8 @@ const GOODS = {
   uranium: { n: 'Urânio', p: 14, c: 'raw', e: '☢️' },
   rare:    { n: 'Terras raras', p: 16, c: 'raw', e: '💠' },
   cloth:   { n: 'Tecido', p: 5, c: 'ind', e: '🧵' },
+  clothes: { n: 'Roupas', p: 7, c: 'ind', e: '👕' },
+  pfood:   { n: 'Comida processada', p: 5, c: 'ind', e: '🥫' },
   goods:   { n: 'Bens de consumo', p: 8, c: 'ind', e: '🏺' },
   tools:   { n: 'Ferramentas', p: 7, c: 'ind', e: '🔨' },
   arms:    { n: 'Armas', p: 9, c: 'ind', e: '🗡️' },
@@ -39,27 +41,44 @@ const GOODS = {
 };
 const GOOD_IDS = Object.keys(GOODS);
 
-/* necessidades da população por 1.000 habitantes/mês; crescem com o tempo (padrão de vida) */
-function popNeeds(year) {
-  const t = Math.max(0, Math.min(1, (year - 860) / 900));             // pré-industrial: sobe devagar até 1760
-  const ti = Math.max(0, Math.min(1, (year - 1760) / 200));           // industrialização
-  const t2 = Math.max(0, Math.min(1, (year - 1950) / 250));           // era digital e futura
-  return { food: 1, cloth: .04 + .02 * t + .05 * ti, goods: .015 + .02 * t + .08 * ti + .1 * t2, lux: .0012 + .003 * t + .009 * ti, elec: year < 1950 ? 0 : .01 + .12 * t2, power: year < 1890 ? 0 : .01 + .05 * Math.min(1, (year - 1890) / 110) + .12 * t2 };
+/* ---------- classes sociais: necessidades por 1.000 pessoas/mês (crescem com o padrão de vida da era) ----------
+   staple = grãos ou peixe · as outras chaves são bens · svc = serviços públicos que a classe cobra (saúde e educação) */
+const CLASSES = {
+  slave: { n: 'Escravos', e: '⛓️', col: '#8a6d5a', d: 'Mão de obra forçada: trabalham em fazendas, plantações, minas e madeireiras rendendo mais e só comem.\nNão votam nem compram nada. Muitos escravos derrubam a estabilidade e causam revoltas.' },
+  low:   { n: 'Classe baixa', e: '🧑‍🌾', col: '#b59a6a', d: 'Camponeses, pescadores e operários: a maior parte do povo e do contingente.\nPrecisam de comida e roupas; com fome ou sem roupa, fazem revoltas populares.' },
+  mid:   { n: 'Classe média', e: '🧑‍💼', col: '#7fb3d5', d: 'Artesãos, comerciantes, burocratas, professores e técnicos.\nCompram comida processada, roupas e bens; querem saúde e educação. Satisfeita: mais pesquisa e impostos.' },
+  high:  { n: 'Classe alta', e: '🎩', col: '#d9b45a', d: 'Nobreza, clero, oficiais e capitalistas.\nConsome luxo, roupas e comida processada. Insatisfeita: apoia golpes contra o governo.' },
+};
+const CLASS_IDS = Object.keys(CLASSES);
+function classNeeds(year, k) {
+  const t = Math.max(0, Math.min(1, (year - 860) / 900)), ti = Math.max(0, Math.min(1, (year - 1760) / 200)), t2 = Math.max(0, Math.min(1, (year - 1950) / 250));
+  const pw = year < 1890 ? 0 : .01 + .05 * Math.min(1, (year - 1890) / 110) + .12 * t2, el = year < 1950 ? 0 : .01 + .12 * t2;
+  if (k === 'slave') return { staple: .85 };
+  if (k === 'low') return { staple: 1, clothes: .025 + .015 * t + .04 * ti, goods: .01 + .012 * t + .06 * ti + .08 * t2, pfood: .03 * ti + .1 * t2, power: pw * .7, elec: el * .6 };
+  if (k === 'mid') return { staple: .8, pfood: .12 + .1 * t + .2 * ti, clothes: .07 + .04 * t + .08 * ti, goods: .06 + .05 * t + .15 * ti + .15 * t2, lux: .002 + .004 * t + .01 * ti, tools: .01, power: pw * 1.4, elec: el * 1.6, svc: 1 };
+  return { staple: .6, pfood: .35 + .2 * ti, clothes: .18 + .1 * ti, goods: .2 + .2 * ti + .2 * t2, lux: .04 + .07 * t + .12 * ti, power: pw * 2.5, elec: el * 3, svc: 1 };
 }
+/* quem trabalha em cada grupo de prédios (fração de cada classe) */
+const JOBS = { prod: { low: .93, mid: .05, high: .02 }, ind: { low: .8, mid: .16, high: .04 }, energy: { low: .65, mid: .3, high: .05 }, infra: { low: .82, mid: .15, high: .03 },
+  svc: { low: .2, mid: .72, high: .08 }, mil: { low: .45, mid: .35, high: .2 }, vert: { low: .55, mid: .35, high: .1 }, trade: { low: .4, mid: .5, high: .1 } };
+const JOB_N = { prod: 'Agricultura e extração', ind: 'Indústria e artesanato', energy: 'Energia', infra: 'Transporte', svc: 'Serviços públicos', mil: 'Militar', vert: 'Vertente', trade: 'Comércio' };
+const SLAVE_JOBS = ['farm', 'plantation', 'lumber', 'quarry', 'iron_mine', 'coal_mine', 'gold_mine', 'copper_mine'];
 
 /* ---------- prédios (no estado; nível = quantas unidades) ----------
    w = mil trabalhadores por nível · in/out = bens por mês por nível · req = condição do estado · tech = tecnologia que libera */
 const BUILDINGS = {
-  farm:        { n: 'Fazenda', e: '🌾', cost: 60, w: 2, out: { grain: 4.4 }, req: 'arable' },
-  fishery:     { n: 'Pesqueiro', e: '🐟', cost: 50, w: 1, out: { fish: 2.6 }, req: 'coast' },
-  lumber:      { n: 'Madeireira', e: '🪵', cost: 45, w: 1, out: { wood: 3 }, req: 'forest' },
-  quarry:      { n: 'Pedreira', e: '🪨', cost: 50, w: 1, out: { stone: 2.6 }, req: 'rocky' },
-  iron_mine:   { n: 'Mina de ferro', e: '⛓️', cost: 80, w: 1.5, out: { iron: 2.2 }, req: 'res:iron' },
-  coal_mine:   { n: 'Mina de carvão', e: '⚫', cost: 80, w: 1.5, out: { coal: 2.6 }, req: 'res:coal', tech: 'eco_deepmining' },
-  gold_mine:   { n: 'Mina de ouro', e: '🪙', cost: 120, w: 1, out: { gold: .45 }, req: 'res:gold' },
-  plantation:  { n: 'Plantação', e: '🧶', cost: 60, w: 2, out: { fiber: 3.4 }, req: 'warm' },
-  weaver:      { n: 'Tecelagem', e: '🧵', cost: 70, w: 1, in: { fiber: 2 }, out: { cloth: 1.6 } },
-  workshop:    { n: 'Oficina de artesãos', e: '🏺', cost: 80, w: 1, in: { wood: 1, cloth: .3 }, out: { goods: .85 } },
+  farm:        { n: 'Fazenda', e: '🌾', cost: 60, w: 2, out: { grain: 4.4 }, req: 'arable', tl: .04 },
+  fishery:     { n: 'Pesqueiro', e: '🐟', cost: 50, w: 1, out: { fish: 2.6 }, req: 'coast', tl: .03 },
+  lumber:      { n: 'Madeireira', e: '🪵', cost: 45, w: 1, out: { wood: 3 }, req: 'forest', tl: .04 },
+  quarry:      { n: 'Pedreira', e: '🪨', cost: 50, w: 1, out: { stone: 2.6 }, req: 'rocky', tl: .05 },
+  iron_mine:   { n: 'Mina de ferro', e: '⛓️', cost: 80, w: 1.5, out: { iron: 2.2 }, req: 'res:iron', tl: .06 },
+  coal_mine:   { n: 'Mina de carvão', e: '⚫', cost: 80, w: 1.5, out: { coal: 2.6 }, req: 'res:coal', tech: 'eco_deepmining', tl: .06 },
+  gold_mine:   { n: 'Mina de ouro', e: '🪙', cost: 120, w: 1, out: { gold: .45 }, req: 'res:gold', tl: .05 },
+  plantation:  { n: 'Plantação', e: '🧶', cost: 60, w: 2, out: { fiber: 3.4 }, req: 'warm', tl: .04 },
+  weaver:      { n: 'Tecelagem', e: '🧵', cost: 70, w: 1, in: { fiber: 2 }, out: { cloth: 1.6 }, tl: .03 },
+  tailor:      { n: 'Alfaiataria', e: '👕', cost: 70, w: 1, in: { cloth: 1 }, out: { clothes: 1.2 }, tl: .03 },
+  bakery:      { n: 'Padaria e salgadeira', e: '🥫', cost: 60, w: 1, in: { grain: 1.4, fish: .4 }, out: { pfood: 1.5 }, tl: .02 },
+  workshop:    { n: 'Oficina de artesãos', e: '🏺', cost: 80, w: 1, in: { wood: 1, cloth: .3 }, out: { goods: .85 }, tl: .05 },
   smithy:      { n: 'Ferraria', e: '🔨', cost: 90, w: 1, in: { iron: 1, wood: .6 }, out: { tools: .5, arms: .45 } },
   jeweler:     { n: 'Ourivesaria', e: '💎', cost: 120, w: .6, in: { gold: .2, cloth: .2 }, out: { lux: .42 }, tech: 'eco_guilds' },
   market:      { n: 'Mercado', e: '🏪', cost: 90, w: .5, fx: { tax: .06 }, tech: 'eco_trade_fairs', max: 3 },
@@ -68,17 +87,19 @@ const BUILDINGS = {
   university:  { n: 'Universidade', e: '🎓', cost: 160, w: .4, fx: { research: 2.5 }, tech: 'soc_universities', max: 3 },
   temple:      { n: 'Templo', e: '⛪', cost: 100, w: .3, fx: { stab: .5 }, max: 2 },
   mill:        { n: 'Moinho e celeiro', e: '🥖', cost: 90, w: .5, fx: { mill: .15 }, tech: 'eco_watermill', max: 2 },
-  foundry:     { n: 'Fundição', e: '🔥', cost: 160, w: 1.5, in: { iron: 2, coal: 1 }, out: { tools: 1.2, arms: 1.1 }, tech: 'eco_foundry' },
+  foundry:     { n: 'Fundição', e: '🔥', cost: 160, w: 1.5, in: { iron: 2, coal: 1, wood: .5 }, out: { tools: 1.2, arms: 1.1 }, tech: 'eco_foundry' },
   blast_furnace:{ n: 'Alto-forno', e: '🏗️', cost: 220, w: 2, in: { iron: 2.5, coal: 1.5 }, out: { steel: 1.4 }, tech: 'eco_blastfurnace' },
-  textile_manuf:{ n: 'Manufatura têxtil', e: '🧶', cost: 180, w: 2, in: { fiber: 3 }, out: { cloth: 3 }, tech: 'eco_manufactory' },
-  manufactory: { n: 'Manufatura', e: '🏭', cost: 200, w: 2, in: { cloth: .8, wood: 1 }, out: { goods: 2.6 }, tech: 'eco_manufactory' },
+  textile_manuf:{ n: 'Manufatura têxtil', e: '🧶', cost: 180, w: 2, in: { fiber: 3 }, out: { cloth: 3 }, tech: 'eco_manufactory', tl: .08 },
+  manufactory: { n: 'Manufatura', e: '🏭', cost: 200, w: 2, in: { cloth: .8, wood: 1 }, out: { goods: 2.6 }, tech: 'eco_manufactory', tl: .1 },
+  garment_factory:{ n: 'Fábrica de roupas', e: '👕', cost: 340, w: 3, in: { cloth: 3.5, power: .3 }, out: { clothes: 8 }, tech: 'eco_factory', tl: .05 },
+  food_factory:{ n: 'Fábrica de alimentos', e: '🥫', cost: 340, w: 2.5, in: { grain: 4, fish: 1, power: .3 }, out: { pfood: 9.5 }, tech: 'eco_mechanization', tl: .05 },
   textile_mill:{ n: 'Fábrica têxtil', e: '🧵', cost: 320, w: 3, in: { fiber: 4, coal: .5, power: .3 }, out: { cloth: 8 }, tech: 'eco_textile' },
   goods_factory:{ n: 'Fábrica de bens', e: '🏭', cost: 380, w: 3, in: { cloth: 1, steel: .5, wood: 1, power: .5 }, out: { goods: 7 }, tech: 'eco_factory' },
   tool_factory:{ n: 'Fábrica de ferramentas', e: '🔧', cost: 360, w: 3, in: { steel: 1.5, coal: .5, power: .4 }, out: { tools: 5 }, tech: 'eco_mechanization' },
   arms_factory:{ n: 'Fábrica de armamentos', e: '💣', cost: 400, w: 3, in: { steel: 1.5, coal: .5, power: .4 }, out: { arms: 4.8 }, tech: 'eco_interchangeable' },
   steel_mill:  { n: 'Siderúrgica', e: '🔩', cost: 420, w: 3, in: { iron: 3, coal: 2, power: .8 }, out: { steel: 5 }, tech: 'eco_bessemer' },
   railway:     { n: 'Ferrovia', e: '🚂', cost: 300, w: 1, in: { steel: .3, coal: .5 }, fx: { prod: .08, speed: .5, infra: 2 }, tech: 'eco_railways', max: 3 },
-  copper_mine: { n: 'Mina de cobre', e: '🟠', cost: 80, w: 1.5, out: { copper: 2.4 }, req: 'res:copper' },
+  copper_mine: { n: 'Mina de cobre', e: '🟠', cost: 80, w: 1.5, out: { copper: 2.4 }, req: 'res:copper', tl: .06 },
   uranium_mine:{ n: 'Mina de urânio', e: '☢️', cost: 300, w: 1, out: { uranium: 1.4 }, req: 'res:uranium', tech: 'eco_electricity' },
   rare_mine:   { n: 'Mina de terras raras', e: '💠', cost: 350, w: 1.5, out: { rare: 1.2 }, req: 'res:rare', tech: 'eco_assembly' },
   oil_well:    { n: 'Poço de petróleo', e: '🛢️', cost: 300, w: 1, out: { oil: 3.2 }, req: 'res:oil', tech: 'eco_oil' },
@@ -217,17 +238,17 @@ T('eco_companies', 'eco', 1600, 'Companhias de comércio', ['eco_colonization', 
 T('eco_agri_rev', 'eco', 1700, 'Revolução agrícola', ['eco_manufactory'], { bo: { farm: .3, plantation: .2 }, m: { growth: .15 } });
 T('eco_steam', 'eco', 1770, 'Máquina a vapor', ['eco_agri_rev'], { m: { prod: .08 }, slots: 1 });
 T('eco_textile', 'eco', 1780, 'Maquinário têxtil', ['eco_steam'], { b: ['textile_mill'] });
-T('eco_factory', 'eco', 1800, 'Sistema fabril', ['eco_textile'], { b: ['goods_factory'] });
-T('eco_mechanization', 'eco', 1820, 'Mecanização', ['eco_factory'], { b: ['tool_factory'] });
+T('eco_factory', 'eco', 1800, 'Sistema fabril', ['eco_textile'], { b: ['goods_factory', 'garment_factory'] });
+T('eco_mechanization', 'eco', 1820, 'Mecanização', ['eco_factory'], { b: ['tool_factory', 'food_factory'] });
 T('eco_interchangeable', 'eco', 1830, 'Peças intercambiáveis', ['eco_mechanization'], { b: ['arms_factory'] });
 T('eco_railways', 'eco', 1830, 'Ferrovias', ['eco_steam'], { b: ['railway'], slots: 1 });
 T('eco_bessemer', 'eco', 1856, 'Processo Bessemer', ['eco_railways'], { b: ['steel_mill'] });
 T('eco_oil', 'eco', 1870, 'Perfuração de petróleo', ['eco_bessemer'], { b: ['oil_well'] });
-T('eco_electricity', 'eco', 1885, 'Eletricidade', ['eco_oil'], { b: ['power_plant', 'hydro'], m: { research: .05 } });
+T('eco_electricity', 'eco', 1885, 'Eletricidade', ['eco_oil'], { b: ['power_plant', 'hydro', 'uranium_mine'], m: { research: .05 } });
 T('eco_oil_power', 'eco', 1900, 'Termelétricas a óleo', ['eco_electricity'], { b: ['oil_plant'] });
 T('eco_pipelines', 'eco', 1905, 'Oleodutos e gasodutos', ['eco_oil'], { b: ['pipeline'], m: { trade: .03 } });
 T('eco_fertilizer', 'eco', 1910, 'Fertilizantes químicos', ['eco_electricity'], { bo: { farm: .35 }, m: { growth: .1 } });
-T('eco_assembly', 'eco', 1913, 'Linha de montagem', ['eco_electricity'], { m: { prod: .12 }, slots: 1 });
+T('eco_assembly', 'eco', 1913, 'Linha de montagem', ['eco_electricity'], { b: ['rare_mine'], m: { prod: .12 }, slots: 1 });
 T('eco_highways', 'eco', 1920, 'Rodovias', ['eco_assembly'], { b: ['highway'] });
 T('eco_nuclear', 'eco', 1955, 'Energia nuclear', ['eco_assembly', 'eco_electricity'], { b: ['nuclear'] });
 T('eco_hsr', 'eco', 1965, 'Trem de alta velocidade', ['eco_highways'], { b: ['hsr'] });
@@ -305,7 +326,7 @@ const VERTS = [
     tree: [[1945, 'mil', 'Soldados de rádio'], [1955, 'eco', 'Energia atômica barata'], [1965, 'nav', 'Frotas atômicas'], [1980, 'mil', 'Robôs atômicos'], [2000, 'eco', 'Cidades-cúpula'], [2030, 'nav', 'Foguetes nucleares'], [2070, 'mil', 'Gigantes de cobalto'], [2110, 'eco', 'Era do átomo eterno'], [2160, 'nav', 'Arcas atômicas'], [2190, 'mil', 'Titãs nucleares']],
     unit: ['Soldados de rádio', 'Tanques atômicos', 'Robôs atômicos', 'Gigantes de cobalto', 'Titãs nucleares'] },
   { id: 'bio', need: 'wild', n: 'Biopunk', e: '🧬', col: '#8bc34a', good: 'biomass', bld: 'biovat', m: { growth: .4, food: .3 },
-    entry: { y: 1960, c: 'eco', req: ['eco_green_rev'], n: 'Engenharia genética' },
+    entry: { y: 1960, c: 'soc', req: ['eco_green_rev'], n: 'Engenharia genética' },
     tree: [[1975, 'eco', 'Colheitas sintéticas'], [1990, 'mil', 'Soldados aprimorados'], [2010, 'nav', 'Cascos vivos'], [2030, 'eco', 'Fábricas orgânicas'], [2060, 'mil', 'Quimeras'], [2090, 'nav', 'Leviatãs vivos'], [2120, 'eco', 'Organismos-cidade'], [2160, 'nav', 'Naves orgânicas'], [2190, 'mil', 'Hivemente']],
     unit: ['Soldados aprimorados', 'Feras de laboratório', 'Quimeras', 'Leviatãs vivos', 'Enxame orgânico'] },
   { id: 'cyber', need: 'rare', n: 'Cyberpunk', e: '💾', col: '#e040fb', good: 'chips', bld: 'chipfab', m: { research: .3, tax: .25 },
@@ -317,15 +338,29 @@ const VERTS = [
     tree: [[2055, 'eco', 'Cidades-jardim'], [2070, 'mil', 'Guardiões verdes'], [2090, 'nav', 'Velas solares'], [2110, 'eco', 'Arcologias verdes'], [2140, 'mil', 'Sentinelas de luz'], [2165, 'nav', 'Esferas solares'], [2190, 'eco', 'Era dourada']],
     unit: ['Guardiões verdes', 'Drones solares', 'Andarilhos de jardim', 'Sentinelas de luz', 'Coros solares'] },
   { id: 'nano', need: 'gold', n: 'Nanopunk', e: '🔬', col: '#00bcd4', good: 'nanites', bld: 'nanoforge', m: { prod: .35, army: .2 },
-    entry: { y: 2080, c: 'eco', req: ['eco_fusion'], n: 'Nanomáquinas' },
+    entry: { y: 2080, c: 'mil', req: ['eco_fusion'], n: 'Nanomáquinas' },
     tree: [[2095, 'mil', 'Nanotropa'], [2110, 'eco', 'Matéria programável'], [2130, 'nav', 'Cascos autorreparáveis'], [2150, 'mil', 'Nuvem cinza'], [2170, 'eco', 'Forja infinita'], [2190, 'nav', 'Naves de matéria']],
     unit: ['Nanotropa', 'Legião autorreparável', 'Soldados de matéria', 'Nuvem cinza', 'Exército fluido'] },
   { id: 'space', need: 'launch', n: 'Spacepunk', e: '🚀', col: '#7e57c2', good: 'he3', bld: 'spaceport', m: { research: .25, trade: .3, army: .2 },
-    entry: { y: 2120, c: 'nav', req: ['nav_seastead'], n: 'Elevadores orbitais' },
-    tree: [[2135, 'nav', 'Estações orbitais'], [2150, 'eco', 'Mineração lunar'], [2165, 'mil', 'Tropas de queda'], [2180, 'nav', 'Colônias marcianas'], [2195, 'eco', 'Império estelar']],
+    entry: { y: 2050, c: 'nav', req: ['nav_autonomous'], n: 'Elevadores orbitais' },
+    tree: [[2060, 'nav', 'Estações orbitais'], [2070, 'eco', 'Mineração lunar'], [2085, 'mil', 'Tropas de queda'], [2100, 'nav', 'Colônias marcianas'], [2115, 'eco', 'Fábricas orbitais'], [2130, 'mil', 'Legiões estelares'], [2150, 'nav', 'Frotas do vazio'], [2170, 'eco', 'Economia do cinturão'], [2195, 'mil', 'Império estelar']],
     unit: ['Fuzileiros orbitais', 'Tropas de queda', 'Naves de assalto', 'Legiões estelares', 'Armada do vazio'] },
 ];
 const VERT = Object.fromEntries(VERTS.map(v => [v.id, v]));
+/* tropas próprias de cada vertente: substituem infantaria, cavalaria, artilharia e navios da árvore normal.
+   [progresso na árvore (0–1), nome] — evoluem conforme a vertente avança pelas eras · um: força de cada tipo */
+const VUNITS = {
+  clock:  { um: { inf: 1.1, cav: 1, art: 1.15 }, inf: [[0, 'Besteiros de corda'], [.2, 'Arcabuzeiros de mola'], [.4, 'Granadeiros autômatos'], [.6, 'Soldados de relojoaria'], [.8, 'Legiões de engrenagem']], cav: [[0, 'Cavaleiros de mola'], [.3, 'Corcéis mecânicos'], [.55, 'Carruagens de corda'], [.8, 'Aranhas de bronze']], art: [[0, 'Balistas de engrenagem'], [.3, 'Canhões de relojoaria'], [.6, 'Morteiros automáticos'], [.85, 'Baterias perpétuas']], ship: [[0, 'Caravelas de relojoaria'], [.4, 'Navios de corda'], [.6, 'Submarinos de corda'], [.8, 'Dirigíveis de engrenagem'], [.95, 'Arcas celestes']] },
+  steam:  { um: { inf: 1, cav: 1.1, art: 1.2 }, inf: [[0, 'Fuzileiros de caldeira'], [.3, 'Couraceiros a vapor'], [.6, 'Granadeiros pressurizados'], [.85, 'Exossoldados a vapor']], cav: [[0, 'Carroças a vapor'], [.3, 'Tratores blindados'], [.5, 'Caminhantes a vapor'], [.8, 'Fortalezas rolantes']], art: [[0, 'Canhões a vapor'], [.4, 'Obuses pneumáticos'], [.75, 'Supercanhões de pressão']], ship: [[0, 'Navios a roda'], [.25, 'Dirigíveis'], [.6, 'Encouraçados aéreos'], [.85, 'Dirigíveis orbitais']] },
+  tesla:  { um: { inf: 1.05, cav: 1, art: 1.25 }, inf: [[0, 'Lanceiros voltaicos'], [.35, 'Tropas de bobina'], [.7, 'Infantaria de arco']], cav: [[0, 'Motociclos elétricos'], [.4, 'Andarilhos de arco'], [.75, 'Tanques de plasma']], art: [[0, 'Torres de raio'], [.4, 'Canhões de raio'], [.75, 'Tempestades dirigidas']], ship: [[0, 'Navios voltaicos'], [.5, 'Frotas de arco'], [.85, 'Velas de plasma']] },
+  diesel: { um: { inf: 1.05, cav: 1.25, art: 1 }, inf: [[0, 'Infantaria motorizada'], [.35, 'Tropas de assalto blindadas'], [.7, 'Legionários de aço']], cav: [[0, 'Couraçados de lagarta'], [.35, 'Supertanques'], [.7, 'Megatanques']], art: [[0, 'Canhões ferroviários'], [.4, 'Obuses colossais'], [.75, 'Moloques de artilharia']], ship: [[0, 'Couraçados a diesel'], [.4, 'Fortalezas voadoras'], [.8, 'Foguetes a diesel']] },
+  atom:   { um: { inf: 1, cav: 1.1, art: 1.2 }, inf: [[0, 'Soldados de rádio'], [.4, 'Patrulheiros atômicos'], [.75, 'Robôs atômicos']], cav: [[0, 'Tanques atômicos'], [.45, 'Andarilhos de cobalto'], [.8, 'Gigantes nucleares']], art: [[0, 'Canhões atômicos'], [.4, 'Lançadores de ogivas'], [.75, 'Baterias de cobalto']], ship: [[0, 'Frotas atômicas'], [.5, 'Foguetes nucleares'], [.85, 'Arcas atômicas']] },
+  bio:    { um: { inf: 1.2, cav: 1.05, art: .95 }, inf: [[0, 'Soldados aprimorados'], [.35, 'Enxertados'], [.7, 'Quimeras de assalto']], cav: [[0, 'Feras de laboratório'], [.4, 'Montarias quiméricas'], [.75, 'Leviatãs terrestres']], art: [[0, 'Lançadores de esporos'], [.4, 'Artilharia viva'], [.75, 'Colmeias de cerco']], ship: [[0, 'Cascos vivos'], [.5, 'Leviatãs vivos'], [.85, 'Naves orgânicas']] },
+  cyber:  { um: { inf: 1.15, cav: 1, art: 1.1 }, inf: [[0, 'Ciborgues'], [.4, 'Mercenários cromados'], [.75, 'Fantasmas de rede']], cav: [[0, 'Drones de assalto'], [.4, 'Mechas urbanos'], [.75, 'Mechas de guerra']], art: [[0, 'Baterias inteligentes'], [.4, 'Enxames de mísseis'], [.75, 'Satélites armados']], ship: [[0, 'Frotas em rede'], [.55, 'Drones orbitais'], [.9, 'Naves da singularidade']] },
+  solar:  { um: { inf: 1.1, cav: 1.1, art: 1 }, inf: [[0, 'Guardiões verdes'], [.45, 'Patrulhas de luz'], [.8, 'Sentinelas de luz']], cav: [[0, 'Andarilhos de jardim'], [.5, 'Drones solares'], [.8, 'Carros de prisma']], art: [[0, 'Espelhos ardentes'], [.5, 'Lentes de cerco'], [.8, 'Coros solares']], ship: [[0, 'Velas solares'], [.7, 'Esferas solares']] },
+  nano:   { um: { inf: 1.25, cav: 1.1, art: 1 }, inf: [[0, 'Nanotropa'], [.4, 'Legião autorreparável'], [.75, 'Exército fluido']], cav: [[0, 'Blindados de matéria'], [.5, 'Nuvem cinza']], art: [[0, 'Desmontadores'], [.5, 'Canhões de enxame']], ship: [[0, 'Cascos autorreparáveis'], [.7, 'Naves de matéria']] },
+  space:  { um: { inf: 1.1, cav: 1, art: 1.3 }, inf: [[0, 'Fuzileiros orbitais'], [.35, 'Tropas de queda'], [.7, 'Legiões estelares']], cav: [[0, 'Naves de assalto'], [.45, 'Andarilhos lunares'], [.8, 'Couraçados de queda']], art: [[0, 'Canhões de massa'], [.4, 'Bombardeio orbital'], [.75, 'Armada do vazio']], ship: [[0, 'Estações orbitais'], [.35, 'Cruzadores marcianos'], [.7, 'Frotas do vazio']] },
+};
 // necessidades que não são recurso: terreno ou posição
 const NEEDS = { wild: { n: 'selva ou pântano (biodiversidade)', ok: p => p.terr === 'jungle' || p.terr === 'marsh' }, sun: { n: 'deserto ou savana (sol forte)', ok: p => p.terr === 'desert' || p.terr === 'savanna' }, launch: { n: 'litoral perto do equador (base de lançamento)', ok: p => p.coast && Math.abs(p.cy / MAP_H - .5) < .12 } };
 VERTS.forEach(v => {
@@ -497,16 +532,53 @@ const LAWS = {
   trade: { eco: 1, n: 'Comércio', o: { free: { n: 'Livre comércio', m: { trade: .15, prod: -.03 }, req: 'eco_mercantilism' }, normal: { n: 'Tarifas moderadas', m: {} }, protect: { n: 'Protecionismo', m: { trade: -.1, prod: .06 } }, autarky: { n: 'Autarquia', m: { trade: -.4, prod: .08, stab: .03 } } } },
   spend: { n: 'Gastos públicos', o: { austerity: { n: 'Austeridade', m: { stab: -.05 }, svc: .5 }, normal: { n: 'Equilibrados', m: {}, svc: 1 }, welfare: { n: 'Bem-estar social', m: { stab: .08, growth: .05 }, svc: 1.6, req: 'soc_welfare' } } },
   press: { n: 'Imprensa', o: { censored: { n: 'Censurada', m: { stab: .05, research: -.05 } }, regulated: { n: 'Regulada', m: {} }, free: { n: 'Livre', m: { research: .06, stab: -.03 }, req: 'soc_printing' } } },
-  currency: { eco: 1, n: 'Moeda', o: { metal: { n: 'Metálica / padrão-ouro', m: { trade: .04, stab: .02 } }, paper: { n: 'Papel-moeda', m: { tax: .05, trade: .05, stab: -.02 }, req: 'eco_banking' }, fiat: { n: 'Moeda fiduciária', m: { prod: .06, tax: .05, stab: -.03 }, req: 'soc_welfare' }, digital: { n: 'Moeda digital', m: { tax: .08, trade: .1 }, req: 'eco_internet' } } },
+  currency: { eco: 1, n: 'Moeda', o: { metal: { n: 'Padrão-ouro', m: { trade: .04, stab: .02 } }, paper: { n: 'Papel-moeda', m: { tax: .05, trade: .05, stab: -.02 }, req: 'eco_banking' }, fiat: { n: 'Moeda fiduciária', m: { prod: .06, tax: .05, stab: -.03 }, req: 'soc_welfare' }, digital: { n: 'Moeda digital', m: { tax: .08, trade: .1 }, req: 'eco_internet' } } },
   bank:  { eco: 1, n: 'Sistema bancário', o: { none: { n: 'Agiotas', m: {} }, private: { n: 'Bancos privados', m: { prod: .04, trade: .04, stab: -.02 }, req: 'eco_banking' }, central: { n: 'Banco central', m: { stab: .04, tax: .04 }, req: 'eco_doubleentry' }, state: { n: 'Banco estatal', m: { prod: .06, trade: -.06 }, req: 'soc_socialism' } } },
   labor: { n: 'Trabalho', o: { serfdom: { n: 'Servidão', m: { tax: .05, prod: -.05, stab: -.03 } }, free: { n: 'Trabalho livre', m: {} }, unions: { n: 'Sindicatos', m: { stab: .05, prod: -.03 }, req: 'soc_unions' }, collective: { n: 'Coletivizado', m: { prod: .08, stab: -.06 }, req: 'soc_socialism' } } },
   land:  { n: 'Terra', o: { feudal: { n: 'Feudal', m: { manpower: .1, prod: -.04 } }, private: { n: 'Propriedade privada', m: { prod: .05, food: .05 }, req: 'soc_common_law' }, reform: { n: 'Reforma agrária', m: { food: .1, stab: .04, tax: -.03 }, req: 'soc_mass_politics' }, collective: { n: 'Fazendas coletivas', m: { food: -.05, prod: .05 }, req: 'soc_socialism' } } },
   edu:   { n: 'Educação', o: { clergy: { n: 'Do clero', m: { stab: .03 } }, public: { n: 'Pública', m: { research: .08 }, req: 'soc_enlightenment' }, mandatory: { n: 'Obrigatória', m: { research: .15, prod: .03 }, req: 'soc_nationalism' } } },
   health:{ n: 'Saúde', o: { charity: { n: 'Caridade', m: {} }, public: { n: 'Pública', m: { growth: .08 }, req: 'soc_enlightenment' }, universal: { n: 'Universal', m: { growth: .15, stab: .05 }, req: 'soc_welfare' } } },
   police:{ n: 'Policiamento', o: { militia: { n: 'Milícias locais', m: {} }, police: { n: 'Polícia nacional', m: { stab: .05, coup: -.2 }, req: 'soc_nationalism' }, secret: { n: 'Polícia secreta', m: { stab: .08, coup: -.5, research: -.04 }, req: 'soc_mass_media' } } },
-  vote:  { n: 'Sufrágio', o: { nobles: { n: 'Só nobres', m: {} }, census: { n: 'Censitário', m: { stab: .03 }, req: 'soc_constitution' }, universal: { n: 'Universal', m: { stab: .06, research: .03 }, req: 'soc_mass_politics' } } },
+  vote:  { n: 'Sufrágio', o: { nobles: { n: 'Só nobres', m: {}, d: 'Só a classe alta pesa na política' }, census: { n: 'Censitário', m: { stab: .03 }, req: 'soc_constitution', d: 'Classes alta e média pesam na política' }, universal: { n: 'Universal', m: { stab: .06, research: .03 }, req: 'soc_mass_politics', d: 'Todas as classes livres pesam na política' } } },
+  subsidy:{ eco: 1, n: 'Subsídios', o: { none: { n: 'Nenhum', m: {} }, agri: { n: 'Agrícolas', m: { food: .12, tax: -.03 } }, industry: { n: 'Industriais', m: { prod: .07, tax: -.05 }, req: 'eco_manufactory' }, total: { n: 'Dirigismo', m: { prod: .1, food: .08, tax: -.1, trade: -.05 }, req: 'eco_assembly' } } },
+  company:{ eco: 1, n: 'Empresas', o: { guilds: { n: 'Guildas', m: { stab: .02, prod: -.02 } }, crown: { n: 'Monopólios régios', m: { tax: .08, prod: -.03, trade: .03 }, req: 'eco_banking' }, free: { n: 'Livre iniciativa', m: { prod: .05, trade: .04, stab: -.02 }, req: 'eco_mercantilism' }, state: { n: 'Estatais', m: { prod: .03, tax: .05, trade: -.05 }, req: 'soc_socialism' } } },
+  hours: { eco: 1, n: 'Jornada de trabalho', o: { free: { n: 'Sem limite', m: { prod: .04, stab: -.02 } }, ten: { n: 'Dez horas', m: { stab: .03 }, req: 'soc_unions' }, eight: { n: 'Oito horas', m: { stab: .06, prod: -.02, growth: .02 }, req: 'soc_welfare' } } },
+  slavery:{ eco: 1, n: 'Escravidão', o: { banned: { n: 'Proibida', m: {}, sl: 0, d: 'Escravos são libertados aos poucos e viram classe baixa' }, colonial: { n: 'Só nas colônias', m: { tax: .02 }, sl: .25, d: 'Até 25% de escravos nas províncias fora do continente de origem' }, legal: { n: 'Legal', m: { tax: .04, prod: .02 }, sl: .15, d: 'Até 15% de escravos em todo o país' } } },
+  relig: { n: 'Religião', o: { state: { n: 'Igreja de Estado', m: { stab: .04, research: -.03 }, mp: 1, d: 'Minorias religiosas: −0,8 de estabilidade por 10% da população' }, tolerant: { n: 'Tolerância', m: {}, mp: .5, req: 'soc_humanism', d: 'Minorias religiosas pesam metade' }, free: { n: 'Liberdade de culto', m: { research: .03 }, mp: .15, req: 'soc_enlightenment', d: 'Minorias quase não pesam' }, secular: { n: 'Estado laico', m: { research: .05, stab: -.02 }, mp: 0, req: 'soc_socialism', d: 'Nenhuma religião oficial; templos rendem menos estabilidade' } } },
+  culture:{ n: 'Cidadania', o: { primary: { n: 'Só a cultura principal', m: {}, mp: 1, d: 'Minorias culturais: −0,8 de estabilidade por 10% da população e menos satisfação' }, accepted: { n: 'Culturas aceitas', m: { manpower: .05 }, mp: .5, req: 'soc_common_law', d: 'Minorias culturais pesam metade' }, multi: { n: 'Multiculturalismo', m: { growth: .03, manpower: .08 }, mp: .1, req: 'soc_welfare', d: 'Minorias quase não pesam' } } },
+  women: { n: 'Mulheres', o: { patriarchy: { n: 'Patriarcado', m: {}, lab: .55, fr: .08, d: 'Força de trabalho: 55% da população' }, property: { n: 'Direito à propriedade', m: { prod: .02 }, lab: .57, fr: .12, req: 'soc_enlightenment', d: 'Força de trabalho: 57%' }, suffrage: { n: 'Sufrágio feminino', m: { stab: .03, prod: .03 }, lab: .6, fr: .25, req: 'soc_mass_politics', d: 'Força de trabalho: 60%; mais governantes mulheres' }, equality: { n: 'Igualdade plena', m: { prod: .05, research: .04, stab: .02 }, lab: .64, fr: .45, req: 'soc_welfare', d: 'Força de trabalho: 64%; metade dos governantes pode ser mulher' } } },
 };
-const LAW_DEF = { tax: 'normal', draft: 'limited', trade: 'normal', spend: 'normal', press: 'regulated', currency: 'metal', bank: 'none', labor: 'free', land: 'feudal', edu: 'clergy', health: 'charity', police: 'militia', vote: 'nobles' };
+const LAW_DEF = { tax: 'normal', draft: 'limited', trade: 'normal', spend: 'normal', press: 'regulated', currency: 'metal', bank: 'none', labor: 'free', land: 'feudal', edu: 'clergy', health: 'charity', police: 'militia', vote: 'nobles', subsidy: 'none', company: 'guilds', hours: 'free', slavery: 'colonial', relig: 'state', culture: 'primary', women: 'patriarchy' };
+
+/* ---------- autonomia de culturas e religiões que não são a principal/oficial (−2 a +2; 0 = livre) ----------
+   w: peso como minoria (estabilidade e satisfação) · as: assimilação/conversão por ano · ag: agitação (revoltas) */
+const CPOL = { '-2': { n: 'Escravizada', e: '⛓️', w: 2.5, as: 0, ag: 3, d: 'Parte desse povo vira escravo a cada mês (exige escravidão permitida). Pesa muito na estabilidade e gera revoltas.' },
+  '-1': { n: 'Reprimida', e: '🚫', w: 1.6, as: 3, ag: 1.8, d: 'Assimilação três vezes mais rápida para a cultura principal, mas pesa mais e gera revoltas.' },
+  '0': { n: 'Livre', e: '⚪', w: 1, as: 1, ag: 1, d: 'Situação normal de minoria: assimila devagar.' },
+  '1': { n: 'Integrada', e: '🤝', w: .5, as: .4, ag: .5, d: 'Metade do peso como minoria; assimila bem devagar.' },
+  '2': { n: 'Aceita', e: '✅', w: 0, as: 0, ag: 0, d: 'Conta como cultura do país (sem peso como minoria). Ocupa uma vaga de cultura secundária e pode virar a principal.' } };
+const RPOL_N = { '-2': ['Perseguida', 'Fiéis dessa fé viram escravos a cada mês (exige escravidão permitida).'], '-1': ['Discriminada', 'Conversão três vezes mais rápida para a fé oficial, mas pesa mais e gera revoltas.'], '0': ['Livre', 'Situação normal de minoria: converte devagar.'], '1': ['Tolerada', 'Metade do peso como minoria; converte bem devagar.'], '2': ['Reconhecida', 'Conta como fé do país (sem peso). Ocupa uma vaga e pode virar a fé oficial.'] };
+const CUL_SLOTS = { primary: 1, accepted: 3, multi: 8 }, REL_SLOTS = { state: 0, tolerant: 1, free: 3, secular: 8 };
+
+/* ---------- religiões (reais e fictícias): cada cultura nasce com uma; as fictícias surgem como heresias ---------- */
+const RELIGIONS = {
+  roman:     { n: 'Cristianismo romano', e: '✝️', col: '#e8d48a' }, orthodox: { n: 'Cristianismo ortodoxo', e: '☦️', col: '#c9a0dc' },
+  norse:     { n: 'Fé nórdica', e: '🪓', col: '#7aa6c2' }, slavic: { n: 'Fé eslava', e: '🌳', col: '#6f9e5a' },
+  islam:     { n: 'Islã', e: '☪️', col: '#4fa36b' }, buddhism: { n: 'Budismo', e: '☸️', col: '#f0a64a' },
+  confucian: { n: 'Confucionismo', e: '📜', col: '#d46a5a' }, ancestral: { n: 'Fé ancestral', e: '🥁', col: '#a0784a' },
+  fifthsun:  { n: 'Culto do Quinto Sol', e: '🌞', col: '#e0703c' }, ocean: { n: 'Fé do Oceano', e: '🌊', col: '#4a9ec9' },
+  zoroaster: { n: 'Zoroastrismo', e: '🔥', col: '#e6a23c' },
+  aurora:    { n: 'Culto da Aurora', e: '🌅', col: '#ff9ec7', fict: 1 }, machine: { n: 'Igreja da Máquina', e: '⚙️', col: '#9aa4ad', fict: 1 },
+  // religiões menores (sem Estado): bolsões espalhados pelo mundo
+  druid:     { n: 'Fé druídica', e: '🌿', col: '#5f9e6e', minor: 1 }, shaman: { n: 'Xamanismo', e: '🦌', col: '#8f7a5c', minor: 1 },
+  bon:       { n: 'Bön', e: '🏔️', col: '#b0705a', minor: 1 }, kamuy: { n: 'Fé Kamuy', e: '🐻', col: '#7d6a8f', minor: 1 },
+  tengri:    { n: 'Tengrismo', e: '🐺', col: '#6f8fb5', minor: 1 }, gnostic: { n: 'Gnosticismo', e: '👁️', col: '#c8b7e8', minor: 1 },
+  manich:    { n: 'Maniqueísmo', e: '🌗', col: '#9e9e6e', minor: 1 }, serpent: { n: 'Irmandade da Serpente', e: '🐍', col: '#5aa58a', minor: 1, fict: 1 },
+};
+const REL_IDS = Object.keys(RELIGIONS);
+const CUL_MAJOR = 10;                                         // as 10 primeiras culturas podem ter nação; as outras são menores
+const CUL_REL = ['roman', 'roman', 'norse', 'slavic', 'islam', 'confucian', 'ancestral', 'fifthsun', 'ocean', 'zoroaster'];   // pelo índice de CULTURES
+const CUL_REL2 = ['orthodox', 'orthodox', 'roman', 'orthodox', 'islam', 'buddhism', 'islam', 'fifthsun', 'ocean', 'islam'];    // variante regional
 
 /* ---------- espaço: foguete de cada vertente e a lua sorteada em cada partida ---------- */
 const ROCKETS = { none: 'Foguete químico', clock: 'Foguete de corda', steam: 'Foguete a vapor', tesla: 'Canhão eletromagnético', diesel: 'Foguete a diesel', atom: 'Foguete nuclear', bio: 'Nave orgânica', cyber: 'Lançador em rede', solar: 'Vela solar', nano: 'Elevador de nanotubos', space: 'Nave estelar' };
@@ -514,7 +586,7 @@ const MOON_TYPES = [['Rochosa', '#9a9890'], ['Gelada', '#cfe6f2'], ['Oceânica',
 const ALIEN_ERAS = ['Idade da Pedra', 'Idade do Bronze', 'Idade Média', 'Renascimento', 'Era Industrial', 'Era Atômica', 'Era Digital', 'Era Interestelar'];
 /* grupos de prédios (painel do estado e janela de construção) */
 const BGROUPS = [['prod', '🌾 Produção e extração', ['farm', 'mill', 'fishery', 'lumber', 'quarry', 'plantation', 'iron_mine', 'coal_mine', 'gold_mine', 'copper_mine', 'uranium_mine', 'rare_mine', 'oil_well']],
-  ['ind', '🏭 Indústria', ['weaver', 'textile_manuf', 'workshop', 'smithy', 'foundry', 'blast_furnace', 'jeweler', 'manufactory', 'textile_mill', 'goods_factory', 'tool_factory', 'arms_factory', 'steel_mill', 'electronics']],
+  ['ind', '🏭 Indústria', ['weaver', 'textile_manuf', 'tailor', 'bakery', 'garment_factory', 'food_factory', 'workshop', 'smithy', 'foundry', 'blast_furnace', 'jeweler', 'manufactory', 'textile_mill', 'goods_factory', 'tool_factory', 'arms_factory', 'steel_mill', 'electronics']],
   ['energy', '⚡ Energia', ['power_plant', 'oil_plant', 'hydro', 'nuclear', 'wind', 'solar_plant', 'fusion']],
   ['infra', '🛤️ Transporte e comércio', ['road', 'railway', 'highway', 'hsr', 'maglev', 'tubes', 'portal', 'pipeline', 'port', 'market']],
   ['svc', '🏛️ Serviços públicos', ['hospital', 'school', 'office', 'guard', 'university', 'temple']],
@@ -537,4 +609,15 @@ const CULTURES = [
   { n: 'Nauatle',  a: ['tla', 'xo', 'cha', 'tec', 'ma', 'ix', 'ozo', 'co', 'te', 'mix', 'za', 'qui', 'hua', 'to'], b: ['tlan', 'pan', 'co', 'tepec', 'can', 'apan', 'titlan', 'lco', 'xco', 'huac'], m: ['Itzcoatl', 'Tizoc', 'Ahuitzotl', 'Cuauhtli', 'Xolotl', 'Tlacaelel', 'Mixcoatl'], f: ['Citlali', 'Xochitl', 'Itzel', 'Yaretzi', 'Tonalli', 'Atzi'] },
   { n: 'Polinésia', a: ['ka', 'mo', 'ha', 'lei', 'ta', 'ri', 'ma', 'oa', 'pu', 'ke', 'na', 'ho', 'ki', 'tu'], b: ['loa', 'kai', 'nui', 'moana', 'rua', 'tea', 'hiva', 'lani', 'aro', 'riki'], m: ['Kamehameha', 'Tane', 'Maui', 'Keola', 'Rangi', 'Tupa', 'Kai', 'Hoku'], f: ['Leilani', 'Moana', 'Kalani', 'Hina', 'Malia', 'Noelani'] },
   { n: 'Persa',    a: ['par', 'sa', 'kho', 'da', 'ar', 'mi', 'ra', 'sha', 'ba', 'zar', 'ves', 'ta', 'pa', 'go'], b: ['stan', 'abad', 'van', 'shahr', 'gird', 'kand', 'pur', 'dan', 'shan', 'zar'], m: ['Darius', 'Cyrus', 'Khosrow', 'Ardashir', 'Shapur', 'Bahram', 'Rostam', 'Kaveh'], f: ['Roxana', 'Shirin', 'Parisa', 'Azadeh', 'Mitra', 'Soraya', 'Yasaman'] },
+
+  // culturas menores, sem nação própria: nascem em bolsões dentro de outros países
+  { n: 'Basca', minor: 1, rel: 'roman', a: ['ar', 'go', 'ize', 'mai', 'txu', 'be', 'lo', 'za'], b: ['rri', 'tegi', 'eta', 'aga', 'ola', 'ondo'], m: ['Aitor', 'Iñaki', 'Xabier', 'Gorka', 'Unai'], f: ['Ane', 'Maite', 'Nerea', 'Itziar', 'Amaia'] },
+  { n: 'Gaélica', minor: 1, rel: 'druid', a: ['dun', 'kil', 'bal', 'glen', 'inis', 'ard', 'cair', 'loch'], b: ['more', 'beg', 'ach', 'an', 'ree', 'ross'], m: ['Brian', 'Cormac', 'Niall', 'Fergus', 'Conall'], f: ['Brigid', 'Aoife', 'Niamh', 'Saoirse', 'Deirdre'] },
+  { n: 'Lapônica', minor: 1, rel: 'shaman', a: ['sam', 'ki', 'jaur', 'vuo', 'rov', 'ina', 'ana', 'gal'], b: ['ri', 'javri', 'vuopmi', 'oaivi', 'la'], m: ['Ánte', 'Niillas', 'Ásllat', 'Mihkkal'], f: ['Elle', 'Máret', 'Sárá', 'Ristin'] },
+  { n: 'Berbere', minor: 1, rel: 'ancestral', a: ['ta', 'ma', 'zi', 'ghr', 'ou', 'ti', 'ad', 'ag'], b: ['mazirt', 'zou', 'ghen', 'dad', 'ouine', 'tit'], m: ['Masinissa', 'Yugurta', 'Aksil', 'Idir', 'Massin'], f: ['Tiziri', 'Dihya', 'Tanirt', 'Lunja'] },
+  { n: 'Tibetana', minor: 1, rel: 'bon', a: ['lha', 'gyal', 'tse', 'dro', 'sam', 'ri', 'ngar', 'khar'], b: ['sa', 'tse', 'ling', 'gang', 'pa', 'chen'], m: ['Tenzin', 'Norbu', 'Dorje', 'Pema', 'Jampa'], f: ['Dolma', 'Yangchen', 'Lhamo', 'Kunsang'] },
+  { n: 'Andina', minor: 1, rel: 'fifthsun', a: ['wa', 'ti', 'qha', 'pu', 'cha', 'ka', 'yu', 'mar'], b: ['pampa', 'marka', 'llaqta', 'qucha', 'wasi', 'kancha'], m: ['Wayna', 'Tupaq', 'Inti', 'Waman', 'Kusi'], f: ['Killa', 'Sisa', 'Urpi', 'Chaska', 'Nina'] },
+  { n: 'Ainu', minor: 1, rel: 'kamuy', a: ['shi', 'ka', 'ru', 'po', 'ta', 'ni', 'sap', 'pet'], b: ['pet', 'nay', 'shiri', 'kotan', 'ushi', 'to'], m: ['Shakushain', 'Kamuy', 'Ekashi', 'Retar'], f: ['Huchi', 'Pirka', 'Mena', 'Uapo'] },
+  { n: 'Malgaxe', minor: 1, rel: 'ancestral', a: ['ana', 'tsi', 'mi', 'ra', 'vo', 'ki', 'ma', 'fi'], b: ['vo', 'rivo', 'tsara', 'ana', 'be', 'tany'], m: ['Rado', 'Andry', 'Ravo', 'Hery', 'Tojo'], f: ['Lova', 'Soa', 'Hanta', 'Fara', 'Vola'] },
+  { n: 'Estepária', minor: 1, rel: 'tengri', a: ['kur', 'tem', 'bat', 'ak', 'kara', 'sar', 'tol', 'yen'], b: ['tai', 'bek', 'kul', 'tash', 'dar', 'gan'], m: ['Temür', 'Bars', 'Arslan', 'Kutlu', 'Bayan'], f: ['Altani', 'Börte', 'Khulan', 'Ayaz'] },
 ];

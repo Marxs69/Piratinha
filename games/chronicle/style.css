@@ -202,3 +202,28 @@ h4.bgrp { font: 700 11px var(--title); color: var(--dim); letter-spacing: 1px; m
 
 #wm { position: fixed; left: 50%; bottom: 6px; transform: translateX(-50%); z-index: 40; font: 700 12px var(--title); letter-spacing: 2px; color: rgba(255,240,210,.28); pointer-events: none; text-transform: uppercase; }
 .tsearch { width: 100%; margin: 10px 0 4px; font: inherit; font-size: 14px; color: var(--text); background: #120e09; border: 1px solid var(--line); border-radius: 4px; padding: 7px 10px; }
+/* culturas e religiões: régua de autonomia */
+.polist { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.polrow { background: rgba(0,0,0,.25); border: 1px solid rgba(90,74,50,.6); border-radius: 5px; padding: 7px 10px; display: flex; flex-direction: column; gap: 5px; }
+.polh { display: flex; justify-content: space-between; gap: 8px; }
+.polsl { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+.polsl .btn { padding: 3px 4px; overflow: hidden; text-overflow: ellipsis; }
+.polsl .btn.on { background: rgba(217,180,90,.22); }
+/* tecnologia */
+.thead { display: grid; grid-template-columns: minmax(260px, 1fr) 1.3fr; gap: 12px; align-items: stretch; }
+.tcur b { display: block; margin-bottom: 4px; }
+.tside { display: flex; flex-direction: column; justify-content: center; } .tside .tsearch { margin: 0 0 6px; } .tside .row { align-items: center; gap: 8px; flex-wrap: wrap; }
+.tera { margin-top: 14px; } .terah { display: grid; grid-template-columns: auto auto 1fr; gap: 10px; align-items: center; border-bottom: 1px solid var(--line); padding-bottom: 4px; }
+.terah b { font: 700 14px var(--title); color: var(--gold); } .tera.now .terah b { color: var(--gold-2); } .tera.now { background: rgba(217,180,90,.05); border-radius: 5px; padding: 4px 6px; }
+.tera .tgrid { margin-top: 6px; }
+.chip.lg-done { color: var(--green); } .chip.lg-av { color: var(--gold-2); } .chip.lg-lock { opacity: .6; } .chip.lg-early { color: #ffb347; border-style: dashed; }
+.tech.av { border-color: rgba(217,180,90,.55); }
+/* recursos por estado */
+.reslist { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 8px; margin-top: 8px; }
+.reslist.compact { grid-template-columns: 1fr; gap: 6px; }
+.resrow { background: rgba(0,0,0,.25); border: 1px solid rgba(90,74,50,.6); border-radius: 5px; padding: 6px 8px; display: flex; flex-direction: column; gap: 4px; }
+.resh { display: flex; align-items: center; gap: 7px; cursor: pointer; } .resh:hover b { color: var(--gold-2); } .resh small { margin-left: auto; }
+.resh .sw { width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(0,0,0,.6); flex: none; }
+#s-card select { display: block; width: 100%; margin: 6px 0; font: inherit; color: var(--text); background: #120e09; border: 1px solid var(--line); border-radius: 3px; padding: 4px; }
+#s-card .card small { display: block; }
+.seed select { margin-left: 6px; font: inherit; color: var(--text); background: #120e09; border: 1px solid var(--line); border-radius: 3px; padding: 3px 4px; }

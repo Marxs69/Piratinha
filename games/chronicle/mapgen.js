@@ -255,7 +255,7 @@ function generateWorld(seed) {
   });
   regions.forEach(g => { g.n = nameGen(CULTURES[g.cul], r, used); });
   conts.forEach(c => { c.n = nameGen(CULTURES[c.cul[0]], r, used).replace(/[aeiou]?$/, 'ia'); });
-  seas.forEach(z => { const cul = z.provs.length ? provs[z.provs[0]].cul : (r() * CULTURES.length | 0); z.n = (z.deep ? 'Oceano ' : pick(r, ['Mar de ', 'Mar de ', 'Golfo de ', 'Baía de '])) + nameGen(CULTURES[cul], r, used); });
+  seas.forEach(z => { const cul = z.provs.length ? provs[z.provs[0]].cul : (r() * CUL_MAJOR | 0); z.n = (z.deep ? 'Oceano ' : pick(r, ['Mar de ', 'Mar de ', 'Golfo de ', 'Baía de '])) + nameGen(CULTURES[cul], r, used); });
   // lagos com nome
   const lakeId = new Int16Array(N).fill(-1), lakes = [];
   for (let i = 0; i < N; i++) if (water[i] === 2 && lakeId[i] === -1) {

@@ -20,7 +20,7 @@
 
 <!-- Escolha do mundo e da nação -->
 <section id="setup" class="screen">
-  <header class="bar"><button id="s-back" class="btn">← Voltar</button><label class="seed">Semente <input id="s-seed" maxlength="9" spellcheck="false"></label><button id="s-gen" class="btn">🎲 Novo mundo</button><span class="grow"></span><nav class="modes" id="s-modes"></nav></header>
+  <header class="bar"><button id="s-back" class="btn">← Voltar</button><label class="seed">Semente <input id="s-seed" maxlength="9" spellcheck="false"></label><label class="seed">Início <select id="s-era"><option value="860">860 · Alta Idade Média</option><option value="1100">1100 · Idade Média</option><option value="1453">1453 · Renascimento</option><option value="1680">1680 · Era Moderna</option><option value="1789">1789 · Era das Revoluções</option><option value="1900">1900 · Era Industrial</option></select></label><button id="s-gen" class="btn">🎲 Novo mundo</button><span class="grow"></span><nav class="modes" id="s-modes"></nav></header>
   <aside id="s-card" class="panel"></aside>
   <div id="s-load" class="loading" hidden><b>Gerando o mundo…</b></div>
 </section>
@@ -39,7 +39,7 @@
 </section>
 
 <div id="tip" hidden></div>
-<div id="wm">build 0.5</div>
+<div id="wm">build 0.8</div>
 
 <script src="data.js"></script>
 <script src="mapgen.js"></script>

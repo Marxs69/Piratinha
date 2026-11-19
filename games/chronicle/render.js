@@ -49,12 +49,22 @@ function provColors() {
     else if (mode === 'cont') c = contCol[WD.provs[p].cont];
     else if (mode.startsWith('svc:')) { const st = WD.provs[p].state, cv = S.scov && S.scov[st] && stateOwnerOf(st) === o ? S.scov[st][mode.slice(4)] : 0; c = o < 0 ? null : [200 - cv * 160, 70 + cv * 150, 70 + cv * 40]; }
     else if (mode === 'plague') { const P = S.plague, D = P ? P.done : (S.plagueDone || {}).done || {}; c = P && P.inf[p] != null ? [30, 70, 20] : D[p] ? [150, 150, 140] : o >= 0 ? [205, 200, 180] : null; }
-    else if (mode === 'res') { const r = resVisible(p) ? provRes(p) : null, nr = natRes(p); if (!r && nr.length) { c = NATRES[['fiber', 'farm', 'wood', 'stone', 'fish'].find(k => nr.includes(k))][2]; } else c = r === 'iron' ? [150, 150, 170] : r === 'coal' ? [50, 50, 50] : r === 'gold' ? [240, 200, 40] : r === 'oil' ? [30, 20, 40] : r === 'copper' ? [214, 110, 40] : r === 'uranium' ? [110, 230, 60] : r === 'rare' ? [190, 70, 220] : [200, 190, 160]; }
+    else if (mode === 'res') c = stateTone(WD.provs[p].state);   // todas as províncias do estado com a mesma cor
+    else if (mode === 'cul') c = hsl(((S.culg ? S.culg[p] : WD.provs[p].cul) * .17) % 1, .45, .55);
+    else if (mode === 'rel') { const R0 = RELIGIONS[REL_IDS[S.relg ? S.relg[p] : 0]]; c = R0 ? hexRGB(R0.col) : null; }
     if (c) { col[p * 3] = c[0]; col[p * 3 + 1] = c[1]; col[p * 3 + 2] = c[2]; } else { col[p * 3] = 255; col[p * 3 + 1] = 0; col[p * 3 + 2] = 255; }   // magenta = sem cor (mostra terreno)
   }
   return col;
 }
 
+const RES_COL = { iron: [120, 140, 190], coal: [40, 40, 44], gold: [250, 205, 40], oil: [70, 20, 90], copper: [214, 110, 40], uranium: [110, 235, 60], rare: [225, 70, 200] };
+const hexRGB = h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+/* mapa de recursos: cada estado tem um tom próprio tirado da cor do país dono (estados vizinhos variam o tom) */
+const TONES = [.62, 1.3, .82, 1.12, .7, 1.22, .94];
+function stateTone(sid) {
+  const o = stateOwnerOf(sid), base = o >= 0 ? nat(o).col : [196, 186, 158], k = TONES[(sid * 5 + (sid >> 3)) % TONES.length];
+  return base.map(v => clamp(k >= 1 ? v + (255 - v) * (k - 1) * 1.1 : v * k, 0, 255));
+}
 function rebuildMap() {
   if (!terrRGB) buildTerrain();
   const W = MAP_W, H = MAP_H, BW = W * K, d = R.img.data, pc = provColors(), me = R.view >= 0 ? nat(R.view) : (S.player >= 0 ? nat(S.player) : null), terrOnly = R.mode === 'ter';
@@ -75,17 +85,17 @@ function rebuildMap() {
     const right = x < W - 1 ? i + 1 : i, down = y < H - 1 ? i + W : i;
     let eR = 0, eD = 0;
     if (!fog) {
-      const edge = j => { const q = prov[j]; if (p < 0 && q < 0) return 0; if ((p < 0) !== (q < 0)) return 4; if (p === q) return 0; if (own[p] !== own[q] && R.mode !== 'ter') return 3; if (WD.provs[p].state !== WD.provs[q].state) return 2; return 1; };
+      const edge = j => { const q = prov[j]; if (p < 0 && q < 0) return sea[i] >= 0 && sea[j] >= 0 && sea[i] !== sea[j] && !(exZ && !exZ[sea[j]]) ? 5 : 0; if ((p < 0) !== (q < 0)) return 4; if (p === q) return 0; if (own[p] !== own[q] && R.mode !== 'ter') return 3; if (WD.provs[p].state !== WD.provs[q].state) return 2; return 1; };
       eR = edge(right); eD = edge(down);
     }
-    const occ = p >= 0 && !fog && own[p] >= 0 && ctrl[p] !== own[p] && ctrl[p] >= 0 && R.mode === 'pol';
+    const occ = p >= 0 && !fog && own[p] >= 0 && ctrl[p] !== own[p] && R.mode === 'pol';
     for (let dy = 0; dy < K; dy++) for (let dx = 0; dx < K; dx++) {
       const px = x * K + dx, py = y * K + dy, o = (py * BW + px) * 4;
       let R0 = r, G0 = g, B0 = b;
-      if (occ && ((px + py) >> 2) % 2 === 0) { const c = nat(ctrl[p]).col; R0 = c[0]; G0 = c[1]; B0 = c[2]; }
+      if (occ && ((px + py) >> 2) % 2 === 0) { const c = ctrl[p] >= 0 ? nat(ctrl[p]).col : [170, 25, 25]; R0 = c[0]; G0 = c[1]; B0 = c[2]; }   // ocupada (cor do ocupante) ou rebelde (vermelho)
       let a = 0;
       if (dx === K - 1 && eR) a = Math.max(a, eR); if (dy === K - 1 && eD) a = Math.max(a, eD);
-      if (a === 1) { R0 *= .84; G0 *= .84; B0 *= .84; } else if (a === 2) { R0 *= .45; G0 *= .45; B0 *= .45; } else if (a === 3) { R0 *= .25; G0 *= .25; B0 *= .25; } else if (a === 4) { R0 = R0 * .45; G0 = G0 * .45; B0 = B0 * .5; }
+      if (a === 1) { R0 *= .84; G0 *= .84; B0 *= .84; } else if (a === 2) { R0 *= .45; G0 *= .45; B0 *= .45; } else if (a === 3) { R0 *= .25; G0 *= .25; B0 *= .25; } else if (a === 4) { R0 = R0 * .45; G0 = G0 * .45; B0 = B0 * .5; } else if (a === 5) { R0 = R0 * .35 + 120; G0 = G0 * .35 + 150; B0 = B0 * .35 + 180; }
       d[o] = R0; d[o + 1] = G0; d[o + 2] = B0; d[o + 3] = 255;
     }
   }
@@ -148,12 +158,17 @@ function drawFrame() {
     c.lineWidth = Math.max(2, fs / 7); c.strokeStyle = 'rgba(20,16,10,.55)'; c.fillStyle = 'rgba(255,248,230,.92)';
     c.strokeText(L.t, sx, sy); c.fillText(L.t, sx, sy);
   }
+  if (R.mode === 'res' && z >= 1.1 && z < 2.2) {   // de média distância: nome de cada estado
+    c.font = '10px "Alegreya Sans", sans-serif';
+    for (const st of WD.states) { const p = WD.provs[st.cap]; if (me && !me.exP[p.id]) continue; const wx = p.cx * K + K / 2, wy = p.cy * K + K / 2; if (!vis(wx, wy)) continue; const [sx, sy] = toScreen(wx, wy);
+      c.lineWidth = 3; c.strokeStyle = 'rgba(0,0,0,.5)'; c.fillStyle = '#f5e9c8'; c.strokeText(st.n, sx, sy + 4); c.fillText(st.n, sx, sy + 4); }
+  }
   if (z >= 2.2) {
     c.font = (z >= 4 ? 12 : 10) + 'px "Alegreya Sans", sans-serif';
     for (const p of WD.provs) {
       if (me && !me.exP[p.id]) continue; const wx = p.cx * K + K / 2, wy = p.cy * K + K / 2; if (!vis(wx, wy)) continue;
       if (z < 4 && WD.states[p.state].cap !== p.id) continue;
-      const [sx, sy] = toScreen(wx, wy), stCap = WD.states[p.state].cap === p, t = z < 4 ? WD.states[p.state].n : p.n;
+      const [sx, sy] = toScreen(wx, wy), stCap = WD.states[p.state].cap === p.id, t = z < 4 ? WD.states[p.state].n : p.n;
       c.lineWidth = 3; c.strokeStyle = 'rgba(0,0,0,.5)'; c.fillStyle = z < 4 ? '#f5e9c8' : '#fff'; c.strokeText(t, sx, sy + 14); c.fillText(t, sx, sy + 14);
       if (stCap) { const tw = c.measureText(t).width; c.fillStyle = '#fff'; c.strokeStyle = 'rgba(0,0,0,.6)'; c.lineWidth = 1.2; c.beginPath(); c.arc(sx - tw / 2 - 7, sy + 14, 3.2, 0, Math.PI * 2); c.fill(); c.stroke(); }
     }
@@ -205,6 +220,7 @@ function drawFrame() {
     const im = flagImg(nat(a.o).flag); if (im.complete) c.drawImage(im, sx - 18, sy - 6, 15, 10);
     c.fillStyle = '#fff'; c.font = '600 11px "Alegreya Sans", sans-serif'; c.textAlign = 'left'; c.fillText(fmtK(regs(a)), sx, sy + 1); c.textAlign = 'center';
     c.fillStyle = '#333'; c.fillRect(sx - 18, sy + 6, 40, 2); c.fillStyle = '#7fe08a'; c.fillRect(sx - 18, sy + 6, 40 * a.mor, 2);
+    if (a.exp || a.gen) { c.font = '10px serif'; c.textAlign = 'left'; c.fillText(a.exp ? '🧭' : '★', sx + 27, sy + 1); c.textAlign = 'center'; }
   }
   // batalhas
   const bt = new Set(); for (const a of S.armies) if (a.inBattle && a.p < P) bt.add(a.p);
