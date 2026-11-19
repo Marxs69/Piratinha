@@ -305,6 +305,7 @@ function canBuild(n, s, b) {
   else if (d.req === 'sunny') { if (!st.provs.some(p => ['desert', 'savanna', 'grass'].includes(WD.provs[p].terr))) return 'Exige deserto, savana ou campos'; }
   else if (d.req && L >= (capOf[d.req] ?? 99)) return 'Sem espaço';
   const max = b === 'castle' ? 1 + n.fx.fort : d.max; if (max && L >= max) return 'Nível máximo';
+  if (d.w >= .5 && freeLabor(n, s) < d.w) return 'Sem trabalhadores livres no estado';
   if (n.cons.length >= consSlots(n)) return 'Sem canteiros livres';
   if (n.money < bCost(n, b)) return 'Sem dinheiro';
   return '';
@@ -319,6 +320,12 @@ function rankUp(n) {                                          // proclama o pró
   log(n.name + ' agora é ' + natName(n) + ' (' + RANK_N[r] + ').', n.id === S.player ? 'good' : 'world', [n.id]); S.mapDirty = true; return '';
 }
 const rankCost = n => Math.round(150 * ((n.rank || 0) + 1) * eraScale());
+function freeLabor(n, s) {                                    // mil trabalhadores ainda sem emprego no estado (contando obras em andamento)
+  const st = WD.states[s], B = S.bld[s]; let sp = 0, used = 0;
+  for (const p of st.provs) if (S.own[p] === n.id && S.ctrl[p] === n.id) sp += S.pop[p];
+  for (const b in B) used += B[b] * BUILDINGS[b].w; n.cons.forEach(c => { if (c.s === s) used += BUILDINGS[c.b].w; });
+  return sp * .55 - used;
+}
 const consSlots = n => n.fx.slots + Math.floor((n.popT || 0) / 1000) + Math.floor(Math.max(0, n.money) / 2500);
 function build(n, s, b) { const e = canBuild(n, s, b); if (e) return e; n.money -= bCost(n, b); n.cons.push({ s, b, m: bMonths(b), tot: bMonths(b) }); return ''; }
 
@@ -982,15 +989,15 @@ function ai(n) {
   if (slow && (n.rank || 0) < 4 && provsOf(n.id).length >= RANK_REQ[(n.rank || 0) + 1] && n.money > rankCost(n) * 1.5 && provsOf(n.id).length > domCap(n) * .7) rankUp(n);
   // obras (ganancioso guarda mais ouro; diligente e construtor tentam mais)
   const mine = slow || n.money > 2000 ? S._mine[n.id] : [];
-  const tries = Math.round(3 * P.build);
+  const slotsN = consSlots(n), tries = Math.round(clamp(slotsN / 3, 3, 40) * P.build), stGdp = (n.gdp || 0) / Math.max(1, mine.length);
   if (mine.length && n.cons.length < consSlots(n) && n.money > 100 * P.gold) {
     const cand = [], atW = warsOf(n.id).length > 0, avail = Object.keys(BUILDINGS).filter(b => BUILDINGS[b].vert ? n.vert === BUILDINGS[b].vert : n.fx.b.has(b));
-    for (let k = 0; k < 3; k++) {                                // avalia uma vez alguns estados e constrói as melhores opções
+    for (let k = 0; k < clamp(3 + slotsN / 10, 3, 12); k++) {   // avalia uma vez alguns estados e constrói as melhores opções
       const s = pickR(mine);
       for (const b of avail) {
         const d = BUILDINGS[b];
         let v = 0; if (d.out) for (const g in d.out) v += d.out[g] * S.wp[g] * (n.mk.sat[g] < 1 ? 1.6 : 1); if (d.in) for (const g in d.in) v -= d.in[g] * S.wp[g] * (n.mk.sat[g] < .8 ? 2 : 1);
-        if (d.fx) v += (d.fx.svc ? (1 - ((n.cov || {})[d.fx.svc] || 0)) * 50 : 0) + (d.fx.speed || 0) * 8 + (d.fx.army ? (atW ? 30 : 8) : 0) + (d.fx.mp ? 10 : 0) + (d.fx.launch && hasT(n, 'spc_rockets') && !launchOk(n) ? 300 : 0) + (d.fx.pipe && S.bld[s.id].oil_well ? 30 : 0) + (d.fx.yard ? 4 : 0) + (d.fx.research || 0) * 4 + (d.fx.tax || 0) * (n.gdp || 0) * .15 + (d.fx.prod || 0) * 60 + (d.fx.fort ? (atW ? 25 : 4) : 0) + (d.fx.port ? 8 : 0) + (d.fx.stab ? (n.stab < 45 ? 20 : 3) : 0);
+        if (d.fx) v += (d.fx.svc ? (1 - ((n.cov || {})[d.fx.svc] || 0)) * 50 : 0) + (d.fx.speed || 0) * 8 + (d.fx.army ? (atW ? 30 : 8) : 0) + (d.fx.mp ? 10 : 0) + (d.fx.launch && hasT(n, 'spc_rockets') && !launchOk(n) ? 300 : 0) + (d.fx.pipe && S.bld[s.id].oil_well ? 30 : 0) + (d.fx.yard ? 4 : 0) + (d.fx.research || 0) * 4 + (d.fx.tax || 0) * (n.gdp || 0) * .15 + (d.fx.prod || 0) * Math.max(60, stGdp) + (d.fx.fort ? (atW ? 25 : 4) : 0) + (d.fx.port ? 8 : 0) + (d.fx.stab ? (n.stab < 45 ? 20 : 3) : 0);
         if (d.out && (d.out.goods || d.out.cloth) && ((n.mk.sat.goods || 1) < .85 || (n.mk.sat.cloth || 1) < .85)) v += 70;
         if ((b === 'farm' || b === 'fishery') && n.foodSat < 1.05) v += 120; else if (n.foodSat < .95 && d.w > 1) v -= 40;
         if (b === 'university' && tr.includes('scholar')) v += 40; if (b === 'temple' && tr.includes('zealous')) v += 40; if (b === 'temple' && tr.includes('cynical')) v -= 30; if (b === 'market' && tr.includes('greedy')) v += 40;
@@ -998,6 +1005,8 @@ function ai(n) {
       }
     }
     cand.sort((x, y) => y[0] - x[0]);
+    // modernização: sem mão de obra, desmonta artesanato antigo onde já dá para ter fábricas
+    if (hasT(n, 'eco_factory') && chance(.3)) { const s = pickR(mine), B = S.bld[s.id]; if (freeLabor(n, s.id) < 2) { const old = ['workshop', 'weaver', 'manufactory'].filter(b => B[b] > 0).sort((a, b) => B[b] - B[a])[0]; if (old) B[old] = Math.max(0, B[old] - Math.max(1, Math.ceil(B[old] * .25))); } }
     let done = 0; for (const [, sid, b] of cand) { if (done >= tries || n.cons.length >= consSlots(n) || n.money <= 100 * P.gold) break; if (!build(n, sid, b)) done++; }
   }
   // exército (em dívida, desmobiliza um pouco)

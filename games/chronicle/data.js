@@ -44,7 +44,7 @@ function popNeeds(year) {
   const t = Math.max(0, Math.min(1, (year - 860) / 900));             // pré-industrial: sobe devagar até 1760
   const ti = Math.max(0, Math.min(1, (year - 1760) / 200));           // industrialização
   const t2 = Math.max(0, Math.min(1, (year - 1950) / 250));           // era digital e futura
-  return { food: 1, cloth: .04 + .02 * t + .08 * ti, goods: .015 + .02 * t + .18 * ti + .2 * t2, lux: .0012 + .003 * t + .009 * ti, elec: year < 1950 ? 0 : .01 + .12 * t2, power: year < 1890 ? 0 : .01 + .05 * Math.min(1, (year - 1890) / 110) + .12 * t2 };
+  return { food: 1, cloth: .04 + .02 * t + .05 * ti, goods: .015 + .02 * t + .08 * ti + .1 * t2, lux: .0012 + .003 * t + .009 * ti, elec: year < 1950 ? 0 : .01 + .12 * t2, power: year < 1890 ? 0 : .01 + .05 * Math.min(1, (year - 1890) / 110) + .12 * t2 };
 }
 
 /* ---------- prédios (no estado; nível = quantas unidades) ----------
@@ -68,18 +68,18 @@ const BUILDINGS = {
   university:  { n: 'Universidade', e: '🎓', cost: 160, w: .4, fx: { research: 2.5 }, tech: 'soc_universities', max: 3 },
   temple:      { n: 'Templo', e: '⛪', cost: 100, w: .3, fx: { stab: .5 }, max: 2 },
   manufactory: { n: 'Manufatura', e: '🏭', cost: 200, w: 2, in: { cloth: .8, wood: 1 }, out: { goods: 2.6 }, tech: 'eco_manufactory' },
-  textile_mill:{ n: 'Fábrica têxtil', e: '🧵', cost: 320, w: 3, in: { fiber: 4, coal: .5, power: .3 }, out: { cloth: 5.5 }, tech: 'eco_textile' },
-  goods_factory:{ n: 'Fábrica de bens', e: '🏭', cost: 380, w: 3, in: { cloth: 1, steel: .5, wood: 1, power: .5 }, out: { goods: 4.6 }, tech: 'eco_factory' },
-  tool_factory:{ n: 'Fábrica de ferramentas', e: '🔧', cost: 360, w: 3, in: { steel: 1.5, coal: .5, power: .4 }, out: { tools: 3.4 }, tech: 'eco_mechanization' },
-  arms_factory:{ n: 'Fábrica de armamentos', e: '💣', cost: 400, w: 3, in: { steel: 1.5, coal: .5, power: .4 }, out: { arms: 3.2 }, tech: 'eco_interchangeable' },
-  steel_mill:  { n: 'Siderúrgica', e: '🔩', cost: 420, w: 3, in: { iron: 3, coal: 2, power: .8 }, out: { steel: 3.4 }, tech: 'eco_bessemer' },
+  textile_mill:{ n: 'Fábrica têxtil', e: '🧵', cost: 320, w: 3, in: { fiber: 4, coal: .5, power: .3 }, out: { cloth: 8 }, tech: 'eco_textile' },
+  goods_factory:{ n: 'Fábrica de bens', e: '🏭', cost: 380, w: 3, in: { cloth: 1, steel: .5, wood: 1, power: .5 }, out: { goods: 7 }, tech: 'eco_factory' },
+  tool_factory:{ n: 'Fábrica de ferramentas', e: '🔧', cost: 360, w: 3, in: { steel: 1.5, coal: .5, power: .4 }, out: { tools: 5 }, tech: 'eco_mechanization' },
+  arms_factory:{ n: 'Fábrica de armamentos', e: '💣', cost: 400, w: 3, in: { steel: 1.5, coal: .5, power: .4 }, out: { arms: 4.8 }, tech: 'eco_interchangeable' },
+  steel_mill:  { n: 'Siderúrgica', e: '🔩', cost: 420, w: 3, in: { iron: 3, coal: 2, power: .8 }, out: { steel: 5 }, tech: 'eco_bessemer' },
   railway:     { n: 'Ferrovia', e: '🚂', cost: 300, w: 1, in: { steel: .3, coal: .5 }, fx: { prod: .08, speed: .5, infra: 2 }, tech: 'eco_railways', max: 3 },
   copper_mine: { n: 'Mina de cobre', e: '🟠', cost: 80, w: 1.5, out: { copper: 2.4 }, req: 'res:copper' },
   uranium_mine:{ n: 'Mina de urânio', e: '☢️', cost: 300, w: 1, out: { uranium: 1.4 }, req: 'res:uranium', tech: 'eco_electricity' },
   rare_mine:   { n: 'Mina de terras raras', e: '💠', cost: 350, w: 1.5, out: { rare: 1.2 }, req: 'res:rare', tech: 'eco_assembly' },
   oil_well:    { n: 'Poço de petróleo', e: '🛢️', cost: 300, w: 1, out: { oil: 3.2 }, req: 'res:oil', tech: 'eco_oil' },
   power_plant: { n: 'Termelétrica a carvão', e: '🏭', cost: 420, w: 1, in: { coal: 2 }, out: { power: 5 }, tech: 'eco_electricity' },
-  electronics: { n: 'Fábrica de eletrônicos', e: '📟', cost: 600, w: 3, in: { steel: .5, oil: .6, power: .8 }, out: { elec: 1.6 }, tech: 'eco_transistor' },
+  electronics: { n: 'Fábrica de eletrônicos', e: '📟', cost: 600, w: 3, in: { steel: .5, oil: .6, power: .8 }, out: { elec: 2.4 }, tech: 'eco_transistor' },
   // energia
   oil_plant:   { n: 'Termelétrica a óleo', e: '🏭', cost: 420, w: 1, in: { oil: 1.5 }, out: { power: 5 }, tech: 'eco_oil_power' },
   hydro:       { n: 'Hidrelétrica', e: '💧', cost: 600, w: .6, out: { power: 4.5 }, req: 'rocky', tech: 'eco_electricity' },
