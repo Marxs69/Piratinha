@@ -141,7 +141,7 @@ function religTick() {                                         // uma vez por an
     if (y > 1880 && hasT(n, 'eco_factory') && chance(.002)) { const p = pickR(ps); S.relg[p] = REL_IDS.indexOf('machine'); if (n.id === S.player) log('⚙️ A Igreja da Máquina ganhou fiéis em ' + WD.provs[p].n + '.', 'info', [n.id]); }
   });
   const fict = new Set(REL_IDS.map((r, i) => RELIGIONS[r].fict ? i : -1).filter(i => i >= 0));     // heresias se espalham devagar
-  for (let p = 0; p < S.relg.length; p++) if (fict.has(S.relg[p]) && chance(.08)) { const q = pickR(WD.provs[p].adj); const o = S.own[q]; if (o < 0 || nat(o).laws.relig !== 'state') S.relg[q] = S.relg[p]; }
+  for (let p = 0; p < S.relg.length; p++) if (fict.has(S.relg[p]) && chance(.08)) { const q = pickR(WD.provs[p].adj); if (q == null) continue; const o = S.own[q]; if (o < 0 || nat(o).laws.relig !== 'state') S.relg[q] = S.relg[p]; }   // ilhas sem vizinhos: nada a espalhar
   S.mapDirty = S.mapDirty || (typeof R !== 'undefined' && (R.mode === 'rel' || R.mode === 'cul'));
 }
 /* política para culturas e religiões que não são a principal: −2 escravizar · −1 reprimir · 0 livre · +1 integrar · +2 aceitar */
