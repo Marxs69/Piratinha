@@ -48,7 +48,7 @@ function fxLines(fx) {
 }
 function techTip(n, t, st) {
   const o = [t.n + ' · ' + t.y + ' · ' + (CATS[t.c] || '')];
-  if (t.entry) { const v = VERT[t.v]; o.push('Entrada da vertente ' + v.e + ' ' + v.n + '.', 'Escolhê-la troca as tecnologias militares, navais e econômicas posteriores a ' + v.entry.y + ' pela árvore ' + v.n + ' (até 2200).', 'Bônus da árvore completa: ' + modLines(v.m).join(', ')); }
+  if (t.entry) { const v = VERT[t.v]; o.push('Entrada da vertente ' + v.e + ' ' + v.n + '.', 'Escolhê-la troca as tecnologias militares, navais e econômicas posteriores a ' + v.entry.y + ' pela árvore ' + v.n + ' (até 2200).', 'Bônus da árvore completa: ' + modLines(v.m).join(', '), 'Exige ' + needName(t.v) + ' no território ou numa província vizinha' + (S && S.player >= 0 ? (vertNeedOk(n, t.v) ? ' ✓' : ' ✗') : '')); }
   o.push(...fxLines(t.fx));
   if (t.vt) { const v = VERT[t.v]; if (t.src.length) o.push('Traz o equivalente a: ' + t.src.map(x => TECH[x].n).join(', ')); o.push('Parte da árvore ' + v.n + ': ' + modLines(Object.fromEntries(Object.entries(v.m).map(([k, x]) => [k, x / v.len]))).join(', ')); }
   if (t.req.length) o.push('Exige: ' + t.req.map(q => TECH[q].n).join(', '));
@@ -97,7 +97,7 @@ function startPlay(fresh) {
 }
 
 /* ---------- modos de mapa ---------- */
-const MODEBTN = [['pol', '🗺️', 'Político'], ['ter', '⛰️', 'Terreno'], ['dip', '🤝', 'Diplomático: verde é você, azul aliados, vermelho inimigos, laranja trégua'], ['pop', '👥', 'População'], ['reg', '🧩', 'Regiões e estados'], ['cont', '🌍', 'Continentes'], ['res', '⛏️', 'Recursos: cinza ferro, preto carvão, amarelo ouro, roxo petróleo'], ['plague', '☠️', 'Peste: verde escuro doente agora, cinza já passou']];
+const MODEBTN = [['pol', '🗺️', 'Político'], ['ter', '⛰️', 'Terreno'], ['dip', '🤝', 'Diplomático: verde é você, azul aliados, vermelho inimigos, laranja trégua'], ['pop', '👥', 'População'], ['reg', '🧩', 'Regiões e estados'], ['cont', '🌍', 'Continentes'], ['res', '⛏️', 'Recursos: cinza ferro, preto carvão, amarelo ouro, roxo-escuro petróleo, laranja cobre, verde urânio, lilás terras raras'], ['plague', '☠️', 'Peste: verde escuro doente agora, cinza já passou']];
 function drawModes(box) { box.innerHTML = ''; MODEBTN.forEach(([m, e, t]) => box.append(btn(e, () => { R.mode = m; S.mapDirty = true; drawModes(box); }, R.mode === m ? 'on' : '', '', t))); }
 
 /* ---------- barra do topo ---------- */

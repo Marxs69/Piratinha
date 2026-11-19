@@ -16,7 +16,7 @@ function resize() { const d = devicePixelRatio || 1; R.cv.width = innerWidth * d
 function fitCam() { const z = Math.min(innerWidth / R.base.width, innerHeight / R.base.height) * 1.05; R.cam = { z, x: R.base.width / 2 - innerWidth / 2 / z, y: R.base.height / 2 - innerHeight / 2 / z }; R.dirty = true; }
 function clampCam() {
   const c = R.cam, zmin = Math.min(innerWidth / R.base.width, innerHeight / R.base.height) * .8; c.z = clamp(c.z, zmin, 14);
-  const vw = innerWidth / c.z, vh = innerHeight / c.z, m = 200;
+  const vw = innerWidth / c.z, vh = innerHeight / c.z, m = 60;
   c.x = clamp(c.x, -m - Math.max(0, (vw - R.base.width) / 2) * 2, R.base.width - vw + m + Math.max(0, (vw - R.base.width) / 2) * 2);
   c.y = clamp(c.y, -m - Math.max(0, (vh - R.base.height) / 2) * 2, R.base.height - vh + m + Math.max(0, (vh - R.base.height) / 2) * 2);
 }
@@ -48,7 +48,7 @@ function provColors() {
     else if (mode === 'reg') c = regCol[WD.provs[p].region].map((v, i) => v * (.85 + (WD.provs[p].state % 3) * .08));
     else if (mode === 'cont') c = contCol[WD.provs[p].cont];
     else if (mode === 'plague') { const P = S.plague, D = P ? P.done : (S.plagueDone || {}).done || {}; c = P && P.inf[p] != null ? [30, 70, 20] : D[p] ? [150, 150, 140] : o >= 0 ? [205, 200, 180] : null; }
-    else if (mode === 'res') { const r = WD.provs[p].res; c = r === 'iron' ? [150, 150, 170] : r === 'coal' ? [50, 50, 50] : r === 'gold' ? [240, 200, 40] : r === 'oil' ? [30, 20, 40] : [200, 190, 160]; }
+    else if (mode === 'res') { const r = WD.provs[p].res; c = r === 'iron' ? [150, 150, 170] : r === 'coal' ? [50, 50, 50] : r === 'gold' ? [240, 200, 40] : r === 'oil' ? [30, 20, 40] : r === 'copper' ? [214, 110, 40] : r === 'uranium' ? [110, 230, 60] : r === 'rare' ? [190, 70, 220] : [200, 190, 160]; }
     if (c) { col[p * 3] = c[0]; col[p * 3 + 1] = c[1]; col[p * 3 + 2] = c[2]; } else { col[p * 3] = 255; col[p * 3 + 1] = 0; col[p * 3 + 2] = 255; }   // magenta = sem cor (mostra terreno)
   }
   return col;

@@ -233,11 +233,11 @@ function generateWorld(seed) {
   provs.forEach(p => {
     p.cul = regions[p.region].cul; p.n = nameGen(CULTURES[p.cul], r, used);
     const t = p.terr, x = r();
-    p.res = (t === 'hills' || t === 'mountain') ? (x < .28 ? 'iron' : x < .48 ? 'coal' : x < .55 ? 'gold' : null)
-      : t === 'desert' ? (x < .14 ? 'oil' : x < .18 ? 'gold' : null)
-      : (t === 'tundra' || t === 'taiga') ? (x < .08 ? 'oil' : x < .2 ? 'coal' : x < .26 ? 'iron' : null)
-      : (t === 'marsh' || t === 'jungle') ? (x < .07 ? 'oil' : x < .1 ? 'gold' : null)
-      : (x < .04 ? 'iron' : x < .06 ? 'oil' : null);
+    p.res = (t === 'hills' || t === 'mountain') ? (x < .25 ? 'iron' : x < .43 ? 'coal' : x < .49 ? 'gold' : x < .61 ? 'copper' : x < .65 ? 'uranium' : x < .68 ? 'rare' : null)
+      : t === 'desert' ? (x < .14 ? 'oil' : x < .17 ? 'gold' : x < .21 ? 'uranium' : x < .24 ? 'rare' : null)
+      : (t === 'tundra' || t === 'taiga') ? (x < .08 ? 'oil' : x < .2 ? 'coal' : x < .26 ? 'iron' : x < .29 ? 'uranium' : null)
+      : (t === 'marsh' || t === 'jungle') ? (x < .07 ? 'oil' : x < .1 ? 'gold' : x < .13 ? 'rare' : null)
+      : (x < .04 ? 'iron' : x < .06 ? 'oil' : x < .08 ? 'copper' : null);
     p.size = p.n;   // será sobrescrito abaixo pelo número de células
   });
   { const cnt = new Int32Array(P); for (const i of landCells) cnt[prov[i]]++; provs.forEach(p => { p.size = cnt[p.id]; }); }
@@ -248,6 +248,7 @@ function generateWorld(seed) {
       farm: Math.max(0, Math.round(fert * 1.6)), fishery: ps.filter(p => p.coast).length * 2, lumber: ps.filter(p => ['forest', 'taiga', 'jungle'].includes(p.terr)).length * 2,
       quarry: ps.filter(p => ['hills', 'mountain', 'desert'].includes(p.terr)).length + 1, iron_mine: ps.filter(p => p.res === 'iron').length * 3, coal_mine: ps.filter(p => p.res === 'coal').length * 3,
       gold_mine: ps.filter(p => p.res === 'gold').length * 2, oil_well: ps.filter(p => p.res === 'oil').length * 3,
+      copper_mine: ps.filter(p => p.res === 'copper').length * 3, uranium_mine: ps.filter(p => p.res === 'uranium').length * 2, rare_mine: ps.filter(p => p.res === 'rare').length * 2,
       plantation: ps.filter(p => p.temp > .55 && TERRAIN[p.terr].food >= .7).length * 2,
     };
     s.coast = ps.some(p => p.coast);

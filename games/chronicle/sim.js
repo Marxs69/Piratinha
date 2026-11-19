@@ -266,7 +266,7 @@ function canBuild(n, s, b) {
   if (!d.vert && !n.fx.b.has(b)) return 'Exige tecnologia';
   if (d.req === 'coast' && !st.coast) return 'Exige litoral';
   const capOf = { arable: st.caps.farm, forest: st.caps.lumber, rocky: st.caps.quarry, warm: st.caps.plantation, coast: b === 'fishery' ? st.caps.fishery : 99 };
-  if (d.req && d.req.startsWith('res:')) { const k = { iron: 'iron_mine', coal: 'coal_mine', gold: 'gold_mine', oil: 'oil_well' }[d.req.slice(4)]; if (L >= st.caps[k]) return st.caps[k] ? 'Recurso esgotado' : 'Sem o recurso'; }
+  if (d.req && d.req.startsWith('res:')) { const k = { iron: 'iron_mine', coal: 'coal_mine', gold: 'gold_mine', oil: 'oil_well', copper: 'copper_mine', uranium: 'uranium_mine', rare: 'rare_mine' }[d.req.slice(4)]; if (L >= st.caps[k]) return st.caps[k] ? 'Recurso esgotado' : 'Sem o recurso'; }
   else if (d.req && L >= (capOf[d.req] ?? 99)) return 'Sem espaço';
   const max = b === 'castle' ? 1 + n.fx.fort : d.max; if (max && L >= max) return 'Nível máximo';
   if (n.cons.length >= consSlots(n)) return 'Sem canteiros livres';
@@ -310,6 +310,12 @@ function techCost(n, t) {
   if (t.cb == null) t.cb = t.vt && t.src.length ? t.src.reduce((a, x) => a + techBase(TECH[x].y), 0) * .8 + techBase(t.y) * .3 : techBase(t.y) * (t.entry ? 1.2 : 1);
   const ahead = Math.max(0, t.y - curYear()); return Math.round(t.cb * (1 + ahead * .03));
 }
+function vertNeedOk(n, v) {                                  // recurso ou terreno exigido no território ou numa província vizinha
+  const need = VERT[v].need, test = NEEDS[need] ? NEEDS[need].ok : p => p.res === need;
+  for (const p of provsOf(n.id)) { const pr = WD.provs[p]; if (test(pr) || pr.adj.some(o => test(WD.provs[o]))) return true; }
+  return false;
+}
+const needName = v => { const k = VERT[v].need; return NEEDS[k] ? NEEDS[k].n : GOODS[k].n.toLowerCase(); };
 function techState(n, t) {                                  // '' = pode pesquisar
   if (n.techs[t.id]) return 'done';
   if (t.v) { if (n.vert && n.vert !== t.v) return 'Outra vertente escolhida'; if (t.vt && n.vert !== t.v) return 'Exige escolher ' + VERT[t.v].n; }
@@ -317,6 +323,7 @@ function techState(n, t) {                                  // '' = pode pesquis
   if (!t.req.every(q => hasT(n, q))) return 'Exige tecnologias anteriores';
   const ahead = t.y - curYear();
   if (t.entry && ahead > 20) return 'Só a partir de ' + (t.y - 20);
+  if (t.entry && !vertNeedOk(n, t.v)) return 'Exige ' + needName(t.v) + ' no território ou numa província vizinha';
   if (ahead > (t.vt ? 60 : 100)) return 'Só a partir de ' + (t.y - (t.vt ? 60 : 100));
   return '';
 }
