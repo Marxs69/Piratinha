@@ -144,10 +144,11 @@ function joinWar(w, id, side) {
 function breakTies(a, b) { ['allies', 'trade', 'marr'].forEach(k => { a[k] = (a[k] || []).filter(x => x !== b.id); b[k] = (b[k] || []).filter(x => x !== a.id); }); }
 function callAllies(w, side) {                                // aliados e parceiros juniores são chamados; o jogador decide numa janela
   const lead = nat(side === 'A' ? w.a : w.d), foe = side === 'A' ? w.d : w.a;
-  const calls = new Set([...(lead.allies || []), ...S.nations.filter(j => j.alive && j.senior === lead.id).map(j => j.id)]);
+  const calls = new Set([...(lead.allies || []), ...subjectsOf(lead.id).map(j => j.id), ...(lead.senior != null ? [lead.senior] : [])]);   // súditos acompanham o suserano; o suserano defende o súdito
   calls.forEach(id => {
     const al = nat(id); if (!al.alive || sideOf(w, id) || id === foe) return;
-    if (al.senior === lead.id) { joinWar(w, id, side); return; }
+    if (al.senior === lead.id && (!al.subj || SUBJECTS[al.subj.tier].war)) { joinWar(w, id, side); return; }
+    if (lead.senior === id) { joinWar(w, id, side); return; }
     if (id === S.player) { S.calls = S.calls || []; S.calls.push({ w: w.id, side, from: lead.id }); return; }
     const p = (al.ruler.tr.includes('honest') ? 1 : side === 'D' ? .75 : .45) + (al.rel[lead.id] || 0) / 400 - (al.ruler.tr.includes('craven') ? .3 : 0);
     if (chance(p)) joinWar(w, id, side);
@@ -161,7 +162,8 @@ function answerCall(c, yes) {
 }
 function declareWar(n, t, s) {
   if (atWar(n.id, t.id)) return 'Já em guerra'; if (n.truce[t.id] > S.t) return 'Trégua em vigor';
-  if (n.senior != null) return 'Parceiro júnior de união não declara guerras';
+  if (n.senior != null && !(n.subj && SUBJECTS[n.subj.tier].dip)) return 'Súdito sem diplomacia própria não declara guerras';
+  if (t.id === n.senior || t.senior === n.id) return 'É seu suserano ou súdito';
   if ((n.allies || []).includes(t.id)) return 'Rompa a aliança antes';
   const claim = s != null && n.claims[s];
   const w = { id: S.id++, A: [n.id], D: [t.id], a: n.id, d: t.id, goal: s, start: S.t, loss: {}, bp: {}, score: 0 };
@@ -172,91 +174,15 @@ function declareWar(n, t, s) {
   return '';
 }
 const sideProvs = ids => { const out = []; ids.forEach(id => out.push(...provsOf(id))); return out; };
-/* rendição: território ocupado, tropas perdidas e capital tomada (100% = capitula) */
-function surrender(w, side) {
-  const ids = side === 'A' ? w.A : w.D, foes = side === 'A' ? w.D : w.A; let tot = 0, occ = 0;
-  for (const p of sideProvs(ids)) { const v = S.pop[p] + 1; tot += v; if (foes.includes(S.ctrl[p])) occ += v; }
-  const lost = ids.reduce((a, id) => a + ((w.loss || {})[id] || 0), 0), now = S.armies.filter(a => ids.includes(a.o)).reduce((a, x) => a + regs(x), 0);
-  const lead = nat(side === 'A' ? w.a : w.d), cap = lead.alive && foes.includes(S.ctrl[lead.capital]) ? .25 : 0;
-  return clamp((tot ? occ / tot : 0) * .9 + (lost / (lost + now + 1)) * .45 + cap, 0, 1);
-}
-function warScore(w) { return Math.round((surrender(w, 'D') - surrender(w, 'A')) * 100); }   // positivo = lado atacante vencendo
-/* pontos de cada participante: o que ocupou do lado inimigo e as batalhas que venceu */
-function warPoints(w, id) {
-  const foes = w.A.includes(id) ? w.D : w.A; let tot = 0, occ = 0;
-  for (const p of sideProvs(foes)) { const v = S.pop[p] + 1; tot += v; if (S.ctrl[p] === id) occ += v; }
-  return Math.round((tot ? occ / tot * 100 : 0) + ((w.bp || {})[id] || 0));
-}
-function provPrice(w, picker, p) {                            // custo em pontos de uma província do lado perdedor
-  const owner = S.own[p], side = w.A.includes(picker) ? w.A : w.D, loserSide = side === w.A ? w.D : w.A; let tot = 0;
-  for (const q of sideProvs(loserSide)) tot += S.pop[q] + 1;
-  let c = Math.max(4, (S.pop[p] + 1) / tot * 140) * (side.includes(S.ctrl[p]) ? .7 : 1.4);
-  if (nat(picker).claims[WD.provs[p].state]) c *= .5;
-  if (owner >= 0 && nat(owner).capital === p) c *= 1.5;
-  return Math.ceil(c);
-}
-function aiPicks(w, picker, budget, taken) {                  // a IA escolhe: reivindicações, vizinhas e ocupadas primeiro
-  const n = nat(picker), loserSide = w.A.includes(picker) ? w.D : w.A, picks = [];
-  const cands = sideProvs(loserSide).filter(p => !taken.has(p)).map(p => [p, (n.claims[WD.provs[p].state] ? 50 : 0) + (WD.provs[p].adj.some(o => S.own[o] === picker) ? 20 : 0) + (S.ctrl[p] === picker ? 30 : 0) + rnd() * 5]).sort((a, b) => b[1] - a[1]);
-  for (const [p] of cands) { const c = provPrice(w, picker, p); if (c > budget) continue; if (statesOf(n, picks.concat(p)) > domCap(n) * 1.1 + 1) continue; picks.push(p); taken.add(p); budget -= c; }
-  return picks;
-}
-function conference(w, winSide, playerPicks) {               // cada vencedor gasta os próprios pontos; o jogador escolhe à mão
-  const ids = (winSide === 'A' ? w.A : w.D).slice().sort((a, b) => warPoints(w, b) - warPoints(w, a)), taken = new Set(playerPicks || []), deals = [];
-  if (playerPicks) deals.push([S.player, playerPicks]);
-  const capit = surrender(w, winSide === 'A' ? 'D' : 'A') >= 1 ? 1.25 : 1;
-  ids.forEach(id => { if (id === S.player && playerPicks) return; if (id === S.player) return; deals.push([id, aiPicks(w, id, warPoints(w, id) * capit, taken)]); });
-  return deals;
-}
-const peaceCost = (w, winner, provs) => provs.reduce((a, p) => a + provPrice(w, winner, p), 0);
-function makePeace(w, winner, provs, money, deals) {
-  const loser = winner == null ? null : (winner === w.a ? w.d : w.a), all = [...w.A, ...w.D];
-  deals = deals || (provs && provs.length ? [[winner, provs]] : []);
-  deals.forEach(([id, ps]) => ps.forEach(p => { S.own[p] = id; }));
-  for (let p = 0; p < S.own.length; p++) { const o = S.own[p]; if (all.includes(o) && all.includes(S.ctrl[p])) S.ctrl[p] = o; }
-  S.armies.forEach(a => { if (all.includes(a.o) && a.p < WD.provs.length && S.own[a.p] !== a.o && nat(a.o).alive) { a.p = nat(a.o).capital; a.path = []; } });
-  if (money && loser != null) { const amt = Math.max(0, Math.min(nat(loser).money, money)); nat(loser).money -= amt; nat(winner).money += amt; }
-  S.wars = S.wars.filter(x => x !== w); warsChanged();
-  w.A.forEach(x => w.D.forEach(y => { nat(x).truce[y] = S.t + 360 * 5; nat(y).truce[x] = S.t + 360 * 5; }));
-  deals.forEach(([id]) => { if (w.goal != null && nat(id).claims[w.goal] && WD.states[w.goal].provs.every(p => S.own[p] === id)) delete nat(id).claims[w.goal]; });
-  ownChanged(); checkDead();
-  const A = nat(w.a), D = nat(w.d), got = deals.filter(([, ps]) => ps.length).map(([id, ps]) => nat(id).name + ' +' + ps.length);
-  const txt = winner == null ? 'Paz branca entre ' + natName(A) + ' e ' + natName(D) + '.' : natName(nat(winner)) + ' venceu a guerra contra ' + natName(nat(loser)) + (got.length ? ' (' + got.join(', ') + ' províncias)' : '') + '.';
-  log(txt, all.includes(S.player) ? (winner != null && sideOf(w, S.player) === sideOf(w, winner) ? 'good' : winner == null ? 'info' : 'bad') : 'world', all);
-}
 function checkDead() {
   S.nations.forEach(n => {
     if (!n.alive) return;
     if (!provsOf(n.id).length) {
       n.alive = false; S.armies = S.armies.filter(a => a.o !== n.id); S.fleets = S.fleets.filter(f => f.o !== n.id); S.cols = S.cols.filter(c => c.o !== n.id);
       S.wars = S.wars.filter(w => w.a !== n.id && w.d !== n.id); S.wars.forEach(w => { w.A = w.A.filter(x => x !== n.id); w.D = w.D.filter(x => x !== n.id); }); warsChanged();
-      S.nations.forEach(o => { breakTies(o, n); if (o.senior === n.id) delete o.senior; });
+      S.nations.forEach(o => { breakTies(o, n); if (o.senior === n.id) { delete o.senior; delete o.subj; } }); if (n.senior != null) { delete n.senior; delete n.subj; }
       log(natName(n) + ' deixou de existir.', 'world', [n.id]); if (n.id === S.player) S.over = 'dead';
     } else if (S.own[n.capital] !== n.id) { const ps = provsOf(n.id); n.capital = ps.reduce((a, b) => S.pop[a] >= S.pop[b] ? a : b); }
   });
-}
-function occupiedBy(w, winner) { const side = w.A.includes(winner) ? w.A : w.D; return sideProvs(side === w.A ? w.D : w.A).filter(p => side.includes(S.ctrl[p])); }
-function aiPeace(w) {
-  const sA = surrender(w, 'A'), sD = surrender(w, 'D'); w.score = Math.round((sD - sA) * 100);
-  const months = (S.t - w.start) / 30, human = w.A.includes(S.player) || w.D.includes(S.player), pSide = sideOf(w, S.player);
-  const loseSide = sD >= sA ? 'D' : 'A', winSide = loseSide === 'A' ? 'D' : 'A', sl = Math.max(sA, sD), winLead = winSide === 'A' ? w.a : w.d;
-  if (sl >= 1 || (months >= 8 && sl >= .6 && chance(.12))) {           // capitulação ou derrota clara
-    if (human && pSide === winSide && winLead === S.player) { if (!S.conf && sl >= 1) S.conf = { w: w.id }; return; }
-    const deals = conference(w, winSide);
-    if (human && pSide === loseSide && sl < 1) { if (!S.offer) S.offer = { w: w.id, winner: winLead, deals }; return; }
-    if (human && pSide === loseSide) notify(S.player, '🏳️ Capitulação', 'Seu lado capitulou. Os vencedores tomaram ' + deals.reduce((a, d) => a + d[1].length, 0) + ' províncias.');
-    makePeace(w, winLead, null, 0, deals); return;
-  }
-  if (months > 12 * 7 && sl < .3 && chance(.05)) { if (!human) makePeace(w, null, []); else if (!S.offer) S.offer = { w: w.id, winner: null, deals: [] }; }
-}
-function proposePeace(w, provs, money) {                     // jogador líder: impõe a paz com as províncias escolhidas (pontos) ou paz branca
-  const me = S.player; if (w.a !== me && w.d !== me) return 'Só o líder da guerra negocia a paz';
-  const mySide = sideOf(w, me), foeSur = surrender(w, mySide === 'A' ? 'D' : 'A'), mySur = surrender(w, mySide);
-  if (!provs.length && !money) { if (mySur < .5 || (S.t - w.start) > 360 * 4) { makePeace(w, null, []); return ''; } return 'Recusada: eles acham que estão vencendo'; }
-  if (foeSur < .5) return 'Eles só aceitam ceder terras com a rendição em 50% ou mais (está em ' + Math.round(foeSur * 100) + '%)';
-  const budget = warPoints(w, me) * (foeSur >= 1 ? 1.25 : 1), c = peaceCost(w, me, provs) + (money ? 12 : 0);
-  if (c > budget) return 'Faltam pontos: custa ' + c + ', você tem ' + Math.floor(budget);
-  if (statesOf(nat(me), provs) > domCap(nat(me)) * 1.1 + 1) return 'Seu título não sustenta tantos estados (limite ' + domCap(nat(me)) + ')';
-  makePeace(w, me, null, money, conference(w, mySide, provs)); return '';
 }
 function fabricate(n, s) { if (n.fab) return 'Já fabricando'; const c = Math.round(40 * eraScale()); if (n.money < c) return 'Sem dinheiro'; n.money -= c; n.fab = { s, m: 6 }; return ''; }

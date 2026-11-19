@@ -229,3 +229,9 @@ h4.bgrp { font: 700 11px var(--title); color: var(--dim); letter-spacing: 1px; m
 .seed select { margin-left: 6px; font: inherit; color: var(--text); background: #120e09; border: 1px solid var(--line); border-radius: 3px; padding: 3px 4px; }
 
 .evopts { gap: 6px; margin-top: 10px; } .evopts .btn { text-align: left; }
+.libbar { position: relative; height: 10px; border-radius: 5px; background: var(--bg-3, #2a241c); margin: 6px 0; overflow: visible; }
+.libfill { height: 100%; border-radius: 5px; }
+.libtg { position: absolute; top: -3px; width: 2px; height: 16px; background: #fff; opacity: .8; transform: translateX(-1px); }
+.prow.preg { margin-top: 6px; border-top: 1px solid rgba(255,255,255,.08); padding-top: 6px; }
+.prow.pst { padding-left: 22px; }
+.plist.tree { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); } .plist.tree .preg { grid-column: 1 / -1; }

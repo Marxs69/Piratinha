@@ -230,6 +230,7 @@ function canRecruit(n, type, k = 1) {
   if (type === 'art' && !canArt(n)) return 'Exige Trabuco';
   if (type === 'vrt' && !n.vert) return 'Exige uma vertente';
   if (n.manpower < k) return 'Sem contingente';
+  if (n.subj && SUBJ_LAWS.army.o[n.subj.laws.army].demil && S.armies.reduce((s, a) => s + (a.o === n.id ? regs(a) : 0), 0) + k > Math.max(3, (n.mpMax || 0) * .1)) return 'Desmilitarizado pelo suserano';
   if (n.money < recCost(n, type, k)) return 'Sem dinheiro';
   return '';
 }

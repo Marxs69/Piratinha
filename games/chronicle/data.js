@@ -671,6 +671,23 @@ const PANDEMICS = {
   flu:     { n: 'Grande Gripe', e: '🤧', y: [1916, 1922], le: .022, sp: .4, mar: .7, dur: 6, war: 1, m: 'Uma gripe devastadora surgiu em {p}. Tropas e navios a levam para todo o mundo.' },
   synth:   { n: 'Pandemia sintética', e: '🧬', y: [2030, 2120], le: .02, sp: .35, mar: .7, dur: 8, m: 'Um patógeno criado em laboratório escapou em {p}.' },
 };
+/* ---------- súditos ----------
+   base = liberdade de partida (0% integrado, 100% livre); tri = parte dos impostos paga ao suserano; war = entra nas guerras do suserano;
+   dip = diplomacia própria; int = velocidade de integração; cost = preço na paz (fração do valor do país; null = não se impõe) */
+const SUBJECTS = {
+  puppet:   { n: 'Fantoche', e: '🎭', base: 15, tri: .3, war: 1, dip: 0, int: 1.5, cost: .9, d: 'Governo imposto: paga muito, segue o suserano em tudo e integra rápido.' },
+  vassal:   { n: 'Vassalo', e: '🛡️', base: 30, tri: .15, war: 1, dip: 0, int: 1, cost: .7, d: 'Paga tributo e luta nas guerras do suserano.' },
+  protect:  { n: 'Protetorado', e: '☂️', base: 45, tri: .05, war: 0, dip: 1, int: .6, cost: .5, d: 'Tem diplomacia própria e é defendido pelo suserano; paga pouco.' },
+  dominion: { n: 'Domínio', e: '🏛️', base: 55, tri: .05, war: 0, dip: 1, int: .4, cost: .35, d: 'Quase independente: governo e diplomacia próprios, laço leve com a coroa.' },
+  union:    { n: 'União pessoal', e: '👑', base: 30, tri: 0, war: 1, dip: 0, int: .8, cost: null, d: 'O mesmo monarca nas duas coroas; nasce de casamentos reais.' },
+};
+/* leis para cada súdito: lib = efeito na liberdade; tri = multiplicador do tributo; mp = parte do contingente cedida; int = velocidade de integração */
+const SUBJ_LAWS = {
+  tribute: { n: 'Tributo', o: { none: { n: 'Isento', lib: -10, tri: 0 }, normal: { n: 'Normal', lib: 0, tri: 1 }, heavy: { n: 'Pesado', lib: 15, tri: 2 } } },
+  army:    { n: 'Exército', o: { own: { n: 'Próprio', lib: 0 }, levies: { n: 'Contingentes ao suserano', lib: 8, mp: .2 }, demil: { n: 'Desmilitarizado', lib: 12, demil: 1 } } },
+  rule:    { n: 'Governo', o: { self: { n: 'Autogoverno', lib: -10, int: .5 }, advisors: { n: 'Conselheiros do suserano', lib: 0, int: 1 }, governor: { n: 'Governador nomeado', lib: 12, int: 2 } } },
+};
+const SUBJ_LAW_DEF = { tribute: 'normal', army: 'own', rule: 'advisors' };
 const COUNCIL = [['chancellor', 'Chanceler', 'dip'], ['marshal', 'Marechal', 'mar'], ['steward', 'Tesoureiro', 'adm'], ['spymaster', 'Mestre espião', 'int'], ['scholar', 'Erudito', 'lea']];
 
 /* ---------- culturas: sílabas para nomes de lugares, pessoas e dinastias ---------- */

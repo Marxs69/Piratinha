@@ -43,7 +43,7 @@ function provColors() {
   for (let p = 0; p < P; p++) {
     const o = S.own[p]; let c = null;
     if (mode === 'pol') c = o >= 0 ? nat(o).col : null;
-    else if (mode === 'dip') { if (o < 0) c = null; else if (!me) c = [150, 150, 150]; else if (o === me.id) c = [70, 170, 90]; else if (atWar(me.id, o)) c = [200, 60, 60]; else if (me.truce[o] > S.t) c = [220, 150, 60]; else c = [150, 150, 150]; }
+    else if (mode === 'dip') { if (o < 0) c = null; else if (!me) c = [150, 150, 150]; else if (o === me.id) c = [70, 170, 90]; else if (nat(o).senior === me.id) c = [140, 205, 150]; else if (me.senior === o) c = [90, 140, 210]; else if (atWar(me.id, o)) c = [200, 60, 60]; else if (me.truce[o] > S.t) c = [220, 150, 60]; else c = [150, 150, 150]; }
     else if (mode === 'pop') { const v = Math.pow(S.pop[p] / WD.provs[p].size / maxPop, .5); c = [40 + v * 215, 40 + v * 170, 90 - v * 60]; }
     else if (mode === 'reg') c = regCol[WD.provs[p].region].map((v, i) => v * (.85 + (WD.provs[p].state % 3) * .08));
     else if (mode === 'cont') c = contCol[WD.provs[p].cont];

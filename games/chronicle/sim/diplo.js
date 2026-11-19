@@ -36,7 +36,7 @@ function dipAct(n, t, kind) {                                 // '' = feito/acei
   if (kind === 'unally') { n.allies = (n.allies || []).filter(x => x !== t.id); t.allies = (t.allies || []).filter(x => x !== n.id); t.rel[n.id] = clamp((t.rel[n.id] || 0) - 40, -100, 100); n.stab = Math.max(0, n.stab - 5); return ''; }
   if (kind === 'untrade') { n.trade = (n.trade || []).filter(x => x !== t.id); t.trade = (t.trade || []).filter(x => x !== n.id); t.rel[n.id] = clamp((t.rel[n.id] || 0) - 10, -100, 100); return ''; }
   if (kind === 'embargo') { n.emb = n.emb || []; if (n.emb.includes(t.id)) n.emb = n.emb.filter(x => x !== t.id); else { n.emb.push(t.id); n.trade = (n.trade || []).filter(x => x !== t.id); t.trade = (t.trade || []).filter(x => x !== n.id); t.rel[n.id] = clamp((t.rel[n.id] || 0) - 25, -100, 100); } return ''; }
-  if (kind === 'integrate') { if (t.senior !== n.id) return 'Não é seu parceiro júnior'; if (S.t - t.unionT < 360 * 50) return 'A união precisa de 50 anos'; if ((t.rel[n.id] || 0) < 50) return 'Exige relação 50+'; n.money -= c; provsOf(t.id).forEach(p => { S.own[p] = n.id; S.ctrl[p] = n.id; }); S.armies.forEach(a => { if (a.o === t.id) a.o = n.id; }); S.fleets.forEach(f => { if (f.o === t.id) f.o = n.id; }); ownChanged(); checkDead(); log(natName(n) + ' integrou ' + t.name + ' à coroa.', 'world', [n.id]); return ''; }
+  if (kind === 'integrate') return 'Use a aba Súditos na diplomacia';
   if (kind === 'ally' && has(n, 'allies', t.id)) return 'Já são aliados';
   if (kind === 'marr') { if (GOVS[n.gov].succ !== 'hered' || GOVS[t.gov].succ !== 'hered') return 'Exige duas monarquias hereditárias'; if (has(n, 'marr', t.id)) return 'Já há casamento'; }
   if (kind === 'trade') { if (has(n, 'trade', t.id)) return 'Já há acordo'; if (has(n, 'emb', t.id) || has(t, 'emb', n.id)) return 'Há embargo'; }
@@ -87,14 +87,14 @@ function aiDiplomacy(n) {
   if (chance(.05) && nb.length) { const t = pickR(nb); if (strength(t) > strength(n) && (n.rel[t.id] || 0) < 30) dipAct(n, t, n.ruler.tr.includes('generous') ? 'gift' : 'improve'); }
   enemiesOf(n.id).forEach(e => { if (!has(n, 'emb', e) && chance(.3)) dipAct(n, nat(e), 'embargo'); });
   if (n.emb && n.emb.length && chance(.05)) { const e = n.emb.find(x => !atWar(n.id, x)); if (e != null) dipAct(n, nat(e), 'embargo'); }
-  S.nations.forEach(j => { if (j.alive && j.senior === n.id && chance(.02)) dipAct(n, j, 'integrate'); });
+  aiSubjects(n);
 }
 function tryUnion(n) {                                        // sem herdeiros: um parceiro de casamento pode herdar (união pessoal)
   if (n.id === S.player || GOVS[n.gov].succ !== 'hered') return false;
   const cands = (n.marr || []).map(nat).filter(t => t.alive && t.senior == null && GOVS[t.gov].succ === 'hered' && t.id !== n.id);
   if (!cands.length || !chance(.6)) return false;
   const s = cands.sort((a, b) => strength(b) - strength(a))[0];
-  n.senior = s.id; n.unionT = S.t; n.ruler = s.ruler; n.dyn = s.dyn; n.kids = []; n.spouse = null; link(n, s, 'allies');
+  makeSubject(n, s, 'union'); n.unionT = S.t; n.ruler = s.ruler; n.dyn = s.dyn; n.kids = []; n.spouse = null;
   log('União pessoal: ' + natName(s) + ' herdou a coroa de ' + natName(n) + '.', 'world', [n.id, s.id]);
   return true;
 }

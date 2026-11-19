@@ -36,7 +36,7 @@ function charMonthly(n) {
   for (const [k, t] of COUNCIL) { const c = n.council[k]; if (c && chance(deathChance(c))) { n.council[k] = mkChar(n, { boost: t ? COUNCIL.find(x => x[0] === k)[2] : null, dyn: newDynasty(n) }); if (n.id === S.player) log(t + ' ' + charName(c) + ' morreu aos ' + ageOf(c) + ' anos; um substituto assumiu.', 'info', [n.id]); } }
   if (n.spouse && chance(deathChance(n.spouse))) { if (n.id === S.player) log('Morreu ' + charName(n.spouse) + ', cônjuge do governante.', 'info', [n.id]); n.spouse = null; }
   if (g.succ === 'hered' && !n.spouse && ageOf(R) >= 16 && ageOf(R) < 60 && chance(.02)) n.spouse = mkChar(n, { f: !R.f, dyn: newDynasty(n), age: Math.max(16, ageOf(R) - 3) });
-  if (n.senior != null) { const s = nat(n.senior); if (s.alive && GOVS[s.gov].succ === 'hered') { n.ruler = s.ruler; n.dyn = s.dyn; return; } delete n.senior; succeed(n, false); return; }
+  if (n.senior != null && (!n.subj || n.subj.tier === 'union')) { const s = nat(n.senior); if (s.alive && GOVS[s.gov].succ === 'hered') { n.ruler = s.ruler; n.dyn = s.dyn; return; } freeSubject(n, null); succeed(n, false); return; }
   if (g.succ === 'ai') return;
   const age = ageOf(R), pDie = deathChance(R);
   if (chance(pDie)) { if (g.succ === 'elect') { log(titleOf(n, R) + ' ' + charName(R) + ' de ' + natName(n) + ' morreu; há eleição.', 'none', [n.id]); if (!election(n)) succeed(n, true); return; } log(titleOf(n, R) + ' ' + charName(R) + ' de ' + natName(n) + ' morreu aos ' + age + ' anos.', n.id === S.player ? 'bad' : 'info', [n.id]); succeed(n, true); return; }
@@ -127,7 +127,7 @@ function setGov(n, g) {
 }
 function applyGov(n, g) {                                     // troca a forma de governo (sem custo; quem chama já checou)
   n.gov = g; n.govCd = S.t + 360 * 10;
-  if (GOVS[g].succ !== 'hered') { n.marr = []; n.kids = []; n.spouse = null; S.nations.forEach(j => { if (j.senior === n.id) { delete j.senior; succeed(j, false); log(j.name + ' deixou a união pessoal.', 'world', [j.id, n.id]); } }); }
+  if (GOVS[g].succ !== 'hered') { n.marr = []; n.kids = []; n.spouse = null; S.nations.forEach(j => { if (j.senior === n.id && (!j.subj || j.subj.tier === 'union')) { freeSubject(j, null); succeed(j, false); log(j.name + ' deixou a união pessoal.', 'world', [j.id, n.id]); } }); }
   else if (!n.kids) { n.kids = []; n.spouse = mkChar(n, { f: !n.ruler.f, dyn: newDynasty(n) }); }
   calcMods(n);
 }
