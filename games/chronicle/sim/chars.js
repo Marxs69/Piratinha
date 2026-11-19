@@ -139,8 +139,22 @@ function setIdeo(n, i) {
   const inf = ideoInfluence(n)[i] || 0; n.ideo = i; n.stab = Math.max(0, n.stab - Math.max(2, 12 - inf * 2)); n.ideoCd = S.t + 360 * 5; calcMods(n); return '';
 }
 const councilCost = () => Math.round(25 * eraScale());
-function councilCands(n, k) { const s = COUNCIL.find(x => x[0] === k)[2]; return [0, 1, 2].map(() => mkChar(n, { boost: s, dyn: newDynasty(n) })); }
-function swapCouncil(n, k, c) { const cost = councilCost(); if (n.money < cost) return 'Sem dinheiro'; n.money -= cost; n.council[k] = c; calcMods(n); return ''; }
+/* candidatos a cada cargo: a lista fica a mesma por 5 anos (n.cands[cargo] = { t: até quando, list }) */
+const CANDS_YEARS = 5;
+function councilCands(n, k) {
+  const s = COUNCIL.find(x => x[0] === k)[2]; n.cands = n.cands || {}; const c = n.cands[k];
+  if (c && c.t > S.t && c.list.length) return c.list;
+  const list = [0, 1, 2].map(() => mkChar(n, { boost: s, dyn: newDynasty(n) })); n.cands[k] = { t: S.t + 360 * CANDS_YEARS, list }; return list;
+}
+const candsUntil = (n, k) => ((n.cands || {})[k] || {}).t;
+function swapCouncil(n, k, c) { const cost = councilCost(); if (n.money < cost) return 'Sem dinheiro'; n.money -= cost; const old = n.council[k]; n.council[k] = c;
+  const L = (n.cands || {})[k]; if (L) { L.list = L.list.filter(x => x !== c); if (old && (old.op ?? 0) > -30) L.list.push(old); }   // quem saiu volta à lista de nomes
+  calcMods(n); return ''; }
+/* troca de um conselheiro por motivo político (renúncia, novo gabinete, expurgo): o substituto é da ideologia do governo quando o regime exige */
+function replaceCouncil(n, k, why, sameIdeo) {
+  const c = n.council[k], s = COUNCIL.find(x => x[0] === k)[2], nc = mkChar(n, { boost: s, dyn: newDynasty(n) }); if (sameIdeo) nc.ld = n.ideo;
+  n.council[k] = nc; if (n.id === S.player && c) log(roleName(n, k) + ' ' + charName(c) + ' ' + why + '; assume ' + charName(nc) + '.', 'info', [n.id]); calcMods(n);
+}
 const flagCost = () => Math.round(30 * eraScale());
 function setFlag(n, f) { const c = flagCost(); if (n.money < c) return 'Sem dinheiro'; n.money -= c; n.flag = JSON.parse(JSON.stringify(f)); return ''; }
 function rename(n, name) { name = (name || '').trim().replace(/\s+/g, ' '); if (name.length < 2 || name.length > 24) return 'Nome deve ter de 2 a 24 letras'; n.name = name; return ''; }
@@ -169,7 +183,7 @@ function election(n) {
   supportTick(n); const sup = n.sup || {}; let win = n.ideo, best = -1;
   for (const k in sup) { const v = sup[k] + (rnd() - .5) * .06; if (v > best) { best = v; win = k; } }
   const pctv = Math.round((sup[win] || 0) * 100), changed = win !== n.ideo;
-  if (changed) { n.ideo = win; succeed(n, false); calcMods(n); }
+  if (changed) { n.ideo = win; succeed(n, false); COUNCIL.forEach(([k]) => { const c = n.council[k]; if (c && c.ld !== win && chance(.6)) replaceCouncil(n, k, 'deixou o gabinete após a eleição', true); }); calcMods(n); }   // novo governo, novo gabinete
   const txt = changed ? 'Eleições em ' + natName(n) + ': o partido ' + IDEOS[win].n + ' venceu com ' + pctv + '% e ' + charName(n.ruler) + ' assume.' : 'Eleições em ' + natName(n) + ': o governo (' + IDEOS[win].n + ') foi reeleito com ' + pctv + '%.';
   log(txt, n.id === S.player ? (changed ? 'bad' : 'good') : 'none', [n.id]);
   notify(n.id, '🗳️ Eleições', txt);

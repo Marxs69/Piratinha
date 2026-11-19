@@ -79,7 +79,15 @@ function courtTick(n) {
       if (n.id === S.player) log(charName(k) + ' terminou a educação com ' + roleName(n, k.tut).toLowerCase() + ' ' + charName(n.council[k.tut] || k) + '.', 'good', [n.id]); } }
   // regência
   if (n.regent && ageOf(n.ruler) >= 16) { n.regent = null; addPres(n, 5); if (n.id === S.player) log(charName(n.ruler) + ' atingiu a maioridade e governa sozinho.', 'good', [n.id]); calcMods(n); }
-  n._dem = null; schemeTick(n);
+  n._dem = null; councilPolitics(n); schemeTick(n);
+}
+/* renúncias e expurgos: conselheiro furioso pede demissão; regimes de partido/ideologia afastam quem pensa diferente */
+const PURGE_CATS = ['Socialista', 'Ditadura', 'Teocracia'];
+function councilPolitics(n) {
+  for (const [k] of COUNCIL) { const c = n.council[k]; if (!c) continue;
+    if ((c.op ?? 0) < -50 && !(c.fear > S.t) && chance(.02)) { replaceCouncil(n, k, 'renunciou em protesto', false); continue; }
+    if (PURGE_CATS.includes(GOVS[n.gov].cat) && c.ld && c.ld !== n.ideo && chance(.008)) replaceCouncil(n, k, GOVS[n.gov].cat === 'Teocracia' ? 'foi afastado pelo clero' : 'foi expurgado do regime', true);
+  }
 }
 /* segredo conhecido: chantagear (fica com medo e não conspira) ou expor (sai da corte; prestígio +3) */
 function useSecret(n, c, k) {
