@@ -304,6 +304,7 @@ const MOD_SOURCES = [
   n => n.alienTrade ? [['Comércio com a lua', { research: .05 * n.alienTrade }]] : [],
   n => { const cs = n.csat, cl = n.cls; if (!(cs && cl && n.popT)) return []; const mid = cl.mid / n.popT;   // a média pesquisa e paga impostos; a alta insatisfeita conspira
     return [['Classes sociais', { research: mid * .8 * cs.mid, tax: mid * .5 * cs.mid + (cs.high - .7) * .1, coup: Math.max(0, 1 - cs.high) * 1.2 }]]; },
+  n => (n.tmods || []).filter(x => x.u > S.t).map(x => ['Evento: ' + x.l, x.m]),          // modificadores temporários (EFF.mod)
 ];
 const modList = n => MOD_SOURCES.flatMap(f => f(n)).filter(x => x[1]);
 /* de onde vem um modificador: [[rótulo, valor]] somando fontes com o mesmo rótulo */
@@ -669,7 +670,7 @@ function coup(n) {                                           // golpe militar: o
   }
   n.dyn = dyn; n.ruler = leader; n.kids = []; n.spouse = null; n.stab = Math.max(20, n.stab - 15); n.coupCd = S.t + 360 * 10; n.press = 0;
   log('Golpe em ' + natName(n) + '! ' + charName(n.ruler) + ' tomou o poder.', n.id === S.player ? 'bad' : 'world', [n.id]);
-  if (n.id === S.player) (S.evq = S.evq || []).push({ t: '⚔️ Golpe militar', m: charName(n.ruler) + ' derrubou o governo com o apoio do exército. Agora governa como ' + titleOf(n).toLowerCase() + ' (' + GOVS[n.gov].n + ').' });
+  notify(n.id, '⚔️ Golpe militar', charName(n.ruler) + ' derrubou o governo com o apoio do exército. Agora governa como ' + titleOf(n).toLowerCase() + ' (' + GOVS[n.gov].n + ').');
   calcMods(n);
 }
 /* exigências: o que o governante e o conselho querem e o país ainda não adotou (só conta o que já é possível adotar) */
@@ -702,7 +703,7 @@ function councilCoup(n, d) {                                   // o conselheiro 
   n.council[slot] = mkChar(n, { boost: COUNCIL.find(x => x[0] === slot)[2], dyn: newDynasty(n) });
   n.dyn = c.dyn; n.ruler = c; n.kids = []; n.spouse = null; n.stab = Math.max(10, n.stab - 12); n.coupCd = S.t + 360 * 10; n.press = 0;
   const txt = 'Golpe do conselho em ' + natName(n) + ': ' + charName(c) + ' tomou o poder' + (done.length ? ' e impôs ' + done.join(', ') : '') + '.';
-  log(txt, n.id === S.player ? 'bad' : 'world', [n.id]); if (n.id === S.player) (S.evq = S.evq || []).push({ t: '🗡️ Golpe do conselho', m: txt });
+  log(txt, n.id === S.player ? 'bad' : 'world', [n.id]); notify(n.id, '🗡️ Golpe do conselho', txt);
   calcMods(n);
 }
 const BASE_GOVS = ['tribal', 'tribal_conf', 'horde', 'feudal', 'elective', 'empire'];
@@ -764,7 +765,7 @@ function election(n) {
   if (changed) { n.ideo = win; succeed(n, false); calcMods(n); }
   const txt = changed ? 'Eleições em ' + natName(n) + ': o partido ' + IDEOS[win].n + ' venceu com ' + pctv + '% e ' + charName(n.ruler) + ' assume.' : 'Eleições em ' + natName(n) + ': o governo (' + IDEOS[win].n + ') foi reeleito com ' + pctv + '%.';
   log(txt, n.id === S.player ? (changed ? 'bad' : 'good') : 'none', [n.id]);
-  if (n.id === S.player) (S.evq = S.evq || []).push({ t: '🗳️ Eleições', m: txt });
+  notify(n.id, '🗳️ Eleições', txt);
   return changed;
 }
 const campaignCost = () => Math.round(40 * eraScale());
@@ -796,7 +797,7 @@ function spaceGo(n, k) { const e = canSpace(n, k); if (e) return e; n.money -= s
 function spaceDone(n, k) {
   const M = S.moon, first = k !== 'sat' && !Object.keys(k === 'probe' ? M.known : k === 'land' ? M.landed : M.base).length, rk = ROCKETS[n.vert || 'none'];
   if (k === 'sat') n.sats = (n.sats || 0) + 1;
-  if (k === 'probe') { M.known[n.id] = 1; const lifeT = { none: 'sem vida', micro: 'com vida microscópica', complex: 'com fauna e flora complexas', intel: 'com vida inteligente: ' + M.civs.length + ' civilização' + (M.civs.length > 1 ? 'ões' : '') }[M.life]; if (n.id === S.player) (S.evq = S.evq || []).push({ t: '🌑 ' + M.n, m: 'A sonda (' + rk + ') chegou a ' + M.n + ': lua ' + M.type.toLowerCase() + ', gravidade ' + M.grav + 'g, ' + lifeT + '.' }); }
+  if (k === 'probe') { M.known[n.id] = 1; const lifeT = { none: 'sem vida', micro: 'com vida microscópica', complex: 'com fauna e flora complexas', intel: 'com vida inteligente: ' + M.civs.length + ' civilização' + (M.civs.length > 1 ? 'ões' : '') }[M.life]; notify(n.id, '🌑 ' + M.n, 'A sonda (' + rk + ') chegou a ' + M.n + ': lua ' + M.type.toLowerCase() + ', gravidade ' + M.grav + 'g, ' + lifeT + '.'); }
   if (k === 'land') { M.landed[n.id] = 1; n.stab = Math.min(100, n.stab + 10); }
   if (k === 'base') M.base[n.id] = 1;
   log((k === 'sat' ? natName(n) + ' pôs um satélite em órbita' : (first ? 'Pela primeira vez na história, ' : '') + natName(n) + ' concluiu: ' + SPACE[k].n + ' em ' + M.n) + ' (' + rk + ').', n.id === S.player ? 'good' : first ? 'world' : 'none', [n.id]);
@@ -819,7 +820,7 @@ function alienTick() {                                        // civilizações 
     if (!c.aggro || c.era < 4 || c.subj != null) return;
     S.nations.forEach(n => {
       if (!n.alive) return;
-      if (M.base[n.id] && chance(.01)) { const def = strength(n) * (1 + (n.sats || 0) * .02); if (def * rnd() < c.pow * 3) { M.base[n.id] = 0; log(c.n + ' atacou e destruiu a base lunar de ' + natName(n) + '.', n.id === S.player ? 'bad' : 'world', [n.id]); if (n.id === S.player) (S.evq = S.evq || []).push({ t: '👽 Ataque à base lunar', m: c.n + ' destruiu sua base em ' + M.n + '.' }); } }
+      if (M.base[n.id] && chance(.01)) { const def = strength(n) * (1 + (n.sats || 0) * .02); if (def * rnd() < c.pow * 3) { M.base[n.id] = 0; log(c.n + ' atacou e destruiu a base lunar de ' + natName(n) + '.', n.id === S.player ? 'bad' : 'world', [n.id]); notify(n.id, '👽 Ataque à base lunar', c.n + ' destruiu sua base em ' + M.n + '.'); } }
       if (c.era >= 7 && M.known[n.id] && chance(.003)) { const ps = provsOf(n.id); if (ps.length) { const p = pickR(ps); S.pop[p] *= .9; n.stab = Math.max(0, n.stab - 5); log(c.n + ' atacou ' + WD.provs[p].n + ' vindo da lua!', n.id === S.player ? 'bad' : 'world', [n.id]); } }
     });
   });
@@ -970,7 +971,7 @@ function autoExplore(f) {                                    // vai ao mar de fr
   const frontier = w => !n.exZ[w] || WD.seas[w].provs.some(p => !n.exP[p]) || WD.seas[w].adj.some(x => !n.exZ[x] && seaOk(n, x));
   for (let h = 0; h < q.length; h++) { const u = q[h]; for (const w of WD.seas[u].adj) { if (seen[w] || !seaOk(n, w)) continue; seen[w] = 1; if (frontier(w)) { const path = seaPath(n, f.z, w); if (path) { f.path = path; return; } } q.push(w); } }
   f.auto = false; if (f.o === S.player) log('Uma frota terminou de explorar o que conseguia alcançar' + (n.fx.sea < 2 ? '; para cruzar o oceano aberto, pesquise Caravela.' : '.'), 'info', [S.player]);
-  if (f.o === S.player && n.fx.sea < 2) (S.evq = S.evq || []).push({ t: '🧭 Exploração', m: 'A frota explorou tudo o que alcança costeando. O oceano aberto exige navegação oceânica (Caravela).' });
+  if (n.fx.sea < 2) notify(f.o, '🧭 Exploração', 'A frota explorou tudo o que alcança costeando. O oceano aberto exige navegação oceânica (Caravela).');
 }
 
 /* ---------- guerra e paz (cada guerra tem dois lados: A ataca, D defende; a e d são os líderes) ---------- */
@@ -1085,7 +1086,7 @@ function aiPeace(w) {
     if (human && pSide === winSide && winLead === S.player) { if (!S.conf && sl >= 1) S.conf = { w: w.id }; return; }
     const deals = conference(w, winSide);
     if (human && pSide === loseSide && sl < 1) { if (!S.offer) S.offer = { w: w.id, winner: winLead, deals }; return; }
-    if (human && pSide === loseSide) (S.evq = S.evq || []).push({ t: '🏳️ Capitulação', m: 'Seu lado capitulou. Os vencedores tomaram ' + deals.reduce((a, d) => a + d[1].length, 0) + ' províncias.' });
+    if (human && pSide === loseSide) notify(S.player, '🏳️ Capitulação', 'Seu lado capitulou. Os vencedores tomaram ' + deals.reduce((a, d) => a + d[1].length, 0) + ' províncias.');
     makePeace(w, winLead, null, 0, deals); return;
   }
   if (months > 12 * 7 && sl < .3 && chance(.05)) { if (!human) makePeace(w, null, []); else if (!S.offer) S.offer = { w: w.id, winner: null, deals: [] }; }
@@ -1240,7 +1241,7 @@ function plagueTick() {
     if (y >= 1340 && !S.plagueDone && chance(y >= 1360 ? 1 : .02)) {
       const main = WD.conts.find(c => c.main), cands = WD.provs.filter(p => p.cont === main.id && p.coast && S.own[p.id] >= 0);
       const p0 = pickR(cands); S.plague = { inf: { [p0.id]: 12 }, done: {}, start: S.t };
-      log('A Grande Peste surgiu em ' + p0.n + '!', 'world'); S.evq = S.evq || []; S.evq.push({ t: '☠️ A Grande Peste', m: 'Uma praga mortal surgiu em ' + p0.n + ' e se espalha pelas estradas e pelos portos. Quem adoecer perde parte da população por um ano.' });
+      log('A Grande Peste surgiu em ' + p0.n + '!', 'world'); notify(S.player, '☠️ A Grande Peste', 'Uma praga mortal surgiu em ' + p0.n + ' e se espalha pelas estradas e pelos portos. Quem adoecer perde parte da população por um ano.');
     }
     return;
   }
@@ -1253,7 +1254,7 @@ function plagueTick() {
     if (--inf[k] <= 0) { delete inf[k]; P.done[p] = 1; }
   }
   Object.assign(inf, newInf);
-  hit.forEach(o => { const n = nat(o); n.stab = Math.max(0, n.stab - .8); if (o === S.player && !P.warned) { P.warned = true; S.evq = S.evq || []; S.evq.push({ t: '☠️ A Peste chegou', m: 'A praga chegou às terras de ' + natName(n) + '. Uma quarentena fecha portos e estradas: o contágio cai muito, mas o comércio também.', quar: true }); log('A Peste chegou a ' + natName(n) + '.', 'bad', [o]); } });
+  hit.forEach(o => { const n = nat(o); n.stab = Math.max(0, n.stab - .8); if (o === S.player && !P.warned) { P.warned = true; notify(S.player, '☠️ A Peste chegou', 'A praga chegou às terras de ' + natName(n) + '. Uma quarentena fecha portos e estradas: o contágio cai muito, mas o comércio também.', { quar: true }); log('A Peste chegou a ' + natName(n) + '.', 'bad', [o]); } });
   S.mapDirty = R_PLAGUE();
   if (!Object.keys(inf).length) { S.plague = null; S.plagueDone = { done: P.done }; log('A Grande Peste terminou depois de ' + Math.round((S.t - P.start) / 360) + ' anos.', 'world'); }
 }
@@ -1294,7 +1295,7 @@ function revolt(n, kind) {
   n.stab = Math.max(0, n.stab - 5); S.mapDirty = true; ownChanged();
   const txt = ic + ' ' + nm + ' em ' + st.n + ': ' + ps.length + ' província' + (ps.length > 1 ? 's' : '') + ' nas mãos dos rebeldes.';
   log(txt, n.id === S.player ? 'bad' : 'none', [n.id]);
-  if (n.id === S.player) (S.evq = S.evq || []).push({ t: ic + ' ' + nm, m: txt + ' Mande tropas para retomá-las (elas cercam como num cerco comum). Se os rebeldes tomarem 30% do país, impõem o que querem.' });
+  notify(n.id, ic + ' ' + nm, txt + ' Mande tropas para retomá-las (elas cercam como num cerco comum). Se os rebeldes tomarem 30% do país, impõem o que querem.');
 }
 function rebelTick() {
   const R0 = S.rebels || (S.rebels = {}), per = {};
@@ -1320,7 +1321,7 @@ function rebelsWin(n, kind, ps) {
   }
   ps.forEach(p => { delete S.rebels[p]; if (S.own[p] >= 0) S.ctrl[p] = S.own[p]; else S.ctrl[p] = -1; });
   n.stab = Math.min(100, n.stab + 10); ownChanged(); checkDead(); calcMods(n);
-  log(txt, n.id === S.player ? 'bad' : 'world', [n.id]); if (n.id === S.player) (S.evq = S.evq || []).push({ t: '🏴 Os rebeldes venceram', m: txt });
+  log(txt, n.id === S.player ? 'bad' : 'world', [n.id]); notify(n.id, '🏴 Os rebeldes venceram', txt);
 }
 function religTick() {                                         // uma vez por ano: conversão à fé do Estado e heresias fictícias
   if (!S.culg) initCul(); if (!S.relg) initRelig(); const y = curYear();
@@ -1398,7 +1399,7 @@ function monthTick() {
     (n.pros || []).forEach(x => x.m--); (n.pros || []).filter(x => x.m <= 0).forEach(x => prospectDone(n, x.s)); if (n.pros) n.pros = n.pros.filter(x => x.m > 0);
     if (n.sproj && --n.sproj.m <= 0) { const k = n.sproj.k; n.sproj = null; spaceDone(n, k); }
     supportTick(n); slaveTick(n); unrestTick(n); pressTick(n);
-    charMonthly(n);
+    charMonthly(n); tmodTick(n); if (n.alive) eventsTick(n);
     if (n.id !== S.player) ai(n);
   });
   rebelTick();
@@ -1615,7 +1616,7 @@ const b64 = u8 => { let s = ''; for (let i = 0; i < u8.length; i += 8192) s += S
 const unb64 = (s, T = Uint8Array) => { const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return new T(u.buffer); };
 function saveGame() {
   const o = Object.assign({}, S, { stSpd: undefined, stS: undefined, stD: undefined, stInfo: undefined, relg: S.relg ? b64(S.relg) : undefined, culg: S.culg ? b64(S.culg) : undefined, own: b64(new Uint8Array(S.own.buffer)), ctrl: b64(new Uint8Array(S.ctrl.buffer)), pop: b64(new Uint8Array(S.pop.buffer)), news: [], offer: null, mapDirty: undefined,
-    nations: S.nations.map(n => Object.assign({}, n, { exP: b64(n.exP), exZ: b64(n.exZ), m: undefined, fx: undefined, up: undefined, eff: undefined })), calls: [], dipOffers: [], evq: [], conf: null });
+    nations: S.nations.map(n => Object.assign({}, n, { exP: b64(n.exP), exZ: b64(n.exZ), m: undefined, fx: undefined, up: undefined, eff: undefined })), calls: [], dipOffers: [], evq: (S.evq || []).filter(e => e.ev), conf: null });
   try { localStorage.setItem('chronicle-save', JSON.stringify(o)); return true; } catch (e) { return false; }
 }
 function loadGame() {
