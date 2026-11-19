@@ -386,7 +386,8 @@ const GOVS = {
 /* ---------- níveis de título (como no CK3): limitam quantos estados o país sustenta (Limite de domínio) ----------
    cap: províncias sem perder estabilidade · req: mínimo para proclamar o nível · no nível 3 cada governo usa o próprio nome (fmt/t) */
 const RANK_N = ['Baronia', 'Condado', 'Ducado', 'Reino', 'Império'];
-const RANK_CAP = [2, 4, 9, 22, 1e9], RANK_REQ = [0, 2, 4, 8, 18];   // em estados (inteiros ou não)
+const RANK_CAP = [2, 5, 12], RANK_REQ = [0, 2, 4, 8];   // em estados (inteiros ou não); Reino e Império dependem do continente de origem
+const RANK_KING = .75, RANK_EMP = 2 / 3;                    // Reino sustenta 3/4 dos estados do continente; Império exige 2/3 das províncias dele
 const RANKSET = {
   Monarquia:   { f: ['Baronato de {}', 'Condado de {}', 'Ducado de {}', null, 'Império de {}'], t: ['Barão', 'Conde', 'Duque', null, 'Imperador'] },
   Tribal:      { f: ['Clã de {}', 'Tribo de {}', 'Chefado de {}', 'Alto Reino de {}', 'Grande Horda de {}'], t: ['Chefe de clã', 'Chefe', 'Grande chefe', 'Alto rei', 'Grão-cã'], f3for: ['tribal'] },
@@ -505,6 +506,17 @@ const LAW_DEF = { tax: 'normal', draft: 'limited', trade: 'normal', spend: 'norm
 const ROCKETS = { none: 'Foguete químico', clock: 'Foguete de corda', steam: 'Foguete a vapor', tesla: 'Canhão eletromagnético', diesel: 'Foguete a diesel', atom: 'Foguete nuclear', bio: 'Nave orgânica', cyber: 'Lançador em rede', solar: 'Vela solar', nano: 'Elevador de nanotubos', space: 'Nave estelar' };
 const MOON_TYPES = [['Rochosa', '#9a9890'], ['Gelada', '#cfe6f2'], ['Oceânica', '#3f78b8'], ['Vulcânica', '#a5452c'], ['Desértica', '#cfa96a'], ['Selvagem', '#4f8a43']];
 const ALIEN_ERAS = ['Idade da Pedra', 'Idade do Bronze', 'Idade Média', 'Renascimento', 'Era Industrial', 'Era Atômica', 'Era Digital', 'Era Interestelar'];
+/* grupos de prédios (painel do estado e janela de construção) */
+const BGROUPS = [['prod', '🌾 Produção e extração', ['farm', 'fishery', 'lumber', 'quarry', 'plantation', 'iron_mine', 'coal_mine', 'gold_mine', 'copper_mine', 'uranium_mine', 'rare_mine', 'oil_well']],
+  ['ind', '🏭 Indústria', ['weaver', 'workshop', 'smithy', 'jeweler', 'manufactory', 'textile_mill', 'goods_factory', 'tool_factory', 'arms_factory', 'steel_mill', 'electronics']],
+  ['energy', '⚡ Energia', ['power_plant', 'oil_plant', 'hydro', 'nuclear', 'wind', 'solar_plant', 'fusion']],
+  ['infra', '🛤️ Transporte e comércio', ['road', 'railway', 'highway', 'hsr', 'maglev', 'tubes', 'portal', 'pipeline', 'port', 'market']],
+  ['svc', '🏛️ Serviços públicos', ['hospital', 'school', 'office', 'guard', 'university', 'temple']],
+  ['mil', '⚔️ Militar', ['castle', 'shipyard', 'barracks', 'academy', 'airbase', 'launch_site']],
+  ['vert', '✨ Vertente', []]];
+const bGroupOf = b => (BGROUPS.find(g => g[2].includes(b)) || BGROUPS[6])[0];
+/* doenças menores, aleatórias ao longo do jogo */
+const DISEASES = ['Febre', 'Tosse', 'Varíola', 'Febre amarela', 'Disenteria', 'Cólera', 'Gripe', 'Sarampo', 'Febre das águas', 'Peste suína', 'Febre dos pântanos'];
 const COUNCIL = [['chancellor', 'Chanceler', 'dip'], ['marshal', 'Marechal', 'mar'], ['steward', 'Tesoureiro', 'adm'], ['spymaster', 'Mestre espião', 'int'], ['scholar', 'Erudito', 'lea']];
 
 /* ---------- culturas: sílabas para nomes de lugares, pessoas e dinastias ---------- */

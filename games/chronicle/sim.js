@@ -78,7 +78,7 @@ function newGame(seed) {
     owner.forEach((nid, s) => WD.states[s].provs.forEach(p => { S.own[p] = nid; S.ctrl[p] = nid; }));
     ns.forEach(n => {
       n.capital = WD.states[n._st[0]].cap; delete n._st; delete n.vig;
-      { const ns = statesOf(n); n.rank = Math.min(3, RANK_CAP.findIndex(c => c >= ns)); }
+      { const ns = statesOf(n); n.rank = [0, 1, 2, 3].find(r => rankCap(n, r) >= ns); if (n.rank == null) n.rank = 3; }
       if (n.kind === 'main') { grantTechs(n, 880 + (r() * 40 | 0)); n.gov = pickR(['feudal', 'feudal', 'feudal', 'feudal', 'elective', 'elective', 'tribal', 'theocracy']); n.ideo = chance(.25) ? 'warrior' : 'trad'; n.money = 160; }
       else if (n.kind === 'cold') { grantTechs(n, 860, ['nav_longship']); n.gov = pickR(['tribal', 'tribal', 'tribal_conf']); n.ideo = 'warrior'; n.money = 90; }
       else { grantTechs(n, 860); if (chance(.4)) delete n.techs.nav_longship; n.gov = pickR(['tribal', 'tribal', 'tribal', 'tribal_conf', 'horde', 'feudal']); n.ideo = chance(.3) ? 'warrior' : 'trad'; n.money = 60; }
@@ -315,11 +315,18 @@ function canBuild(n, s, b) {
   return '';
 }
 const statesOf = (n, extra) => { const set = new Set(); for (const p of provsOf(n.id)) set.add(WD.provs[p].state); (extra || []).forEach(p => set.add(WD.provs[p].state)); return set.size; };
-const domCap = n => RANK_CAP[n.rank || 0];
+const homeCont = n => WD.provs[n.capital >= 0 ? n.capital : 0].cont;
+const contStates = c => { if (!WD.cS) { WD.cS = WD.conts.map(() => 0); WD.states.forEach(st => WD.cS[st.cont]++); } return WD.cS[c]; };
+const contProvs = c => { if (!WD.cP) { WD.cP = WD.conts.map(() => 0); WD.provs.forEach(p => WD.cP[p.cont]++); } return WD.cP[c]; };
+const contShare = n => { const c = homeCont(n); let k = 0; for (const p of provsOf(n.id)) if (WD.provs[p].cont === c) k++; return k / Math.max(1, contProvs(c)); };
+const rankCap = (n, r) => r < 3 ? RANK_CAP[r] : r === 3 ? Math.max(25, Math.round(contStates(homeCont(n)) * RANK_KING)) : Math.round(contStates(homeCont(n)) * 1.6) + 25;
+const rankReqTxt = (n, r) => r < 4 ? RANK_REQ[r] + ' estados' : 'controlar 2/3 das províncias de ' + WD.conts[homeCont(n)].n;
+const domCap = n => rankCap(n, n.rank || 0);
 const overCap = n => Math.max(0, statesOf(n) - domCap(n));
 function rankUp(n) {                                          // proclama o próximo nível de título
   const r = (n.rank || 0) + 1; if (r > 4) return 'Já está no nível máximo';
-  if (statesOf(n) < RANK_REQ[r]) return 'Exige ' + RANK_REQ[r] + ' estados';
+  if (r < 4 && statesOf(n) < RANK_REQ[r]) return 'Exige ' + RANK_REQ[r] + ' estados';
+  if (r === 4 && contShare(n) < RANK_EMP) return 'Exige controlar 2/3 de ' + WD.conts[homeCont(n)].n + ' (tem ' + Math.round(contShare(n) * 100) + '%)';
   const c = rankCost(n); if (n.money < c) return 'Sem dinheiro';
   n.money -= c; n.rank = r; n.stab = Math.max(0, n.stab - 5);
   log(n.name + ' agora é ' + natName(n) + ' (' + RANK_N[r] + ').', n.id === S.player ? 'good' : 'world', [n.id]); S.mapDirty = true; return '';
@@ -390,12 +397,19 @@ function finishTech(n, t) {
 }
 
 /* ---------- personagens: morte, sucessão, eleições e golpes ---------- */
+function deathChance(c) {                                    // por mês; dispara depois dos 60 e passa de 100 anos quase nunca
+  const age = ageOf(c), y = curYear(), die = c.tr.reduce((a, t) => a * ((TRAITS[t] || {}).die || 1), 1);
+  if (age >= 100) return .3;
+  return (age < 40 ? .0006 : .0006 * Math.exp((age - 40) / 8.5)) * die * (y > 1900 ? .6 : 1) * (y > 2050 ? .5 : 1);
+}
 function charMonthly(n) {
   const g = GOVS[n.gov], R = n.ruler, y = curYear();
+  for (const [k, t] of COUNCIL) { const c = n.council[k]; if (c && chance(deathChance(c))) { n.council[k] = mkChar(n, { boost: t ? COUNCIL.find(x => x[0] === k)[2] : null, dyn: newDynasty(n) }); if (n.id === S.player) log(t + ' ' + charName(c) + ' morreu aos ' + ageOf(c) + ' anos; um substituto assumiu.', 'info', [n.id]); } }
+  if (n.spouse && chance(deathChance(n.spouse))) { if (n.id === S.player) log('Morreu ' + charName(n.spouse) + ', cônjuge do governante.', 'info', [n.id]); n.spouse = null; }
+  if (g.succ === 'hered' && !n.spouse && ageOf(R) >= 16 && ageOf(R) < 60 && chance(.02)) n.spouse = mkChar(n, { f: !R.f, dyn: newDynasty(n), age: Math.max(16, ageOf(R) - 3) });
   if (n.senior != null) { const s = nat(n.senior); if (s.alive && GOVS[s.gov].succ === 'hered') { n.ruler = s.ruler; n.dyn = s.dyn; return; } delete n.senior; succeed(n, false); return; }
   if (g.succ === 'ai') return;
-  const age = ageOf(R), die = R.tr.reduce((a, t) => a * (TRAITS[t].die || 1), 1);
-  const pDie = (age < 40 ? .0006 : .0006 * Math.exp((age - 40) / 9)) * die * (y > 1900 ? .5 : 1) * (y > 2050 ? .4 : 1);
+  const age = ageOf(R), pDie = deathChance(R);
   if (chance(pDie)) { if (g.succ === 'elect') { log(titleOf(n, R) + ' ' + charName(R) + ' de ' + natName(n) + ' morreu; há eleição.', 'none', [n.id]); if (!election(n)) succeed(n, true); return; } log(titleOf(n, R) + ' ' + charName(R) + ' de ' + natName(n) + ' morreu aos ' + age + ' anos.', n.id === S.player ? 'bad' : 'info', [n.id]); succeed(n, true); return; }
   if (g.succ === 'term' || g.succ === 'council') { if (!n.termEnd) n.termEnd = y + (g.term || 4); if (y >= n.termEnd && S.t % 360 === 0) { n.termEnd = y + (g.term || 4); if (g.succ === 'term') election(n); else succeed(n, false); } }
   if (g.succ === 'hered' && n.spouse && n.kids && S.t % 360 === 0 && age < 50 && ageOf(n.spouse) < 45 && chance(.22)) { const k = mkChar(n, { age: 0 }); n.kids.push(k); if (n.id === S.player) log('Nasceu ' + k.n + ', filho do governante.', 'good', [n.id]); }
@@ -926,7 +940,21 @@ function colonize(n, p) { const e = canColonize(n, p); if (e) return e; n.money 
 /* ---------- a Grande Peste (fim da Idade Média) ----------
    Surge entre 1340 e 1360 numa província de litoral do continente principal, passa para vizinhas e pelas rotas de mar.
    Cada província doente perde ~2,5% da população por mês durante um ano; depois fica imune. Quarentena reduz o contágio. */
+function epiTick() {                                         // surtos menores: espalham pouco, matam menos e acabam logo
+  S.epis = S.epis || [];
+  if (curYear() > 900 && chance(.012)) { const ps = WD.provs.filter(p => S.own[p.id] >= 0 && S.pop[p.id] > 20); if (ps.length) { const p0 = pickR(ps); S.epis.push({ n: pickR(DISEASES) + ' de ' + p0.n, inf: { [p0.id]: 5 }, done: {} }); log('Surto de ' + S.epis[S.epis.length - 1].n.toLowerCase() + '.', S.own[p0.id] === S.player ? 'bad' : 'none', [S.own[p0.id]]); } }
+  S.epis = S.epis.filter(E => {
+    const add = {};
+    for (const k in E.inf) {
+      const p = +k, o = S.own[p], hp = o >= 0 ? ((nat(o).cov || {}).health || 0) : 0; S.pop[p] *= 1 - .012 * (1 - hp * .6);
+      WD.provs[p].adj.forEach(q => { if (E.inf[q] == null && add[q] == null && !E.done[q] && chance(.12 * (1 - hp * .6) * (o >= 0 && nat(o).quar > S.t ? .3 : 1))) add[q] = 5; });
+      if (--E.inf[k] <= 0) { delete E.inf[k]; E.done[p] = 1; }
+    }
+    Object.assign(E.inf, add); return Object.keys(E.inf).length > 0 && Object.keys(E.done).length < 60;
+  });
+}
 function plagueTick() {
+  epiTick();
   const y = curYear(), P = S.plague;
   if (!P) {
     if (y >= 1340 && !S.plagueDone && chance(y >= 1360 ? 1 : .02)) {
@@ -1045,7 +1073,7 @@ function ai(n) {
   if (slow && isElective(n) && n.sup && (n.sup[n.ideo] || 0) < .3 && n.money > campaignCost() * 4) campaign(n);
   if (slow && chance(.08)) { const st = pickR(S._mine[n.id] || []); if (st && !canProspect(n, st.id)) prospect(n, st.id); }
   if (slow && launchOk(n) && !n.sproj) { for (const k of ['probe', 'land', 'base', 'sat']) if (!canSpace(n, k) && n.money > spaceCost(k) * 2 && (k !== 'sat' || (n.sats || 0) < 8)) { spaceGo(n, k); break; } }
-  if (slow && (n.rank || 0) < 4 && statesOf(n) >= RANK_REQ[(n.rank || 0) + 1] && n.money > rankCost(n) * 1.5 && statesOf(n) > domCap(n) * .7) rankUp(n);
+  if (slow && (n.rank || 0) < 4 && n.money > rankCost(n) * 1.5 && (statesOf(n) > domCap(n) * .7 || (n.rank === 3 && contShare(n) >= RANK_EMP))) rankUp(n);
   // obras (ganancioso guarda mais ouro; diligente e construtor tentam mais)
   const mine = slow || n.money > 2000 ? S._mine[n.id] : [];
   const slotsN = consSlots(n), tries = Math.round(clamp(slotsN / 3, 3, 40) * P.build), stGdp = (n.gdp || 0) / Math.max(1, mine.length);
