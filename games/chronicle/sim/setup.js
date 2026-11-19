@@ -103,43 +103,39 @@ function initCul() {
 /* tecnologias da árvore normal até um ano (respeitando pré-requisitos; com vertente, as substituídas ficam de fora) */
 function grantUntil(n, maxY) {
   const V = n.vert && VERT[n.vert];
-  for (let ch = true; ch;) { ch = false; for (const t of TECHS) { if (t.v || n.techs[t.id] || t.y > maxY || (V && t.c !== 'soc' && t.y > V.entry.y) || !t.req.every(q => n.techs[q] || (n.eff && n.eff.has(q)))) continue; n.techs[t.id] = 1; ch = true; } }
+  for (let ch = true; ch;) { ch = false; for (const t of TECHS) { if (t.v || n.techs[t.id] || t.y > maxY || (V && V.rep.has(t.id)) || !t.req.every(q => n.techs[q] || (n.eff && n.eff.has(q)))) continue; n.techs[t.id] = 1; ch = true; } }
 }
 /* escolhe, troca ou desfaz a vertente na criação do mundo: árvore até o nível do país e prédios da vertente */
 function setVertStart(n, v) {
   for (const id in n.techs) if (TECH[id] && TECH[id].v) delete n.techs[id];
-  n.vert = null; n.vlv = 0; n.eff = null;
+  n.vert = null; n.vlv = 0; n.eff = null; n.vdec = {};
   for (const st of WD.states) if (stateOwnerOf(st.id) === n.id) { const B = S.bld[st.id]; for (const b in B) if (BUILDINGS[b].vert && BUILDINGS[b].vert !== v) delete B[b]; }
   if (v) {
     const V = VERT[v]; n.vert = v; n.techs['v_' + v] = 1;
-    for (const id in n.techs) { const t = TECH[id]; if (t && !t.v && t.c !== 'soc' && t.y > V.entry.y) delete n.techs[id]; }
-    for (let ch = true; ch;) { ch = false; for (const t of TECHS) if (t.v === v && t.vt && !n.techs[t.id] && t.y <= (n.techY || curYear()) && t.req.every(q => n.techs[q])) { n.techs[t.id] = 1; ch = true; } }
+    if (n.vdec) delete n.vdec[v];
+    for (const id in n.techs) if (V.rep.has(id)) delete n.techs[id];
+    for (let ch = true; ch;) { ch = false; calcMods(n); for (const t of TECHS) if (t.v === v && t.vt && !n.techs[t.id] && t.y <= (n.techY || curYear()) && t.req.every(q => n.techs[q] || n.eff.has(q))) { n.techs[t.id] = 1; ch = true; } }
+    grantUntil(n, n.techY || curYear());
     calcMods(n);
     const cs = WD.states[WD.provs[n.capital].state]; if (!S.bld[cs.id][V.bld]) S.bld[cs.id][V.bld] = 1;
   } else grantUntil(n, n.techY || curYear());
-  calcMods(n); return '';
+  // pontos iniciais de outras vertentes que o país já alcançou: pesquisados e recusados (10% do bônus de cada)
+  declineReached(n); return '';
 }
+function declineReached(n) { calcMods(n); n.vdec = n.vdec || {}; VERTS.forEach(o => { if (o.id !== n.vert && o.entry.y <= (n.techY || curYear()) && o.entry.req.every(q => hasT(n, q))) { n.techs['v_' + o.id] = 1; n.vdec[o.id] = 1; } }); calcMods(n); }
 const vertStartOpts = n => VERTS.filter(v => v.entry.y <= (n.techY || curYear()) && vertNeedOk(n, v.id));
-/* abandonar a vertente no meio do jogo: guarda o progresso equivalente da árvore normal, perde os prédios e os bônus */
-const dropVertCost = () => Math.round(200 * eraScale());
-function dropVert(n) {
-  if (!n.vert) return 'Sem vertente'; if (n.money < dropVertCost()) return 'Sem dinheiro';
-  const old = VERT[n.vert];
-  for (const id in n.techs) { const t = TECH[id]; if (t && t.v) { (t.src || []).forEach(x => n.techs[x] = 1); delete n.techs[id]; } }
-  for (const st of WD.states) if (stateOwnerOf(st.id) === n.id) { const B = S.bld[st.id]; for (const b in B) if (BUILDINGS[b].vert) delete B[b]; }
-  n.cons = n.cons.filter(c => !BUILDINGS[c.b].vert); S.armies.forEach(a => { if (a.o === n.id && a.vrt) { a.inf += a.vrt; a.vrt = 0; } });
-  if (n.res && TECH[n.res].v) n.res = null;
-  n.money -= dropVertCost(); n.stab = Math.max(0, n.stab - 20); n.vert = null; n.vertCd = S.t + 360 * 20; calcMods(n);
-  log(natName(n) + ' abandonou a vertente ' + old.n + '.', n.id === S.player ? 'info' : 'world', [n.id]); return '';
-}
 /* começo em era avançada: vertentes, governos da época, prédios, colônias e mapa conhecido */
 const govYear = g => BASE_GOVS.includes(g) ? 860 : (TECHS.find(t => (t.fx.g || []).includes(g)) || { y: 860 }).y;
 function advanceStart(Y, r) {
   const devPick = ['farm', 'stud', 'apothecary', 'fishery', 'lumber', 'iron_mine', 'quarry', 'plantation', 'smithy', 'weaver', 'tailor', 'bakery', 'workshop', 'temple', 'mill', 'market', 'road', 'hospital', 'school', 'office', 'guard', 'port', 'university', 'jeweler', 'coal_mine', 'gold_mine', 'copper_mine', 'foundry', 'manufactory', 'textile_manuf', 'blast_furnace', 'barracks', 'shipyard', 'academy',
     'railway', 'textile_mill', 'goods_factory', 'garment_factory', 'food_factory', 'tool_factory', 'arms_factory', 'steel_mill', 'power_plant', 'hydro', 'oil_well'];
   S.pandDone = {}; for (const id in PANDEMICS) if (Y >= PANDEMICS[id].y[1]) S.pandDone[id] = { done: {} };   // pandemias de antes do início já passaram
+  // as potências chegam perto do máximo da época; as menores ficam alguns anos atrás
+  const big = S.nations.filter(n => n.kind === 'main').sort((a, b) => provsOf(b.id).length - provsOf(a.id).length);
+  big.forEach((n, i) => { const q = i / Math.max(1, big.length); n.techY = Y - (q < .2 ? 0 : q < .5 ? 2 + (r() * 4 | 0) : 5 + (r() * 10 | 0)); grantUntil(n, n.techY); });
   S.nations.forEach(n => {
     if (n.kind === 'main' && chance(n.vpref ? .7 : .3)) { const o = vertStartOpts(n); if (o.length) { const v = o.find(x => x.id === n.vpref) || pickR(o); setVertStart(n, v.id); } }
+    if (!n.vert) declineReached(n);
     calcMods(n);
     // governo e ideologia da época (só o que a tecnologia já liberou)
     const cat = GOVS[n.gov].cat, opts = [...new Set([...n.fx.g, ...BASE_GOVS])].filter(g => govOk(n, g) && (n.kind === 'main' || GOVS[g].cat === cat || chance(.3)));

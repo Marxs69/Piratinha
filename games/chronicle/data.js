@@ -313,6 +313,7 @@ const CATS = { mil: 'Militar', nav: 'Naval', eco: 'Economia', soc: 'Sociedade' }
    Quem pesquisa a entrada fica preso a ela: as tecnologias militares, navais e econômicas posteriores da árvore normal são
    substituídas pela árvore da vertente, que leva o mesmo "futuro" (até a colonização espacial) pelo caminho da vertente.
    tree: [ano, área, nome] · m: bônus total da árvore completa · unit: nomes da unidade especial ao longo da árvore */
+const VERT_DECLINE = .1;                                      // parte do bônus da vertente que fica para quem a recusa
 const VERTS = [
   { id: 'clock', need: 'iron', n: 'Clockpunk', e: '⚙️', col: '#c9a227', good: 'gears', bld: 'clock_works', m: { prod: .2, research: .2 },
     entry: { y: 1360, c: 'eco', req: ['eco_guilds'], n: 'Mecanismos de relojoaria' },
@@ -372,16 +373,25 @@ const VUNITS = {
 };
 // necessidades que não são recurso: terreno ou posição
 const NEEDS = { wild: { n: 'selva ou pântano (biodiversidade)', ok: p => p.terr === 'jungle' || p.terr === 'marsh' }, sun: { n: 'deserto ou savana (sol forte)', ok: p => p.terr === 'desert' || p.terr === 'savanna' }, launch: { n: 'litoral perto do equador (base de lançamento)', ok: p => p.coast && Math.abs(p.cy / MAP_H - .5) < .12 } };
+/* vertentes na árvore comum: o ponto inicial fica na sua área (mostrado à parte); escolher a vertente bloqueia só a área do ponto inicial
+   (as técnicas normais dali em diante viram as da vertente) e, nas outras áreas, cada técnica da vertente substitui uma técnica normal de ano próximo.
+   v.rep = técnicas normais substituídas; v.len = pontos próprios (completar todos libera a tropa e a frota especiais) */
 VERTS.forEach(v => {
   const add = t => { TECHS.push(t); TECH[t.id] = t; };
-  add({ id: 'v_' + v.id, c: v.entry.c, v: v.id, entry: true, y: v.entry.y, n: v.entry.n, req: v.entry.req, fx: { b: [v.bld] }, src: [] });
-  const last = {}; v.len = v.tree.length + 1;
-  v.tree.forEach(([y, c, n], k) => { const id = 'v_' + v.id + '_' + k; add({ id, c, v: v.id, vt: true, y, n, req: [last[c] || 'v_' + v.id], fx: {}, src: [] }); last[c] = id; });
-  // cada tecnologia da árvore normal substituída vai para a primeira da vertente na mesma área com ano igual ou maior
-  TECHS.filter(t => !t.v && ['mil', 'nav', 'eco'].includes(t.c) && t.y > v.entry.y).forEach(t => {
-    const opts = TECHS.filter(x => x.v === v.id && x.vt && x.c === t.c); if (!opts.length) return;
-    (opts.find(x => x.y >= t.y) || opts[opts.length - 1]).src.push(t.id);
+  add({ id: 'v_' + v.id, c: v.entry.c, v: v.id, entry: true, y: v.entry.y, n: v.entry.n, req: v.entry.req, fx: {}, src: [] });
+  const last = {}, used = new Set(); v.len = v.tree.length;
+  v.tree.forEach(([y, c, n], k) => {
+    const t = { id: 'v_' + v.id + '_' + k, c, v: v.id, vt: true, y, n, req: [last[c] || 'v_' + v.id], fx: {}, src: [] };
+    if (c !== v.entry.c) {                                      // outra área: substitui a técnica normal mais próxima no tempo e herda os requisitos dela
+      const cand = TECHS.filter(x => !x.v && x.c === c && x.y >= v.entry.y && !used.has(x.id)).sort((a, b) => Math.abs(a.y - y) - Math.abs(b.y - y))[0];
+      if (cand) { used.add(cand.id); t.src.push(cand.id); t.req = cand.req.slice(); t.rep = cand.id; }
+    }
+    add(t); last[c] = t.id;
   });
+  // área do ponto inicial: tudo depois dele vai para a técnica da vertente da mesma área com ano igual ou maior
+  const own = TECHS.filter(x => x.v === v.id && x.vt && x.c === v.entry.c);
+  if (own.length) TECHS.filter(t => !t.v && t.c === v.entry.c && t.y > v.entry.y && !used.has(t.id)).forEach(t => { (own.find(x => x.y >= t.y) || own[own.length - 1]).src.push(t.id); });
+  v.rep = new Set(TECHS.filter(x => x.v === v.id).flatMap(x => x.src));
 });
 
 /* ---------- governos ----------

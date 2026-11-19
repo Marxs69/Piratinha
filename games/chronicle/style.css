@@ -257,3 +257,7 @@ h4.bgrp { font: 700 11px var(--title); color: var(--dim); letter-spacing: 1px; m
 #side2 { position: absolute; left: 454px; top: 58px; width: 320px; max-height: calc(100% - 70px); overflow: auto; padding: 12px; }
 .btn.prodbtn { width: 100%; margin: 8px 0 4px; padding: 8px; font-weight: 700; border-width: 2px; border-color: rgba(232,194,90,.55); }
 .btn.rbtn b { white-space: normal; text-align: center; }
+.tstick { position: sticky; top: -12px; z-index: 5; background: #1c1711; padding-top: 4px; padding-bottom: 6px; margin-top: -4px; box-shadow: 0 6px 8px -6px rgba(0,0,0,.6); }
+.tbody2 { display: flex; gap: 10px; align-items: flex-start; }
+.tbody2 .tgrid { flex: 1; min-width: 0; }
+.tvert { width: 200px; flex: none; display: flex; flex-direction: column; gap: 6px; padding-left: 10px; border-left: 2px dashed rgba(232,194,90,.45); }

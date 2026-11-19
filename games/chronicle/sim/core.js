@@ -53,8 +53,9 @@ const vertLen = v => VERT[v].len;
 function calcFx(n) {
   const fx = { sea: 0, col: 0, fort: 0, med: 0, cap: 0, logi: 0, width: 0, slots: 1, ship: 1, bo: {}, up: { inf: 1, cav: 1, art: 1, siege: 1 }, b: new Set(Object.keys(BUILDINGS).filter(b => !BUILDINGS[b].tech && !BUILDINGS[b].vert)), g: new Set(), i: new Set(['trad', 'warrior']) };
   const eff = new Set(Object.keys(n.techs)); let vl = 0;
-  for (const id in n.techs) { const t = TECH[id]; if (t && t.v) { vl++; (t.src || []).forEach(x => eff.add(x)); } }
+  for (const id in n.techs) { const t = TECH[id]; if (t && t.vt) { vl++; (t.src || []).forEach(x => eff.add(x)); } }
   n.eff = eff; n.vlv = vl;
+  if (n.vert && vl >= VERT[n.vert].len) fx.ship += 1.5;          // vertente completa: frota especial
   for (const id of eff) {
     const t = TECH[id]; if (!t) continue; const f = t.fx;
     if (f.sea) fx.sea = Math.max(fx.sea, f.sea); if (f.col) fx.col += f.col; if (f.fort) fx.fort += f.fort; if (f.slots) fx.slots += f.slots; if (f.ship) fx.ship += f.ship; if (f.med) fx.med += f.med; if (f.cap) fx.cap += f.cap; if (f.logi) fx.logi += f.logi; if (f.width) fx.width += f.width;
@@ -71,7 +72,7 @@ const COUNCIL_STAT = { steward: 'adm', scholar: 'lea', marshal: 'mar', chancello
 const MOD_SOURCES = [
   n => [['Governo: ' + GOVS[n.gov].n, GOVS[n.gov].m], ['Ideologia: ' + IDEOS[n.ideo].n, IDEOS[n.ideo].m]],
   n => [...n.eff].filter(id => TECH[id] && TECH[id].fx.m).map(id => ['Tecnologia: ' + TECH[id].n, TECH[id].fx.m]),
-  n => { if (!n.vert) return []; const v = VERT[n.vert], o = {}; for (const k in v.m) o[k] = v.m[k] * n.vlv / v.len * (.5 + .5 * (n.vsat == null ? 1 : n.vsat)); return [['Vertente: ' + v.n, o]]; },
+  n => Object.keys(n.vdec || {}).map(k => { const v = VERT[k], o = {}; for (const m in v.m) o[m] = v.m[m] * VERT_DECLINE; return ['Vertente recusada: ' + v.n, o]; }),   // quem não escolhe leva 10% do bônus
   n => [n.ruler, ...Object.values(n.council || {})].flatMap(c => c ? c.tr.filter(t => TRAITS[t]).map(t => ['Traço ' + TRAITS[t].n + ' (' + charName(c) + ')', TRAITS[t].m]) : []),
   n => { const R = n.regent || n.ruler, C = n.council || {}, out = [];   // na regência valem os atributos do regente
     if (R) { const o = {}; STAT_MOD.forEach(([s, k, w]) => o[k] = (R.st[s] - 8) * w); out.push(['Atributos do governante', o]); }
@@ -117,5 +118,6 @@ function unitName(n, type) {
   const v = vRoster(n, type); if (v) return v;
   let nm = UNITS[type][0][1]; for (const [t, x] of UNITS[type]) if (hasT(n, t)) nm = x; return nm;
 }
-function shipName(n) { const v = n.vlv > 1 && vRoster(n, 'ship'); if (v) return v; let nm = SHIPS[0][1]; for (const [t, x] of SHIPS) if (hasT(n, t)) nm = x; return nm; }
+const vertDone = n => !!n.vert && n.vlv >= VERT[n.vert].len;
+function shipName(n) { const v = vertDone(n) && vRoster(n, 'ship'); if (v) return v; let nm = SHIPS[0][1]; for (const [t, x] of SHIPS) if (hasT(n, t)) nm = x; return nm; }
 const canArt = n => hasT(n, 'mil_trebuchet');

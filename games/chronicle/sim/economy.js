@@ -230,6 +230,7 @@ const recCost = (n, type, k = 1) => Math.round(UNIT_BASE[type].c * 3 * eraScale(
 function canRecruit(n, type, k = 1) {
   if (type === 'art' && !canArt(n)) return 'Exige Trabuco';
   if (type === 'vrt' && !n.vert) return 'Exige uma vertente';
+  if (type === 'vrt' && !vertDone(n)) return 'Complete todos os pontos de ' + VERT[n.vert].n + ' (' + n.vlv + '/' + VERT[n.vert].len + ')';
   if (n.manpower < k) return 'Sem contingente';
   if (n.subj && SUBJ_LAWS.army.o[n.subj.laws.army].demil && S.armies.reduce((s, a) => s + (a.o === n.id ? regs(a) : 0), 0) + k > Math.max(3, (n.mpMax || 0) * .1)) return 'Desmilitarizado pelo suserano';
   if (n.money < recCost(n, type, k)) return 'Sem dinheiro';
@@ -282,18 +283,31 @@ function vertNeedOk(n, v) {                                  // recurso ou terre
 const needName = v => { const k = VERT[v].need; return NEEDS[k] ? NEEDS[k].n : GOODS[k].n.toLowerCase(); };
 function techState(n, t) {                                  // '' = pode pesquisar
   if (n.techs[t.id]) return 'done';
-  if (t.v) { if (n.vert && n.vert !== t.v) return 'Outra vertente escolhida'; if (t.vt && n.vert !== t.v) return 'Exige escolher ' + VERT[t.v].n; }
-  else if (n.vert && t.c !== 'soc' && t.y > VERT[n.vert].entry.y) return 'Substituída pela árvore ' + VERT[n.vert].n;
+  if (t.vt && n.vert !== t.v) return 'Exige escolher ' + VERT[t.v].n;
+  if (t.entry && n.vpend) return 'Decida antes a vertente pendente';
+  if (!t.v && n.vert && VERT[n.vert].rep.has(t.id)) return 'Substituída por ' + VERT[n.vert].n;
   if (!t.req.every(q => hasT(n, q))) return 'Exige tecnologias anteriores';
   const ahead = t.y - curYear();
-  if (t.entry && n.vertCd > S.t) return 'Abandonou uma vertente há pouco (até ' + yearOf(n.vertCd) + ')';
   if (t.entry && !vertNeedOk(n, t.v)) return 'Exige ' + needName(t.v) + ' no território ou numa província vizinha';
   return '';
+}
+/* ponto inicial concluído: o país decide entre ficar com a vertente (bloqueia a área dela e troca algumas técnicas) ou levar 10% do bônus.
+   Quem já tem uma vertente recusa as outras automaticamente. A escolha é para sempre. */
+function vertOffer(n, v) {
+  if (n.vert || !vertNeedOk(n, v)) { vertDecide(n, v, false); return; }
+  if (n.id === S.player) { n.vpend = v; return; }
+  vertDecide(n, v, v === n.vpref || (!n.vpref && chance(.15)));
+}
+function vertDecide(n, v, keep) {
+  n.vpend = null; const V = VERT[v];
+  if (keep && !n.vert) { n.vert = v; if (n.res && TECH[n.res] && V.rep.has(n.res)) n.res = null; log(natName(n) + ' abraçou a vertente ' + V.n + '.', n.id === S.player ? 'good' : 'world', [n.id]); }
+  else { (n.vdec = n.vdec || {})[v] = 1; if (n.id === S.player) log('Você seguiu pela via comum e ficou com parte das vantagens de ' + V.n + '.', 'info', [n.id]); }
+  calcMods(n);
 }
 function researchRate(n) { return (2 + (n.popT || 0) * .004 + (n.univ || 0) * 2.5) * Math.max(.2, 1 + n.m.research) * (.6 + n.stab / 250) * (1 + techCount(n) * .012); }
 function finishTech(n, t) {
   n.techs[t.id] = 1;
-  if (t.entry) { n.vert = t.v; log(natName(n) + ' abraçou a vertente ' + VERT[t.v].n + '.', n.id === S.player ? 'good' : 'world', [n.id]); }
+  if (t.entry) vertOffer(n, t.v);
   calcMods(n);
   if (n.id === S.player) log('Pesquisa concluída: ' + t.n + '.', 'good', [n.id]);
 }
