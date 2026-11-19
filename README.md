@@ -20,6 +20,7 @@ Tudo o que o usuário muda fica só no navegador (`localStorage`).
 | Sim Colony | `games/colonia/` | Gerenciamento de colônia. |
 | Zombie Fortress | `games/bastiao/` | Defesa de castelo em 3D contra zumbis. |
 | RPG Adventure | `games/adventure/` | RPG de ação, sozinho ou em coop (até 4). |
+| Grand Chronicle | `games/chronicle/` | Grande estratégia de 860 a 2200 em mundo aleatório. |
 
 Equilíbrio: topo de `game.js` (no RPG Adventure, `data.js`).
 

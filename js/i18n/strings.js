@@ -372,6 +372,7 @@ const D = [
 ['O chefe final agora tem dois finais.','The final boss now has two endings.'],
 ['Os patos ficaram mais espertos.','The ducks got smarter.'],
 ['Adicionar jogo','Add game'],
+['Grande estratégia de 860 a 2200: mundo aleatório, nações com bandeiras, economia, guerras, tecnologias e vertentes punk.','Grand strategy from 860 to 2200: random world, nations with flags, economy, wars, technologies and punk branches.'],
 ['Não é possível adicionar jogos: o Piratinha só roda o que já vem a bordo.','Games cannot be added: Piratinha only runs what is already on board.'],
 ['Dólares zimbabuanos de 1990','1990 Zimbabwean dollars'],
 ];

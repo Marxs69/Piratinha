@@ -28,7 +28,7 @@ const SHOP = [
   { n: 'Primitiveness VI',             e: '🗿', c: ['#c9a227', '#1f3b57'], t: 'Estratégia',         p: 139.99, d: 40, i: CIMG('shop/primitiveness.svg') },
   { n: 'Underwater 2',                 e: '🐠', c: ['#00b4d8', '#03263f'], t: 'Sobrevivência',      p: 34.99, i: CIMG('community/underwater.svg') },
   { n: 'Generic Survival',             e: '🪓', c: ['#8fa3ad', '#22303a'], t: 'Sobrevivência',      p: 18.99, d: 20, i: CIMG('shop/generic-survival.svg') },
-  { n: 'Tankard',                      e: '🍺', c: ['#e8d7b0', '#7a2f2f'], t: 'Plataforma',         p: 18.99, i: CIMG('shop/tankard.svg') },
+  { n: 'TankardFeet',                  e: '🍺', c: ['#e8d7b0', '#7a2f2f'], t: 'Plataforma',         p: 18.99, i: CIMG('shop/tankard.svg') },
   { n: 'Africa Universalis',           e: '🍉', c: ['#e8424f', '#1f6b2c'], t: 'Grande estratégia',  p: 18.99, d: 75, i: CIMG('shop/africa-universalis.svg') },
   { n: 'Sea of Cheese',                e: '🧀', c: ['#f4c542', '#6b4e10'], t: 'Aventura',           p: 64.99, f: 1, i: CIMG('community/cheese-sea.svg') },
   { n: 'Foosball Manager 1987',        e: '⚽', c: ['#27ae60', '#123020'], t: 'Esporte',            p: 99.99, i: CIMG('shop/foosball.svg') },
@@ -36,7 +36,7 @@ const SHOP = [
 ];
 const GAMEC = {   // cores do ícone dos jogos do sistema (pasta em games/)
   doom: ['#c2281f', '#3a0605'], smithing: ['#ea7016', '#3b1d0c'], combate: ['#6a4fc4', '#2a1f4e'],
-  colonia: ['#5fae48', '#24461b'], bastiao: ['#7a5d9e', '#2b2436'], adventure: ['#5f9e48', '#1f3a17'],
+  colonia: ['#5fae48', '#24461b'], bastiao: ['#7a5d9e', '#2b2436'], adventure: ['#5f9e48', '#1f3a17'], chronicle: ['#d9b45a', '#3a2a12'],
 };
 const FRIENDS = [
   { n: 'Barba-Negra',   e: '🧔', c: '#3b3b46' },

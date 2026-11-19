@@ -167,6 +167,7 @@
 .gdesc { margin: 0; padding: 18px 22px; font-size: 15px; line-height: 1.5; }
 .gh[data-g="combate"] { background: linear-gradient(rgba(20,16,28,.15), rgba(20,16,28,.4)), url("../../assets/games/combate.svg") center bottom / cover no-repeat #2a1f4e; }
 .gh[data-g="colonia"] { background: radial-gradient(circle at 50% 45%, rgba(16,20,13,.1), rgba(16,20,13,.6)), url("../../assets/games/colonia-grama.png") center / 128px 128px #5fae48; image-rendering: pixelated; }
+.gh[data-g="chronicle"] { background: linear-gradient(rgba(20,16,10,.15), rgba(20,16,10,.5)), url("../../assets/games/chronicle.jpg") center / cover no-repeat #1d3a5c; }
 .gh[data-g="adventure"] { background: linear-gradient(rgba(16,20,13,.1), rgba(16,20,13,.5)), url("../../assets/games/adventure.png") center / cover no-repeat #5f9e48; image-rendering: pixelated; }
 .gh[data-g="bastiao"] { background: linear-gradient(rgba(20,16,12,.15), rgba(20,16,12,.45)), url("../../assets/games/bastiao.svg") center bottom / cover no-repeat #2b2436; }
 

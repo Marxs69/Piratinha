@@ -31,6 +31,7 @@ const GAMES = [                                  // aparecem no app Jogos; adici
   { n: 'Sim Colony', file: 'SimColony.exe', u: './games/colonia/index.html', g: 'game', e: '🏕️', local: true, max: true },
   { n: 'Zombie Fortress', file: 'ZombieFortress.exe', u: './games/bastiao/index.html', g: 'game', e: '🏰', local: true, max: true },
   { n: 'RPG Adventure', file: 'RPGAdventure.exe', u: './games/adventure/index.html', g: 'game', e: '🗡️', local: true, max: true },
+  { n: 'Grand Chronicle', file: 'GrandChronicle.exe', u: './games/chronicle/index.html', g: 'game', e: '👑', local: true, max: true },
 ];
 const APPITEMS = [   // apps e jogos: aparecem na área de trabalho, na taskbar ou na dock (botão direito: "Mover para…"); tag = grupo na Loja; os jogos (cat 'jogos') ficam no app Jogos, fora da Loja
   { id: 'sys:store', tag: 'sistema', n: 'Loja', e: '🛍️', cat: 'apps', d: 'Instale e remova apps.', fn: () => openStore(), p0: 'dock' },
@@ -53,6 +54,7 @@ const APPITEMS = [   // apps e jogos: aparecem na área de trabalho, na taskbar 
   { id: GAMES[3].u, n: 'Sim Colony', e: '🏕️', cat: 'jogos', d: 'Escolha um lugar no mundo, monte o grupo e erga uma colônia: construa, escave, cace e defenda.', fn: () => playGame(3), p0: 'none' },
   { id: GAMES[4].u, n: 'Zombie Fortress', e: '🏰', cat: 'jogos', d: 'Comande aldeões e soldados, erga muros e torres e segure ondas infinitas de zumbis num mapa hexagonal sorteado.', fn: () => playGame(4), p0: 'none' },
   { id: GAMES[5].u, n: 'RPG Adventure', e: '🗡️', cat: 'jogos', d: 'RPG de ação em tempo real, sozinho ou em coop com até 4 amigos: explore regiões, cumpra missões e desça à cripta.', fn: () => playGame(5), p0: 'none' },
+  { id: GAMES[6].u, n: 'Grand Chronicle', e: '👑', cat: 'jogos', d: 'Grande estratégia de 860 a 2200: mundo aleatório, nações com bandeiras, economia, guerras, tecnologias e vertentes punk.', fn: () => playGame(6), p0: 'none' },
 ].map(a => Object.assign({ app: true, u: a.id, win: a.id, local: true, g: 'app' }, a));
 LINKS.push(...APPITEMS);
 const FOOTER_URL = 'https://desciclopedia.org/wiki/Especial:Aleat%C3%B3ria';
