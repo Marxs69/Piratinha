@@ -58,7 +58,7 @@ h1, h2, h3, h4, p { margin: 0; }
 #top .nname { display: flex; flex-direction: column; line-height: 1.1; min-width: 0; max-width: 220px; }
 #top .nname b { font: 700 15px var(--title); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #top .nname small { color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.res { display: flex; flex-direction: column; align-items: flex-start; padding: 0 8px; border-left: 1px solid rgba(90,74,50,.5); line-height: 1.15; cursor: default; }
+.res { display: flex; flex-direction: column; align-items: flex-start; white-space: nowrap; padding: 0 6px; border-left: 1px solid rgba(90,74,50,.5); line-height: 1.15; cursor: default; }
 .res b { font-size: 15px; } .res small { font-size: 11px; color: var(--dim); }
 .date { font: 700 16px var(--title); color: var(--gold-2); min-width: 120px; text-align: right; }
 .speed { display: flex; gap: 2px; }
@@ -158,3 +158,8 @@ h4.era { font: 700 12px var(--title); color: var(--dim); letter-spacing: 1px; ma
 #modal { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.5); }
 #modal-b { width: min(520px, 94vw); max-height: 86vh; overflow: auto; padding: 18px; display: flex; flex-direction: column; gap: 10px; }
 #modal-b h2 { font: 700 22px var(--title); color: var(--gold-2); }
+
+/* barra do topo compacta em telas menores */
+#top .btn { padding: 5px 8px; font-size: 12px; }
+@media (max-width: 1500px) { #top .nname { max-width: 150px; } .res small { display: none; } .res { padding: 0 4px; } #top .speed .btn { padding: 4px 5px; } .date { min-width: 96px; font-size: 14px; } }
+@media (max-width: 1250px) { #top .btn:not(.speed .btn) { font-size: 0; } #top .btn:not(.speed .btn)::first-letter { font-size: 16px; } }

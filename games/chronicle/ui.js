@@ -97,7 +97,7 @@ function startPlay(fresh) {
 }
 
 /* ---------- modos de mapa ---------- */
-const MODEBTN = [['pol', '🗺️', 'Político'], ['ter', '⛰️', 'Terreno'], ['dip', '🤝', 'Diplomático: verde é você, azul aliados, vermelho inimigos, laranja trégua'], ['pop', '👥', 'População'], ['reg', '🧩', 'Regiões e estados'], ['cont', '🌍', 'Continentes'], ['res', '⛏️', 'Recursos: cinza ferro, preto carvão, amarelo ouro, roxo petróleo']];
+const MODEBTN = [['pol', '🗺️', 'Político'], ['ter', '⛰️', 'Terreno'], ['dip', '🤝', 'Diplomático: verde é você, azul aliados, vermelho inimigos, laranja trégua'], ['pop', '👥', 'População'], ['reg', '🧩', 'Regiões e estados'], ['cont', '🌍', 'Continentes'], ['res', '⛏️', 'Recursos: cinza ferro, preto carvão, amarelo ouro, roxo petróleo'], ['plague', '☠️', 'Peste: verde escuro doente agora, cinza já passou']];
 function drawModes(box) { box.innerHTML = ''; MODEBTN.forEach(([m, e, t]) => box.append(btn(e, () => { R.mode = m; S.mapDirty = true; drawModes(box); }, R.mode === m ? 'on' : '', '', t))); }
 
 /* ---------- barra do topo ---------- */
@@ -108,6 +108,7 @@ function drawTop() {
   const res = (v, s, tt, cls = '') => { const d = el('div', 'res'); tip(d, tt); d.append(el('b', cls, v), el('small', '', s)); t.append(d); };
   const lab = { tax: 'Impostos', trade: 'Exportações', imports: 'Importações', army: 'Exército', navy: 'Marinha', admin: 'Administração', interest: 'Juros', corrupt: 'Corrupção' };
   res('💰 ' + money(n.money), (n.income >= 0 ? '+' : '−') + money(Math.abs(n.income)) + '/mês', 'Tesouro\n' + Object.entries(n.inc).filter(([, v]) => Math.abs(v) >= .5).map(([k, v]) => lab[k] + ': ' + money(v)).join('\n') + (n.money > 2000 ? '\nAcima de 2.000, 1% ao mês se perde em corrupção' : ''), n.money < 0 ? 'bad' : '');
+  const np = provsOf(n.id).length, cap = domCap(n); res('🏰 ' + np + (cap < 1e8 ? '/' + cap : ''), RANK_N[n.rank || 0], 'Título: ' + RANK_N[n.rank || 0] + ' (' + titleOf(n) + ')\nProvíncias que o título sustenta: ' + (cap < 1e8 ? cap : 'sem limite') + '\nAcima do limite: −0,5 de estabilidade por província, sem colonizar e sem anexar na paz.\nProclame um título maior na janela de Governo.', np > cap ? 'bad' : np > cap * .85 ? 'gold' : '');
   res('👥 ' + Math.floor(n.manpower) + 'k', 'de ' + Math.floor(n.mpMax || 0) + 'k', 'Contingente: homens disponíveis para recrutar (1k por regimento).\nCresce com a população; teto de 3% dela.');
   res('⚖️ ' + Math.round(n.stab), 'estabilidade', 'Estabilidade (0–100)\nMais alta: mais impostos, pesquisa e menos golpes.\nSobe com governo, ideologia, comida e bens; cai com guerra, dívida e território grande.', n.stab < 30 ? 'bad' : n.stab > 70 ? 'good' : '');
   const tr = n.res ? TECH[n.res] : null; res('🔬 ' + (tr ? Math.floor(n.rp / techCost(n, tr) * 100) + '%' : '—'), tr ? tr.n : 'sem pesquisa', tr ? techTip(n, tr) + '\n+' + researchRate(n).toFixed(1) + ' por mês' : 'Escolha uma pesquisa na Tecnologia', tr ? '' : 'bad');
@@ -306,6 +307,12 @@ function winGov(b) {
   const cc = el('div', 'cols'); cc.style.marginTop = '12px';
   COUNCIL.forEach(([k, t, s]) => cc.append(charCard(n.council[k], t, btn('Trocar (💰' + councilCost() + ')', () => councilPick(k, t), 'sm', '', 'Escolha entre 3 candidatos. Este cargo usa ' + STATS[s].n + '.'))));
   b.append(el('h3', 'gold', 'Conselho'), cc, msg);
+  // título (nível de nobreza)
+  const tc = el('div', 'card'), np = provsOf(n.id).length, r = n.rank || 0, cap = domCap(n); tc.style.marginTop = '12px';
+  tc.append(el('h4', '', 'Título · ' + RANK_N[r]), el('div', '', natName(n) + ' · ' + titleOf(n)), tip(el('small', np > cap ? 'bad' : 'dim', 'Domínio: ' + np + (cap < 1e8 ? ' de ' + cap + ' províncias' : ' províncias (sem limite)')), 'Acima do limite: −0,5 de estabilidade por província a mais, sem colonizar e sem anexar na paz.'), bar(cap < 1e8 ? np / cap : .2, np > cap ? '#e5636b' : '#d9b45a'));
+  const ladder = el('div', 'chips'); RANK_N.forEach((rn, k) => ladder.append(tip(el('span', 'chip' + (k === r ? ' p' : ''), rn + ': ' + rankFmt(n, k).replace('{}', n.name)), rn + '\nTítulo do governante: ' + rankTitle(n, k) + '\nSustenta ' + (RANK_CAP[k] < 1e8 ? RANK_CAP[k] : 'qualquer número de') + ' províncias\nProclamar exige ' + RANK_REQ[k] + ' províncias'))); tc.append(ladder);
+  if (r < 4) tc.append(btn('👑 Proclamar ' + RANK_N[r + 1] + ' (💰' + rankCost(n) + ')', () => { const e = rankUp(n); msg.textContent = e; if (!e) { refresh(); renameAsk(); } }, 'grn', np < RANK_REQ[r + 1] ? 'Exige ' + RANK_REQ[r + 1] + ' províncias (tem ' + np + ')' : n.money < rankCost(n) ? 'Sem dinheiro' : '', 'Vira ' + rankFmt(n, r + 1).replace('{}', n.name) + ' · −5 de estabilidade'));
+  b.append(tc);
   b.append(el('h3', 'gold', 'Modificadores atuais'), modChips(n.m));
   b.append(el('h3', 'gold', 'Governo · reforma 💰' + Math.round(80 * eraScale())));
   byEraGroups(Object.keys(GOVS), govUnlockYear).forEach(([e, list]) => { b.append(el('h4', 'era', e)); const go = el('div', 'grid-opts');
@@ -462,6 +469,8 @@ function closeModal() { $('#modal').hidden = true; }
 function pendingModals() {
   if (!$('#modal').hidden) return;
   if (S.offer) { peaceOffer(); return; }
+  if (S.evq && S.evq.length) { const ev = S.evq.shift(); UI.speed = 0; drawTop();
+    modal(m => { m.append(el('h2', '', ev.t), el('p', '', ev.m)); const r = el('div', 'row'); if (ev.quar) r.append(btn('🚧 Decretar quarentena (💰' + quarCost(me()) + ')', () => { const e = quarantine(me()); if (e) say(e, 'bad'); else log('Quarentena decretada por dois anos.', 'info', [S.player]); closeModal(); refresh(); }, 'red', '', 'Contágio nas suas províncias cai 70% por 2 anos; comércio −30%')); r.append(btn('Que assim seja', closeModal)); m.append(r); }); return; }
   if (S.calls && S.calls.length) { const c = S.calls.shift(), w = S.wars.find(x => x.id === c.w); if (!w) return; const lead = nat(c.from), foe = nat(c.side === 'A' ? w.d : w.a); UI.speed = 0; drawTop();
     modal(m => { m.append(el('h2', '', 'Chamado às armas'), el('p', '', natName(lead) + ' pede sua ajuda na guerra contra ' + natName(foe) + '.'), el('p', 'dim', 'Recusar acaba com a aliança.')); const r = el('div', 'row'); r.append(btn('Entrar na guerra', () => { answerCall(c, true); closeModal(); refresh(); S.mapDirty = true; }, 'red'), btn('Recusar', () => { answerCall(c, false); closeModal(); refresh(); })); m.append(r); }); return; }
   if (S.dipOffers && S.dipOffers.length) { const o = S.dipOffers.shift(), from = nat(o.from); if (!from.alive) return; UI.speed = 0; drawTop();
@@ -584,6 +593,7 @@ initRender(cv); menu(); requestAnimationFrame(loop);
     S.armies.filter(a => a.o === main.id).forEach(a => orderArmy(a, provsOf(t.id).find(p => WD.provs[p].adj.some(o => S.own[o] === main.id))));
     for (let d = 0; d < +q.get('war'); d++) advanceDay();
   }
+  if (q.get('plague')) { const y0 = S.t; S.t = 360 * (1361 - START_YEAR); for (let d = 0; d < +q.get('plague'); d++) advanceDay(); }
   S.offer = null; S.calls = []; S.dipOffers = [];
   startPlay(false); if (q.get('mode')) { R.mode = q.get('mode'); drawModes($('#modes')); }
   if (q.get('z')) { R.cam.z = +q.get('z'); centerOn(WD.provs[main.capital].cx * K, WD.provs[main.capital].cy * K); }

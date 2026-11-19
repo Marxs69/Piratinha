@@ -15,9 +15,12 @@ const eraScale = () => 1 + (curYear() - 860) / 300;
 const MONTHS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 const dateStr = (t = S.t) => (t % 30 + 1) + ' ' + MONTHS[Math.floor(t % 360 / 30)] + ' ' + yearOf(t);
 const nat = id => S.nations[id];
-const natName = n => (GOVS[n.gov].fmt || '{}').replace('{}', n.name);
-const FEM = { 'Rei': 'Rainha', 'Rei eleito': 'Rainha eleita', 'Imperador': 'Imperatriz', 'Chefe supremo': 'Chefe suprema', 'Sumo-sacerdote': 'Suma-sacerdotisa', 'Grão-mestre': 'Grã-mestra', 'Caudilho': 'Caudilha', 'Diretor técnico': 'Diretora técnica', 'Secretário-geral': 'Secretária-geral', 'Arquissábio': 'Arquissábia', 'Delegado': 'Delegada', 'Presidente do congresso': 'Presidenta do congresso', 'Mediador': 'Mediadora', 'Líder supremo': 'Líder suprema', 'Cônsul': 'Cônsul', 'Doge': 'Dogaresa', 'Cã': 'Cátum' };
-const titleOf = (n, c = n.ruler) => { const t = GOVS[n.gov].t; return c && c.f ? (FEM[t] || t) : t; };
+const ownName = (n, r, set) => !set || (r === 3 && !(set.f3for || []).includes(n.gov));   // no nível 3 cada governo usa o próprio nome
+const rankFmt = (n, r = n.rank || 0) => { const g = GOVS[n.gov], set = RANKSET[g.cat]; return (ownName(n, r, set) ? g.fmt : set.f[r]) || '{}'; };
+const rankTitle = (n, r = n.rank || 0) => { const g = GOVS[n.gov], set = RANKSET[g.cat]; return ownName(n, r, set) ? g.t : set.t[r]; };
+const natName = n => rankFmt(n).replace('{}', n.name);
+const FEM = { 'Rei': 'Rainha', 'Rei eleito': 'Rainha eleita', 'Imperador': 'Imperatriz', 'Chefe supremo': 'Chefe suprema', 'Sumo-sacerdote': 'Suma-sacerdotisa', 'Grão-mestre': 'Grã-mestra', 'Caudilho': 'Caudilha', 'Diretor técnico': 'Diretora técnica', 'Secretário-geral': 'Secretária-geral', 'Arquissábio': 'Arquissábia', 'Delegado': 'Delegada', 'Presidente do congresso': 'Presidenta do congresso', 'Mediador': 'Mediadora', 'Líder supremo': 'Líder suprema', 'Cônsul': 'Cônsul', 'Doge': 'Dogaresa', 'Cã': 'Cátum', 'Barão': 'Baronesa', 'Conde': 'Condessa', 'Duque': 'Duquesa', 'Grão-cã': 'Grã-cátum', 'Prefeito': 'Prefeita', 'Burgomestre': 'Burgomestra', 'Primeiro Cidadão': 'Primeira Cidadã', 'Comissário': 'Comissária', 'Secretário regional': 'Secretária regional', 'Prior': 'Prioresa', 'Bispo': 'Bispa', 'Arcebispo': 'Arcebispa', 'Governador militar': 'Governadora militar', 'Protetor': 'Protetora', 'Engenheiro-chefe': 'Engenheira-chefe', 'Supervisor': 'Supervisora', 'Diretor': 'Diretora', 'Arquiteto supremo': 'Arquiteta suprema', 'Monarca': 'Monarca', 'Alto rei': 'Alta rainha', 'Primeiro-ministro': 'Primeira-ministra' };
+const titleOf = (n, c = n.ruler) => { const t = rankTitle(n); return c && c.f ? (FEM[t] || t) : t; };
 const log = (m, k = 'info', who = []) => { S.log.unshift({ d: dateStr(), m, k }); if (S.log.length > 120) S.log.pop(); if (who.includes(S.player) || k === 'world') S.news.push({ m, k }); };
 
 /* ---------- personagens ---------- */
@@ -74,6 +77,7 @@ function newGame(seed) {
     owner.forEach((nid, s) => WD.states[s].provs.forEach(p => { S.own[p] = nid; S.ctrl[p] = nid; }));
     ns.forEach(n => {
       n.capital = WD.states[n._st[0]].cap; delete n._st; delete n.vig;
+      { const np = provsOf(n.id).length; n.rank = Math.min(3, RANK_CAP.findIndex(c => c >= np)); }
       if (n.kind === 'main') { grantTechs(n, 880 + (r() * 40 | 0)); n.gov = pickR(['feudal', 'feudal', 'feudal', 'feudal', 'elective', 'elective', 'tribal', 'theocracy']); n.ideo = chance(.25) ? 'warrior' : 'trad'; n.money = 160; }
       else if (n.kind === 'cold') { grantTechs(n, 860, ['nav_longship']); n.gov = pickR(['tribal', 'tribal', 'tribal_conf']); n.ideo = 'warrior'; n.money = 90; }
       else { grantTechs(n, 860); if (chance(.4)) delete n.techs.nav_longship; n.gov = pickR(['tribal', 'tribal', 'tribal', 'tribal_conf', 'horde', 'feudal']); n.ideo = chance(.3) ? 'warrior' : 'trad'; n.money = 60; }
@@ -220,7 +224,7 @@ function econAll() {
     if (hasT(n, 'mil_crossbow')) dem.arms += totR * .03; if (hasT(n, 'mil_tank')) dem.oil += R.cav * .15; if (n.vert) dem[VERT[n.vert].good] += R.vrt * .25 + provsOf(n.id).length * .01 * n.vlv;
     // comércio com o mercado mundial: exporta o excedente; importa o que falta dentro de um orçamento, comida primeiro
     const embs = S.nations.filter(o => o.alive && (o.emb || []).includes(n.id)).length;
-    const eff = clamp(.35 + Math.min(5, ports) * .08 + n.m.trade + Math.min(.3, (n.trade || []).length * .07) - Math.min(.4, embs * .08), .1, 1.4);
+    const eff = clamp(.35 - (n.quar > S.t ? .3 : 0) + Math.min(5, ports) * .08 + n.m.trade + Math.min(.3, (n.trade || []).length * .07) - Math.min(.4, embs * .08), .1, 1.4);
     let tradeInc = 0, tradeCost = 0;
     GOOD_IDS.forEach(g => { const net = sup[g] - dem[g]; n.mk.imp[g] = 0; n.mk.exp[g] = 0; if (net > 0) { const exp = net * Math.min(1, eff); n.mk.exp[g] = exp; tradeInc += exp * S.wp[g] * .55; } gdp += sup[g] * S.wp[g]; wsup[g] += sup[g]; wdem[g] += dem[g]; });
     let budget = Math.max(0, gdp * ECON.taxBase * .35 + tradeInc * .8 + Math.max(0, n.money) * .03);
@@ -269,6 +273,16 @@ function canBuild(n, s, b) {
   if (n.money < bCost(n, b)) return 'Sem dinheiro';
   return '';
 }
+const domCap = n => RANK_CAP[n.rank || 0];
+const overCap = n => Math.max(0, provsOf(n.id).length - domCap(n));
+function rankUp(n) {                                          // proclama o próximo nível de título
+  const r = (n.rank || 0) + 1; if (r > 4) return 'Já está no nível máximo';
+  if (provsOf(n.id).length < RANK_REQ[r]) return 'Exige ' + RANK_REQ[r] + ' províncias';
+  const c = rankCost(n); if (n.money < c) return 'Sem dinheiro';
+  n.money -= c; n.rank = r; n.stab = Math.max(0, n.stab - 5);
+  log(n.name + ' agora é ' + natName(n) + ' (' + RANK_N[r] + ').', n.id === S.player ? 'good' : 'world', [n.id]); S.mapDirty = true; return '';
+}
+const rankCost = n => Math.round(150 * ((n.rank || 0) + 1) * eraScale());
 const consSlots = n => n.fx.slots + Math.floor((n.popT || 0) / 1000) + Math.floor(Math.max(0, n.money) / 2500);
 function build(n, s, b) { const e = canBuild(n, s, b); if (e) return e; n.money -= bCost(n, b); n.cons.push({ s, b, m: bMonths(b), tot: bMonths(b) }); return ''; }
 
@@ -592,7 +606,8 @@ function aiPeace(w) {                                        // propostas da IA 
   const human = w.a === S.player || w.d === S.player;
   if (abs >= 25 && months >= 10 && chance(.12)) {
     const occ = occupiedBy(w, winner).sort((x, y) => (S.pop[y] - S.pop[x])); const take = []; let c = 0;
-    for (const p of occ) { const k = peaceCost(w, winner, [p]); if (c + k <= abs) { take.push(p); c += k; } }
+    const room = Math.max(0, Math.round(domCap(nat(winner)) * 1.1) - provsOf(winner).length);
+    for (const p of occ) { const k = peaceCost(w, winner, [p]); if (c + k <= abs && take.length < room) { take.push(p); c += k; } }
     if (!human) { makePeace(w, winner, take); return; }
     if (winner !== S.player && !S.offer) S.offer = { w: w.id, winner, provs: take };
   } else if (months > 12 * 7 && abs < 15 && chance(.05)) { if (!human) makePeace(w, null, []); else if (!S.offer) S.offer = { w: w.id, winner: null, provs: [] }; }
@@ -601,6 +616,7 @@ function proposePeace(w, provs, money) {                     // proposta do joga
   const me = S.player; if (w.a !== me && w.d !== me) return 'Só o líder da guerra negocia a paz';
   const sc = warScore(w) * (w.a === me ? 1 : -1);
   if (!provs.length && !money) { if (sc > -10 || (S.t - w.start) > 360 * 4) { makePeace(w, null, []); return ''; } return 'Recusada: eles acham que estão vencendo'; }
+  if (provsOf(me).length + provs.length > domCap(nat(me)) * 1.1) return 'Seu título não sustenta tantas províncias (limite ' + domCap(nat(me)) + ')';
   const c = peaceCost(w, me, provs) + (money ? 12 : 0); if (c <= sc + 2) { makePeace(w, me, provs, money); return ''; }
   return 'Recusada: exige ' + Math.ceil(c) + ' de placar (tem ' + sc + ')';
 }
@@ -708,6 +724,7 @@ function canColonize(n, p) {
   const adj = WD.provs[p].adj.some(o => S.own[o] === n.id);
   if (!adj) { if (n.fx.col < 1) return 'Exige Colonização'; if (!WD.provs[p].coast || n.fx.sea < 1) return 'Fora de alcance'; }
   if (n.fx.col < 1 && S.pop[p] > 4) return 'Nativos numerosos: exige Colonização';
+  if (provsOf(n.id).length >= domCap(n)) return 'Limite de domínio do título (' + domCap(n) + ')';
   const slots = 1 + n.fx.col; if (S.cols.filter(c => c.o === n.id).length >= slots) return 'Sem colonos livres';
   if (n.money < colCost(n, p)) return 'Sem dinheiro';
   return '';
@@ -715,9 +732,40 @@ function canColonize(n, p) {
 const colCost = (n, p) => Math.round(35 * ECON.costMul * eraScale() * (WD.provs[p].adj.some(o => S.own[o] === n.id) ? .6 : 1));
 function colonize(n, p) { const e = canColonize(n, p); if (e) return e; n.money -= colCost(n, p); const m = Math.round((n.fx.col ? 18 : 48) / (1 + Math.max(-.5, n.m.colon || 0))); S.cols.push({ o: n.id, p, m, tot: m }); return ''; }
 
+/* ---------- a Grande Peste (fim da Idade Média) ----------
+   Surge entre 1340 e 1360 numa província de litoral do continente principal, passa para vizinhas e pelas rotas de mar.
+   Cada província doente perde ~2,5% da população por mês durante um ano; depois fica imune. Quarentena reduz o contágio. */
+function plagueTick() {
+  const y = curYear(), P = S.plague;
+  if (!P) {
+    if (y >= 1340 && !S.plagueDone && chance(y >= 1360 ? 1 : .02)) {
+      const main = WD.conts.find(c => c.main), cands = WD.provs.filter(p => p.cont === main.id && p.coast && S.own[p.id] >= 0);
+      const p0 = pickR(cands); S.plague = { inf: { [p0.id]: 12 }, done: {}, start: S.t };
+      log('A Grande Peste surgiu em ' + p0.n + '!', 'world'); S.evq = S.evq || []; S.evq.push({ t: '☠️ A Grande Peste', m: 'Uma praga mortal surgiu em ' + p0.n + ' e se espalha pelas estradas e pelos portos. Quem adoecer perde parte da população por um ano.' });
+    }
+    return;
+  }
+  const inf = P.inf, newInf = {}, hit = new Set();
+  const spread = (q, base) => { if (inf[q] != null || newInf[q] != null || P.done[q]) return; const o = S.own[q], qq = o >= 0 && nat(o).quar > S.t ? .3 : 1; if (chance(base * qq)) newInf[q] = 12; };
+  for (const k in inf) {
+    const p = +k, pr = WD.provs[p]; S.pop[p] *= .965; if (S.own[p] >= 0) hit.add(S.own[p]);
+    pr.adj.forEach(q => spread(q, .3));
+    if (pr.coast && chance(.08)) { const z = WD.seas[pickR(pr.seas)], far = z.provs.length ? pickR(z.provs) : null; if (far != null) spread(far, .6); }
+    if (--inf[k] <= 0) { delete inf[k]; P.done[p] = 1; }
+  }
+  Object.assign(inf, newInf);
+  hit.forEach(o => { const n = nat(o); n.stab = Math.max(0, n.stab - .8); if (o === S.player && !P.warned) { P.warned = true; S.evq = S.evq || []; S.evq.push({ t: '☠️ A Peste chegou', m: 'A praga chegou às terras de ' + natName(n) + '. Uma quarentena fecha portos e estradas: o contágio cai muito, mas o comércio também.', quar: true }); log('A Peste chegou a ' + natName(n) + '.', 'bad', [o]); } });
+  S.mapDirty = R_PLAGUE();
+  if (!Object.keys(inf).length) { S.plague = null; S.plagueDone = { done: P.done }; log('A Grande Peste terminou depois de ' + Math.round((S.t - P.start) / 360) + ' anos.', 'world'); }
+}
+const R_PLAGUE = () => S.mapDirty || (typeof R !== 'undefined' && R.mode === 'plague');
+const quarCost = n => Math.round(60 * eraScale());
+function quarantine(n) { const c = quarCost(n); if (n.money < c) return 'Sem dinheiro'; if (n.quar > S.t) return 'Já em quarentena'; n.money -= c; n.quar = S.t + 360 * 2; return ''; }
+
 /* ---------- mensal ---------- */
 function monthTick() {
   const y = curYear(), newYear = S.t % 360 === 0;
+  plagueTick();
   econAll();
   S._mine = S.nations.map(() => []); WD.states.forEach(st => { const o = S.own[st.cap]; if (o >= 0 && S.ctrl[st.cap] === o) S._mine[o].push(st); });
   S.nations.forEach(n => {
@@ -740,7 +788,7 @@ function monthTick() {
     // contingente, estabilidade, cansaço de guerra
     const mpMax = (n.popT || 0) * .03 * (1 + n.m.manpower); n.mpMax = mpMax; n.manpower = Math.min(mpMax, n.manpower + (n.popT || 0) * .00025 * (1 + n.m.manpower));
     const war = warsOf(n.id).length; n.wex = war ? Math.min(30, n.wex + .4) : Math.max(0, n.wex - .6);
-    const g = n.mk.sat.goods, target = 36 + n.m.stab * 100 + (n.foodSat - 1) * 60 + (g - .7) * 20 - n.wex + Math.min(10, (n.temples || 0)) - (n.money < 0 ? 15 : 0) - Math.max(0, provsOf(n.id).length - 80) * .06;
+    const g = n.mk.sat.goods, target = 36 + n.m.stab * 100 + (n.foodSat - 1) * 60 + (g - .7) * 20 - n.wex + Math.min(10, (n.temples || 0)) - (n.money < 0 ? 15 : 0) - overCap(n) * .5;
     n.stab = clamp(n.stab + clamp(target - n.stab, -2, 2), 0, 100);
     // reivindicação
     if (n.fab && --n.fab.m <= 0) { n.claims[n.fab.s] = 1; if (n.id === S.player) log('Reivindicação sobre ' + WD.states[n.fab.s].n + ' fabricada.', 'good', [n.id]); n.fab = null; }
@@ -790,6 +838,7 @@ function ai(n) {
   }
   if (chance(.003) && !(n.ideoCd > S.t)) { const opts = [...n.fx.i].filter(i => i !== n.ideo); if (opts.length) setIdeo(n, pickR(opts)); }
   if (slow) aiDiplomacy(n);
+  if (slow && (n.rank || 0) < 4 && provsOf(n.id).length >= RANK_REQ[(n.rank || 0) + 1] && n.money > rankCost(n) * 1.5 && provsOf(n.id).length > domCap(n) * .7) rankUp(n);
   // obras (ganancioso guarda mais ouro; diligente e construtor tentam mais)
   const mine = slow || n.money > 2000 ? S._mine[n.id] : [];
   for (let tries = 0; tries < Math.round(3 * P.build) && n.cons.length < consSlots(n) && n.money > 100 * P.gold; tries++) {
@@ -833,7 +882,7 @@ function ai(n) {
     if (cand.length) { const p = pickR(cand); if (!canColonize(n, p)) colonize(n, p); }
   }
   // guerra: declarar
-  if (slow && !atWarN && n.senior == null && n.stab > 35 && n.money > 0 && chance(.012 * IDEOS[n.ideo].war * P.war * (GOVS[n.gov].cat === 'Tribal' ? 1.4 : 1))) {
+  if (slow && !atWarN && n.senior == null && !overCap(n) && n.stab > 35 && n.money > 0 && chance(.012 * IDEOS[n.ideo].war * P.war * (GOVS[n.gov].cat === 'Tribal' ? 1.4 : 1))) {
     const nb = new Set(); for (const p of provsOf(n.id)) for (const o of WD.provs[p].adj) { const t = S.own[o]; if (t >= 0 && t !== n.id) nb.add(t); }
     if (n.kind === 'cold' || n.fx.col) S.nations.forEach(t => { if (t.alive && t.id !== n.id && provsOf(t.id).some(p => n.exP[p] && WD.provs[p].coast) && chance(.15)) nb.add(t.id); });
     const myP = myR * (1 + n.m.army) * n.up.inf;
@@ -885,7 +934,7 @@ const b64 = u8 => { let s = ''; for (let i = 0; i < u8.length; i += 8192) s += S
 const unb64 = (s, T = Uint8Array) => { const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return new T(u.buffer); };
 function saveGame() {
   const o = Object.assign({}, S, { own: b64(new Uint8Array(S.own.buffer)), ctrl: b64(new Uint8Array(S.ctrl.buffer)), pop: b64(new Uint8Array(S.pop.buffer)), news: [], offer: null, mapDirty: undefined,
-    nations: S.nations.map(n => Object.assign({}, n, { exP: b64(n.exP), exZ: b64(n.exZ), m: undefined, fx: undefined, up: undefined, eff: undefined })), calls: [], dipOffers: [] });
+    nations: S.nations.map(n => Object.assign({}, n, { exP: b64(n.exP), exZ: b64(n.exZ), m: undefined, fx: undefined, up: undefined, eff: undefined })), calls: [], dipOffers: [], evq: [] });
   try { localStorage.setItem('chronicle-save', JSON.stringify(o)); return true; } catch (e) { return false; }
 }
 function loadGame() {

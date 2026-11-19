@@ -47,6 +47,7 @@ function provColors() {
     else if (mode === 'pop') { const v = Math.pow(S.pop[p] / WD.provs[p].size / maxPop, .5); c = [40 + v * 215, 40 + v * 170, 90 - v * 60]; }
     else if (mode === 'reg') c = regCol[WD.provs[p].region].map((v, i) => v * (.85 + (WD.provs[p].state % 3) * .08));
     else if (mode === 'cont') c = contCol[WD.provs[p].cont];
+    else if (mode === 'plague') { const P = S.plague, D = P ? P.done : (S.plagueDone || {}).done || {}; c = P && P.inf[p] != null ? [30, 70, 20] : D[p] ? [150, 150, 140] : o >= 0 ? [205, 200, 180] : null; }
     else if (mode === 'res') { const r = WD.provs[p].res; c = r === 'iron' ? [150, 150, 170] : r === 'coal' ? [50, 50, 50] : r === 'gold' ? [240, 200, 40] : r === 'oil' ? [30, 20, 40] : [200, 190, 160]; }
     if (c) { col[p * 3] = c[0]; col[p * 3 + 1] = c[1]; col[p * 3 + 2] = c[2]; } else { col[p * 3] = 255; col[p * 3 + 1] = 0; col[p * 3 + 2] = 255; }   // magenta = sem cor (mostra terreno)
   }
