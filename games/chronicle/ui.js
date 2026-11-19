@@ -378,9 +378,18 @@ function lawGrid(b, n, eco, msg) {
     lw.append(row); });
   b.append(lw, msg);
 }
+/* soma de cada modificador e, no tooltip, de onde vem cada parte (mesma lista que a simulação usa) */
+const modBreakTip = (n, k) => modBreak(n, k).map(([l, v]) => l + ' ' + sgn(v)).join('\n') || 'Nenhuma fonte';
+function modTable(b, n) {
+  const c = el('div', 'card');
+  [...Object.keys(MODS), 'coup'].forEach(k => { const v = n.m[k] || 0; if (!v && !modBreak(n, k).length) return;
+    const r = el('div', 'brow'); r.append(el('span', 'nm', MODS[k] || 'Risco de golpe'), el('span', 'lv ' + ((k === 'coup' ? -v : v) >= 0 ? 'good' : 'bad'), sgn(v))); tip(r, modBreakTip(n, k)); c.append(r); });
+  b.append(c);
+}
 function winGov(b) {
-  const n = me(), msg = el('div', 'msg'), tab = tabs(b, 'govTab', [['gov', '🏛️ Governo'], ['ideo', '⚑ Ideologia'], ['laws', '📜 Leis']]);
+  const n = me(), msg = el('div', 'msg'), tab = tabs(b, 'govTab', [['gov', '🏛️ Governo'], ['ideo', '⚑ Ideologia'], ['laws', '📜 Leis'], ['mods', '📊 Modificadores']]);
   if (tab === 'laws') { lawGrid(b, n, false, msg); return; }
+  if (tab === 'mods') { modTable(b, n); return; }
   if (tab === 'ideo') {
     const inf = ideoInfluence(n), c = el('div', 'card'); c.append(el('h4', '', 'Ideologia atual: ' + IDEOS[n.ideo].n), modChips(IDEOS[n.ideo].m));
     c.append(el('h4', '', 'Influência do governante e do conselho'));

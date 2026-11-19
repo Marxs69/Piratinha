@@ -265,35 +265,55 @@ const techCount = n => n.eff ? n.eff.size : Object.keys(n.techs).length;
 const vertLen = v => VERT[v].len;
 
 /* ---------- modificadores ---------- */
-function calcMods(n) {
-  const m = {}; Object.keys(MODS).forEach(k => m[k] = 0); m.coup = 0;
-  const add = o => { for (const k in o) m[k] = (m[k] || 0) + o[k]; };
-  add(GOVS[n.gov].m); add(IDEOS[n.ideo].m);
+/* efeitos de tecnologia que não são modificadores (prédios, governos, mares...) e normalização das leis */
+function calcFx(n) {
   const fx = { sea: 0, col: 0, fort: 0, slots: 1, ship: 1, bo: {}, up: { inf: 1, cav: 1, art: 1, siege: 1 }, b: new Set(Object.keys(BUILDINGS).filter(b => !BUILDINGS[b].tech && !BUILDINGS[b].vert)), g: new Set(), i: new Set(['trad', 'warrior']) };
   const eff = new Set(Object.keys(n.techs)); let vl = 0;
   for (const id in n.techs) { const t = TECH[id]; if (t && t.v) { vl++; (t.src || []).forEach(x => eff.add(x)); } }
   n.eff = eff; n.vlv = vl;
   for (const id of eff) {
     const t = TECH[id]; if (!t) continue; const f = t.fx;
-    if (f.m) add(f.m); if (f.sea) fx.sea = Math.max(fx.sea, f.sea); if (f.col) fx.col += f.col; if (f.fort) fx.fort += f.fort; if (f.slots) fx.slots += f.slots; if (f.ship) fx.ship += f.ship;
+    if (f.sea) fx.sea = Math.max(fx.sea, f.sea); if (f.col) fx.col += f.col; if (f.fort) fx.fort += f.fort; if (f.slots) fx.slots += f.slots; if (f.ship) fx.ship += f.ship;
     if (f.bo) for (const k in f.bo) fx.bo[k] = (fx.bo[k] || 0) + f.bo[k]; if (f.u) for (const k in f.u) fx.up[k] = (fx.up[k] || 0) + f.u[k];
     (f.b || []).forEach(b => fx.b.add(b)); (f.g || []).forEach(g => fx.g.add(g)); (f.i || []).forEach(i => fx.i.add(i));
   }
-  if (n.vert) { const v = VERT[n.vert]; for (const k in v.m) m[k] += v.m[k] * n.vlv / v.len * (.5 + .5 * (n.vsat == null ? 1 : n.vsat)); }
-  [n.ruler, ...Object.values(n.council || {})].forEach(c => c && c.tr.forEach(t => TRAITS[t] && add(TRAITS[t].m)));
-  const R = n.ruler, C = n.council || {};
-  if (R) { m.tax += (R.st.adm - 8) * .008; m.research += (R.st.lea - 8) * .008; m.army += (R.st.mar - 8) * .008; m.stab += (R.st.dip - 8) * .004; }
-  if (C.steward) m.tax += (C.steward.st.adm - 8) * .006; if (C.scholar) m.research += (C.scholar.st.lea - 8) * .006; if (C.marshal) m.army += (C.marshal.st.mar - 8) * .006; if (C.chancellor) m.stab += (C.chancellor.st.dip - 8) * .003;
-  if (C.spymaster) m.coup -= (C.spymaster.st.int - 8) * .04; if (R) m.coup -= (R.st.int - 8) * .02;
-  const gd = GOVS[n.gov]; if (gd.until && curYear() > gd.until) m.stab -= .1; if (gd.minRank && (n.rank || 0) < gd.minRank) m.stab -= .1;
-  n.laws = Object.assign({}, LAW_DEF, n.laws || {}); for (const k in LAWS) { if (!LAWS[k].o[n.laws[k]]) n.laws[k] = LAW_DEF[k]; add(LAWS[k].o[n.laws[k]].m); }
-  const cv = n.cov || {}; m.growth += (cv.health || 0) * .5; m.research += (cv.edu || 0) * .3; m.tax += (cv.adm || 0) * .15; m.coup -= (cv.sec || 0) * .6;
-  const bf = n.bfx || {}; m.army += Math.min(.3, bf.army || 0); m.manpower += Math.min(.4, bf.mp || 0);
-  if (n.sats) { m.research += Math.min(20, n.sats) * .01; m.trade += Math.min(20, n.sats) * .005; }
-  if (S.moon && S.moon.base[n.id]) m.research += .05;
-  if (n.alienTrade) m.research += .05 * n.alienTrade;
-  const cs = n.csat, cl = n.cls;                              // classes: a média pesquisa e paga impostos; a alta insatisfeita conspira
-  if (cs && cl && n.popT) { const mid = cl.mid / n.popT; m.research += mid * .8 * cs.mid; m.tax += mid * .5 * cs.mid + (cs.high - .7) * .1; m.coup += Math.max(0, 1 - cs.high) * 1.2; }
+  n.laws = Object.assign({}, LAW_DEF, n.laws || {}); for (const k in LAWS) if (!LAWS[k].o[n.laws[k]]) n.laws[k] = LAW_DEF[k];
+  return fx;
+}
+/* fontes de modificadores: TODO bônus do país passa por aqui, com rótulo — a soma (calcMods) e o detalhamento (modBreak) saem da mesma lista.
+   Cada fonte devolve pares [rótulo, {mod: valor}]; a ordem é fixa (somas em ponto flutuante dependem dela). */
+const STAT_MOD = [['adm', 'tax', .008, .006], ['lea', 'research', .008, .006], ['mar', 'army', .008, .006], ['dip', 'stab', .004, .003]];
+const COUNCIL_STAT = { steward: 'adm', scholar: 'lea', marshal: 'mar', chancellor: 'dip' };
+const MOD_SOURCES = [
+  n => [['Governo: ' + GOVS[n.gov].n, GOVS[n.gov].m], ['Ideologia: ' + IDEOS[n.ideo].n, IDEOS[n.ideo].m]],
+  n => [...n.eff].filter(id => TECH[id] && TECH[id].fx.m).map(id => ['Tecnologia: ' + TECH[id].n, TECH[id].fx.m]),
+  n => { if (!n.vert) return []; const v = VERT[n.vert], o = {}; for (const k in v.m) o[k] = v.m[k] * n.vlv / v.len * (.5 + .5 * (n.vsat == null ? 1 : n.vsat)); return [['Vertente: ' + v.n, o]]; },
+  n => [n.ruler, ...Object.values(n.council || {})].flatMap(c => c ? c.tr.filter(t => TRAITS[t]).map(t => ['Traço ' + TRAITS[t].n + ' (' + charName(c) + ')', TRAITS[t].m]) : []),
+  n => { const R = n.ruler, C = n.council || {}, out = [];
+    if (R) { const o = {}; STAT_MOD.forEach(([s, k, w]) => o[k] = (R.st[s] - 8) * w); out.push(['Atributos do governante', o]); }
+    STAT_MOD.forEach(([s, k, , w]) => { const role = Object.keys(COUNCIL_STAT).find(r => COUNCIL_STAT[r] === s), c = C[role]; if (c) out.push(['Conselho: ' + COUNCIL.find(x => x[0] === role)[1], { [k]: (c.st[s] - 8) * w }]); });
+    if (C.spymaster) out.push(['Conselho: ' + COUNCIL.find(x => x[0] === 'spymaster')[1], { coup: -(C.spymaster.st.int - 8) * .04 }]);
+    if (R) out.push(['Atributos do governante', { coup: -(R.st.int - 8) * .02 }]);
+    return out; },
+  n => { const gd = GOVS[n.gov], out = []; if (gd.until && curYear() > gd.until) out.push(['Governo ultrapassado', { stab: -.1 }]); if (gd.minRank && (n.rank || 0) < gd.minRank) out.push(['Título baixo para o governo', { stab: -.1 }]); return out; },
+  n => Object.keys(LAWS).map(k => ['Lei: ' + LAWS[k].n + ' — ' + LAWS[k].o[n.laws[k]].n, LAWS[k].o[n.laws[k]].m]),
+  n => { const cv = n.cov || {}; return [['Serviços públicos', { growth: (cv.health || 0) * .5, research: (cv.edu || 0) * .3, tax: (cv.adm || 0) * .15, coup: -(cv.sec || 0) * .6 }]]; },
+  n => { const bf = n.bfx || {}; return [['Prédios', { army: Math.min(.3, bf.army || 0), manpower: Math.min(.4, bf.mp || 0) }]]; },
+  n => n.sats ? [['Satélites', { research: Math.min(20, n.sats) * .01, trade: Math.min(20, n.sats) * .005 }]] : [],
+  n => S.moon && S.moon.base[n.id] ? [['Base lunar', { research: .05 }]] : [],
+  n => n.alienTrade ? [['Comércio com a lua', { research: .05 * n.alienTrade }]] : [],
+  n => { const cs = n.csat, cl = n.cls; if (!(cs && cl && n.popT)) return []; const mid = cl.mid / n.popT;   // a média pesquisa e paga impostos; a alta insatisfeita conspira
+    return [['Classes sociais', { research: mid * .8 * cs.mid, tax: mid * .5 * cs.mid + (cs.high - .7) * .1, coup: Math.max(0, 1 - cs.high) * 1.2 }]]; },
+];
+const modList = n => MOD_SOURCES.flatMap(f => f(n)).filter(x => x[1]);
+/* de onde vem um modificador: [[rótulo, valor]] somando fontes com o mesmo rótulo */
+function modBreak(n, k) {
+  const acc = new Map(); for (const [l, o] of modList(n)) if (o[k]) acc.set(l, (acc.get(l) || 0) + o[k]);
+  return [...acc].filter(x => Math.abs(x[1]) > 1e-9).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
+}
+function calcMods(n) {
+  const fx = calcFx(n), m = {}; Object.keys(MODS).forEach(k => m[k] = 0); m.coup = 0;
+  for (const [, o] of modList(n)) for (const k in o) m[k] = (m[k] || 0) + o[k];
   n.m = m; n.fx = fx;
   const up = fx.up, um = n.vert && VUNITS[n.vert] ? VUNITS[n.vert].um : { inf: 1, cav: 1, art: 1 };
   n.up = { inf: up.inf * um.inf, cav: up.cav * um.cav, art: up.art * um.art, siege: up.siege, vrt: n.vert ? (up.inf * (1.5 + 1.75 * n.vlv / VERT[n.vert].len)) * (.5 + .5 * (n.vsat == null ? 1 : n.vsat)) : 0 };
