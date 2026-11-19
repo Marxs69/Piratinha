@@ -155,6 +155,9 @@ h4.era { font: 700 12px var(--title); color: var(--dim); letter-spacing: 1px; ma
 #modal-b.wide { width: min(900px, 96vw); }
 .tcols.v3 { grid-template-columns: repeat(3, minmax(200px, 1fr)); }
 .tech.vt b { color: var(--gold-2); }
+.laws { display: flex; flex-direction: column; gap: 6px; } .lawrow { display: grid; grid-template-columns: 130px repeat(4, 1fr); gap: 6px; align-items: stretch; } .lawrow > b { align-self: center; font: 700 13px var(--title); color: var(--dim); } .opt.law { padding: 5px 8px; }
+canvas.moon { width: 100%; max-width: 320px; border-radius: 6px; display: block; margin-bottom: 8px; }
+.svcs .pbar { margin-bottom: 4px; }
 #modal { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.5); }
 #modal-b { width: min(520px, 94vw); max-height: 86vh; overflow: auto; padding: 18px; display: flex; flex-direction: column; gap: 10px; }
 #modal-b h2 { font: 700 22px var(--title); color: var(--gold-2); }

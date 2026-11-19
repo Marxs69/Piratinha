@@ -47,8 +47,9 @@ function provColors() {
     else if (mode === 'pop') { const v = Math.pow(S.pop[p] / WD.provs[p].size / maxPop, .5); c = [40 + v * 215, 40 + v * 170, 90 - v * 60]; }
     else if (mode === 'reg') c = regCol[WD.provs[p].region].map((v, i) => v * (.85 + (WD.provs[p].state % 3) * .08));
     else if (mode === 'cont') c = contCol[WD.provs[p].cont];
+    else if (mode.startsWith('svc:')) { const st = WD.provs[p].state, cv = S.scov && S.scov[st] && stateOwnerOf(st) === o ? S.scov[st][mode.slice(4)] : 0; c = o < 0 ? null : [200 - cv * 160, 70 + cv * 150, 70 + cv * 40]; }
     else if (mode === 'plague') { const P = S.plague, D = P ? P.done : (S.plagueDone || {}).done || {}; c = P && P.inf[p] != null ? [30, 70, 20] : D[p] ? [150, 150, 140] : o >= 0 ? [205, 200, 180] : null; }
-    else if (mode === 'res') { const r = WD.provs[p].res; c = r === 'iron' ? [150, 150, 170] : r === 'coal' ? [50, 50, 50] : r === 'gold' ? [240, 200, 40] : r === 'oil' ? [30, 20, 40] : r === 'copper' ? [214, 110, 40] : r === 'uranium' ? [110, 230, 60] : r === 'rare' ? [190, 70, 220] : [200, 190, 160]; }
+    else if (mode === 'res') { const r = resVisible(p) ? provRes(p) : null; c = r === 'iron' ? [150, 150, 170] : r === 'coal' ? [50, 50, 50] : r === 'gold' ? [240, 200, 40] : r === 'oil' ? [30, 20, 40] : r === 'copper' ? [214, 110, 40] : r === 'uranium' ? [110, 230, 60] : r === 'rare' ? [190, 70, 220] : [200, 190, 160]; }
     if (c) { col[p * 3] = c[0]; col[p * 3 + 1] = c[1]; col[p * 3 + 2] = c[2]; } else { col[p * 3] = 255; col[p * 3 + 1] = 0; col[p * 3 + 2] = 255; }   // magenta = sem cor (mostra terreno)
   }
   return col;
@@ -96,10 +97,22 @@ function rebuildMap() {
     if (s >= 0 && own[s] !== own[p]) { const o = (((y + 1) * K) * BW + x * K) * 4; for (let dx = 0; dx < K; dx++) { const oo = o + dx * 4; d[oo] *= .35; d[oo + 1] *= .35; d[oo + 2] *= .35; } }
   }
   R.bctx.putImageData(R.img, 0, 0);
-  computeLabels();
+  computeLabels(); computeLinks();
   S.mapDirty = false; R.dirty = true;
 }
 
+/* obras ligando estados vizinhos do mesmo dono: estradas, ferrovias, rodovias… e oleodutos (desenhados por cima do mapa) */
+function computeLinks() {
+  if (!WD.stAdj) { WD.stAdj = WD.states.map(() => new Set()); WD.provs.forEach(p => p.adj.forEach(o => { const a = p.state, b = WD.provs[o].state; if (a < b) WD.stAdj[a].add(b); })); }
+  const me = S.player >= 0 ? nat(S.player) : null, tier = WD.states.map(st => { let t = 0; const B = S.bld[st.id]; for (const k in B) { const f = BUILDINGS[k].fx; if (B[k] && f && f.infra) t = Math.max(t, f.infra); } return t; });
+  R.links = []; R.pipes = [];
+  WD.states.forEach(a => WD.stAdj[a.id].forEach(bi => {
+    const b = WD.states[bi], o = stateOwnerOf(a.id); if (o < 0 || o !== stateOwnerOf(bi)) return; if (me && (!me.exP[a.cap] || !me.exP[b.cap])) return;
+    const t = Math.min(tier[a.id], tier[bi]); if (t) R.links.push([a.cap, b.cap, t]);
+    if (S.bld[a.id].pipeline && S.bld[bi].pipeline) R.pipes.push([a.cap, b.cap]);
+  }));
+}
+const LINK_STYLE = { 1: ['#8b6b3a', 1.2, [4, 3]], 2: ['#2a2a2a', 2, []], 3: ['#d9d9d9', 2.6, []], 4: ['#ffffff', 2.2, [10, 3]], 5: ['#5ff2ff', 2.4, []], 6: ['#d38cff', 2.6, [2, 2]], 7: ['#fff6b0', 3, [1, 4]] };
 function computeLabels() {                                   // rótulo de cada nação no centro de massa das suas províncias
   const acc = new Map(), me = S.player >= 0 ? nat(S.player) : null;
   WD.provs.forEach(p => { const o = S.own[p.id]; if (o < 0) return; if (me && !me.exP[p.id]) return; let a = acc.get(o); if (!a) acc.set(o, a = { x: 0, y: 0, n: 0, minx: 1e9, maxx: -1e9 }); a.x += p.cx * p.size; a.y += p.cy * p.size; a.n += p.size; a.minx = Math.min(a.minx, p.cx); a.maxx = Math.max(a.maxx, p.cx); });
@@ -145,6 +158,14 @@ function drawFrame() {
     }
     c.font = 'italic 11px "Alegreya Sans", sans-serif';
     for (const zz of WD.seas) { if (me && !me.exZ[zz.id]) continue; if (!vis(zz.cx * K, zz.cy * K)) continue; const [sx, sy] = toScreen(zz.cx * K, zz.cy * K); c.fillStyle = 'rgba(200,225,255,.55)'; c.fillText(zz.n, sx, sy); }
+  }
+  // obras e oleodutos
+  if (R.links && z >= .9) {
+    const line = (a, b) => { const pa = WD.provs[a], pb = WD.provs[b]; const [x0, y0] = toScreen(pa.cx * K + K / 2, pa.cy * K + K / 2), [x1, y1] = toScreen(pb.cx * K + K / 2, pb.cy * K + K / 2); c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1); c.stroke(); };
+    c.lineCap = 'round';
+    for (const [a, b, t] of R.links) { const [col, w, dash] = LINK_STYLE[t]; c.strokeStyle = col; c.lineWidth = w * Math.min(1.6, z / 1.5); c.setLineDash(dash); line(a, b); if (t === 2) { c.strokeStyle = 'rgba(255,255,255,.55)'; c.lineWidth = 1; c.setLineDash([2, 5]); line(a, b); } }
+    c.strokeStyle = 'rgba(255,140,0,.85)'; c.lineWidth = 1.6; c.setLineDash([7, 4]); for (const [a, b] of R.pipes) line(a, b);
+    c.setLineDash([]);
   }
   // cercos
   for (const k in S.sieges) {

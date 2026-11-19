@@ -25,6 +25,7 @@ const GOODS = {
   steel:   { n: 'Aço', p: 8, c: 'ind', e: '🔩' },
   elec:    { n: 'Eletrônicos', p: 25, c: 'ind', e: '📟' },
   lux:     { n: 'Luxo', p: 20, c: 'lux', e: '💎' },
+  power:   { n: 'Energia', p: 6, c: 'ind', e: '⚡' },
   gears:   { n: 'Engrenagens', p: 14, c: 'punk', e: '⚙️' },
   boilers: { n: 'Caldeiras', p: 16, c: 'punk', e: '♨️' },
   coils:   { n: 'Bobinas Tesla', p: 18, c: 'punk', e: '⚡' },
@@ -43,7 +44,7 @@ function popNeeds(year) {
   const t = Math.max(0, Math.min(1, (year - 860) / 900));             // pré-industrial: sobe devagar até 1760
   const ti = Math.max(0, Math.min(1, (year - 1760) / 200));           // industrialização
   const t2 = Math.max(0, Math.min(1, (year - 1950) / 250));           // era digital e futura
-  return { food: 1, cloth: .04 + .02 * t + .08 * ti, goods: .015 + .02 * t + .18 * ti + .2 * t2, lux: .0012 + .003 * t + .009 * ti, elec: year < 1950 ? 0 : .01 + .12 * t2 };
+  return { food: 1, cloth: .04 + .02 * t + .08 * ti, goods: .015 + .02 * t + .18 * ti + .2 * t2, lux: .0012 + .003 * t + .009 * ti, elec: year < 1950 ? 0 : .01 + .12 * t2, power: year < 1890 ? 0 : .01 + .05 * Math.min(1, (year - 1890) / 110) + .12 * t2 };
 }
 
 /* ---------- prédios (no estado; nível = quantas unidades) ----------
@@ -67,29 +68,62 @@ const BUILDINGS = {
   university:  { n: 'Universidade', e: '🎓', cost: 160, w: .4, fx: { research: 2.5 }, tech: 'soc_universities', max: 3 },
   temple:      { n: 'Templo', e: '⛪', cost: 100, w: .3, fx: { stab: .5 }, max: 2 },
   manufactory: { n: 'Manufatura', e: '🏭', cost: 200, w: 2, in: { cloth: .8, wood: 1 }, out: { goods: 2.6 }, tech: 'eco_manufactory' },
-  textile_mill:{ n: 'Fábrica têxtil', e: '🧵', cost: 320, w: 3, in: { fiber: 4, coal: .5 }, out: { cloth: 5.5 }, tech: 'eco_textile' },
-  goods_factory:{ n: 'Fábrica de bens', e: '🏭', cost: 380, w: 3, in: { cloth: 1, steel: .5, wood: 1 }, out: { goods: 4.6 }, tech: 'eco_factory' },
-  tool_factory:{ n: 'Fábrica de ferramentas', e: '🔧', cost: 360, w: 3, in: { steel: 1.5, coal: .5 }, out: { tools: 3.4 }, tech: 'eco_mechanization' },
-  arms_factory:{ n: 'Fábrica de armamentos', e: '💣', cost: 400, w: 3, in: { steel: 1.5, coal: .5 }, out: { arms: 3.2 }, tech: 'eco_interchangeable' },
-  steel_mill:  { n: 'Siderúrgica', e: '🔩', cost: 420, w: 3, in: { iron: 3, coal: 2 }, out: { steel: 3.4 }, tech: 'eco_bessemer' },
-  railway:     { n: 'Ferrovia', e: '🚂', cost: 300, w: 1, in: { steel: .3, coal: .5 }, fx: { prod: .1, speed: .5 }, tech: 'eco_railways', max: 3 },
+  textile_mill:{ n: 'Fábrica têxtil', e: '🧵', cost: 320, w: 3, in: { fiber: 4, coal: .5, power: .3 }, out: { cloth: 5.5 }, tech: 'eco_textile' },
+  goods_factory:{ n: 'Fábrica de bens', e: '🏭', cost: 380, w: 3, in: { cloth: 1, steel: .5, wood: 1, power: .5 }, out: { goods: 4.6 }, tech: 'eco_factory' },
+  tool_factory:{ n: 'Fábrica de ferramentas', e: '🔧', cost: 360, w: 3, in: { steel: 1.5, coal: .5, power: .4 }, out: { tools: 3.4 }, tech: 'eco_mechanization' },
+  arms_factory:{ n: 'Fábrica de armamentos', e: '💣', cost: 400, w: 3, in: { steel: 1.5, coal: .5, power: .4 }, out: { arms: 3.2 }, tech: 'eco_interchangeable' },
+  steel_mill:  { n: 'Siderúrgica', e: '🔩', cost: 420, w: 3, in: { iron: 3, coal: 2, power: .8 }, out: { steel: 3.4 }, tech: 'eco_bessemer' },
+  railway:     { n: 'Ferrovia', e: '🚂', cost: 300, w: 1, in: { steel: .3, coal: .5 }, fx: { prod: .08, speed: .5, infra: 2 }, tech: 'eco_railways', max: 3 },
   copper_mine: { n: 'Mina de cobre', e: '🟠', cost: 80, w: 1.5, out: { copper: 2.4 }, req: 'res:copper' },
   uranium_mine:{ n: 'Mina de urânio', e: '☢️', cost: 300, w: 1, out: { uranium: 1.4 }, req: 'res:uranium', tech: 'eco_electricity' },
   rare_mine:   { n: 'Mina de terras raras', e: '💠', cost: 350, w: 1.5, out: { rare: 1.2 }, req: 'res:rare', tech: 'eco_assembly' },
   oil_well:    { n: 'Poço de petróleo', e: '🛢️', cost: 300, w: 1, out: { oil: 3.2 }, req: 'res:oil', tech: 'eco_oil' },
-  power_plant: { n: 'Usina elétrica', e: '🔌', cost: 450, w: 1, in: { coal: 2 }, fx: { prod: .15 }, tech: 'eco_electricity', max: 3 },
-  electronics: { n: 'Fábrica de eletrônicos', e: '📟', cost: 600, w: 3, in: { steel: .5, oil: .6 }, out: { elec: 1.6 }, tech: 'eco_transistor' },
+  power_plant: { n: 'Termelétrica a carvão', e: '🏭', cost: 420, w: 1, in: { coal: 2 }, out: { power: 5 }, tech: 'eco_electricity' },
+  electronics: { n: 'Fábrica de eletrônicos', e: '📟', cost: 600, w: 3, in: { steel: .5, oil: .6, power: .8 }, out: { elec: 1.6 }, tech: 'eco_transistor' },
+  // energia
+  oil_plant:   { n: 'Termelétrica a óleo', e: '🏭', cost: 420, w: 1, in: { oil: 1.5 }, out: { power: 5 }, tech: 'eco_oil_power' },
+  hydro:       { n: 'Hidrelétrica', e: '💧', cost: 600, w: .6, out: { power: 4.5 }, req: 'rocky', tech: 'eco_electricity' },
+  nuclear:     { n: 'Usina nuclear', e: '⚛️', cost: 1000, w: 1, in: { uranium: .4 }, out: { power: 14 }, tech: 'eco_nuclear' },
+  wind:        { n: 'Parque eólico', e: '🌬️', cost: 500, w: .3, out: { power: 3 }, req: 'windy', tech: 'eco_wind' },
+  solar_plant: { n: 'Usina solar', e: '🔆', cost: 550, w: .3, out: { power: 3.5 }, req: 'sunny', tech: 'eco_solar' },
+  fusion:      { n: 'Reator de fusão', e: '🌟', cost: 2500, w: 1, out: { power: 40 }, tech: 'eco_fusion' },
+  pw_clock:    { n: 'Torre de molas', e: '⚙️', cost: 250, w: .6, in: { gears: .2 }, out: { power: 2.5 }, vert: 'clock' },
+  pw_steam:    { n: 'Usina a vapor colossal', e: '♨️', cost: 380, w: 1, in: { coal: 1.5 }, out: { power: 6 }, vert: 'steam' },
+  pw_diesel:   { n: 'Usina a diesel', e: '🛢️', cost: 400, w: .8, in: { oil: 1 }, out: { power: 6 }, vert: 'diesel' },
+  pw_bio:      { n: 'Usina de biogás', e: '🧬', cost: 420, w: .8, in: { grain: 1.5 }, out: { power: 5 }, vert: 'bio' },
+  pw_cyber:    { n: 'Rede elétrica inteligente', e: '💾', cost: 600, w: .4, out: { power: 6 }, vert: 'cyber' },
+  pw_nano:     { n: 'Nanocélulas', e: '🔬', cost: 900, w: .3, out: { power: 12 }, vert: 'nano' },
+  pw_space:    { n: 'Coletor solar orbital', e: '🛰️', cost: 1500, w: .3, out: { power: 25 }, vert: 'space' },
+  // obras de transporte (desenhadas no mapa) e oleodutos
+  road:        { n: 'Estradas', e: '🛤️', cost: 60, w: .3, fx: { speed: .15, trade: .01, infra: 1 }, max: 3 },
+  highway:     { n: 'Rodovias', e: '🛣️', cost: 400, w: .5, in: { oil: .3, steel: .2 }, fx: { speed: .4, prod: .05, infra: 3 }, tech: 'eco_highways', max: 3 },
+  hsr:         { n: 'Trem de alta velocidade', e: '🚄', cost: 700, w: .6, in: { power: .5, steel: .2 }, fx: { speed: .7, prod: .06, infra: 4 }, tech: 'eco_hsr', max: 2 },
+  maglev:      { n: 'Maglev', e: '🚝', cost: 1100, w: .5, in: { power: 1 }, fx: { speed: 1, prod: .08, infra: 5 }, tech: 'eco_maglev', max: 2 },
+  tubes:       { n: 'Tubos a vácuo', e: '🌀', cost: 1600, w: .5, in: { power: 1.5 }, fx: { speed: 1.5, prod: .1, infra: 6 }, tech: 'eco_tubes', max: 2 },
+  portal:      { n: 'Portais', e: '🌌', cost: 3000, w: .4, in: { power: 3 }, fx: { speed: 3, prod: .12, trade: .05, infra: 7 }, tech: 'eco_portals', max: 1 },
+  pipeline:    { n: 'Oleoduto e gasoduto', e: '🧪', cost: 350, w: .3, in: { steel: .2 }, fx: { pipe: 1 }, tech: 'eco_pipelines', max: 1 },
+  // serviços públicos (cobertura por estado)
+  hospital:    { n: 'Hospital', e: '🏥', cost: 120, w: .4, fx: { svc: 'health' }, max: 5 },
+  school:      { n: 'Escola', e: '📚', cost: 110, w: .4, fx: { svc: 'edu' }, max: 5 },
+  office:      { n: 'Repartição pública', e: '🏛️', cost: 130, w: .4, fx: { svc: 'adm' }, max: 5 },
+  guard:       { n: 'Guarda', e: '🛡️', cost: 110, w: .4, fx: { svc: 'sec' }, max: 5 },
+  // militares
+  shipyard:    { n: 'Estaleiro', e: '🛠️', cost: 160, w: .6, req: 'coast', fx: { yard: 1 }, max: 2 },
+  barracks:    { n: 'Quartel', e: '⛺', cost: 100, w: .4, fx: { mp: .05 }, max: 3 },
+  academy:     { n: 'Academia militar', e: '🎖️', cost: 300, w: .3, fx: { army: .03 }, tech: 'mil_drill', max: 2 },
+  airbase:     { n: 'Base aérea', e: '✈️', cost: 700, w: .5, in: { oil: .5 }, fx: { army: .04 }, tech: 'mil_aircraft', max: 2 },
+  launch_site: { n: 'Centro de lançamento', e: '🚀', cost: 1500, w: 1, in: { steel: 1, elec: .5, power: .5 }, fx: { launch: 1 }, tech: 'spc_rockets', max: 1 },
   // vertentes
   clock_works: { n: 'Oficina de engrenagens', e: '⚙️', cost: 220, w: 1, in: { iron: 1, tools: .3 }, out: { gears: 1 }, vert: 'clock' },
   steam_foundry:{ n: 'Fundição a vapor', e: '♨️', cost: 300, w: 2, in: { iron: 1.5, coal: 1.5 }, out: { boilers: 1.2 }, vert: 'steam' },
-  tesla_tower: { n: 'Torre Tesla', e: '⚡', cost: 380, w: 1, in: { steel: .5, copper: 1, coal: .5 }, out: { coils: 1.2 }, fx: { prod: .05 }, vert: 'tesla' },
+  tesla_tower: { n: 'Torre Tesla', e: '⚡', cost: 380, w: 1, in: { steel: .5, copper: 1, coal: .5 }, out: { coils: 1.2, power: 4 }, vert: 'tesla' },
   diesel_works:{ n: 'Fábrica de motores', e: '🛞', cost: 400, w: 2, in: { steel: 1, oil: 1.5 }, out: { engines: 1.2 }, vert: 'diesel' },
-  reactor:     { n: 'Reator atômico', e: '☢️', cost: 600, w: 1, in: { steel: 1, uranium: 1 }, out: { cores: .8 }, fx: { prod: .08 }, vert: 'atom' },
+  reactor:     { n: 'Reator atômico', e: '☢️', cost: 600, w: 1, in: { steel: 1, uranium: 1 }, out: { cores: .8, power: 8 }, vert: 'atom' },
   biovat:      { n: 'Tanque biológico', e: '🧬', cost: 450, w: 1, in: { grain: 3 }, out: { biomass: 1.6 }, vert: 'bio' },
-  chipfab:     { n: 'Fábrica de implantes', e: '💾', cost: 700, w: 2, in: { elec: .8, rare: .6 }, out: { chips: 1.1 }, vert: 'cyber' },
-  solar_array: { n: 'Fazenda solar', e: '☀️', cost: 600, w: 1, in: { steel: .5, elec: .2 }, out: { panels: 1.6 }, fx: { prod: .06 }, vert: 'solar' },
-  nanoforge:   { n: 'Nanoforja', e: '🔬', cost: 900, w: 1, in: { elec: .5, gold: .2, rare: .2 }, out: { nanites: .7 }, vert: 'nano' },
-  spaceport:   { n: 'Porto espacial', e: '🚀', cost: 1200, w: 2, in: { steel: 2, elec: 1 }, out: { he3: .6 }, vert: 'space' },
+  chipfab:     { n: 'Fábrica de implantes', e: '💾', cost: 700, w: 2, in: { elec: .8, rare: .6, power: .8 }, out: { chips: 1.1 }, vert: 'cyber' },
+  solar_array: { n: 'Fazenda solar', e: '☀️', cost: 600, w: 1, in: { steel: .5, elec: .2 }, out: { panels: 1.6, power: 6 }, vert: 'solar' },
+  nanoforge:   { n: 'Nanoforja', e: '🔬', cost: 900, w: 1, in: { elec: .5, gold: .2, rare: .2, power: 1 }, out: { nanites: .7 }, vert: 'nano' },
+  spaceport:   { n: 'Porto espacial', e: '🚀', cost: 1200, w: 2, in: { steel: 2, elec: 1, power: 1.5 }, out: { he3: .6 }, fx: { launch: 1 }, vert: 'space' },
 };
 
 /* ---------- tecnologias ----------
@@ -113,7 +147,7 @@ T('mil_bombard', 'mil', 1400, 'Bombardas', ['mil_gunpowder'], { u: { art: .5, si
 T('mil_arquebus', 'mil', 1450, 'Arcabuz', ['mil_bombard', 'mil_pike'], { u: { inf: .3 } });
 T('mil_bastion', 'mil', 1520, 'Fortificação abaluartada', ['mil_bombard'], { fort: 1 });
 T('mil_musket', 'mil', 1580, 'Mosquete', ['mil_arquebus'], { u: { inf: .35 } });
-T('mil_drill', 'mil', 1620, 'Exército permanente', ['mil_musket'], { m: { army: .1 } });
+T('mil_drill', 'mil', 1620, 'Exército permanente', ['mil_musket'], { m: { army: .1 }, b: ['academy'] });
 T('mil_bayonet', 'mil', 1690, 'Baioneta', ['mil_drill'], { u: { inf: .4, cav: .2 } });
 T('mil_fieldart', 'mil', 1720, 'Artilharia de campanha', ['mil_bayonet'], { u: { art: .6 } });
 T('mil_conscription', 'mil', 1790, 'Conscrição em massa', ['mil_fieldart', 'soc_nationalism'], { m: { manpower: .3 } });
@@ -121,7 +155,7 @@ T('mil_rifle', 'mil', 1840, 'Fuzil raiado', ['mil_conscription'], { u: { inf: .6
 T('mil_breech', 'mil', 1865, 'Retrocarga', ['mil_rifle'], { u: { inf: .5, art: .6 } });
 T('mil_machinegun', 'mil', 1885, 'Metralhadora', ['mil_breech'], { u: { inf: .9 } });
 T('mil_trench', 'mil', 1910, 'Guerra de trincheiras', ['mil_machinegun'], { u: { inf: .5 }, fort: 1 });
-T('mil_aircraft', 'mil', 1915, 'Aviação militar', ['mil_machinegun', 'eco_assembly'], { u: { inf: .4, cav: .4, art: .4 } });
+T('mil_aircraft', 'mil', 1915, 'Aviação militar', ['mil_machinegun', 'eco_assembly'], { u: { inf: .4, cav: .4, art: .4 }, b: ['airbase'] });
 T('mil_tank', 'mil', 1916, 'Tanques', ['mil_trench', 'eco_oil'], { u: { cav: 1.5 } });
 T('mil_blitz', 'mil', 1937, 'Guerra mecanizada', ['mil_tank', 'mil_aircraft'], { u: { cav: 1.2, inf: .6 }, m: { speed: .3 } });
 T('mil_jet', 'mil', 1950, 'Caças a jato', ['mil_blitz'], { u: { inf: .6, cav: .6, art: .6 } });
@@ -152,7 +186,13 @@ T('nav_nuclearsub', 'nav', 1955, 'Submarino nuclear', ['nav_carrier', 'mil_nucle
 T('nav_container', 'nav', 1960, 'Navios porta-contêineres', ['nav_carrier'], { m: { trade: .15 } });
 T('nav_aegis', 'nav', 1985, 'Destróier de mísseis', ['nav_nuclearsub', 'mil_missile'], { ship: 2 });
 T('nav_autonomous', 'nav', 2040, 'Frotas autônomas', ['nav_aegis', 'eco_ai'], { ship: 3 });
+T('spc_rockets', 'nav', 2050, 'Programa espacial', ['nav_autonomous'], { b: ['launch_site'], m: { research: .03 } });
+T('spc_sat', 'nav', 2055, 'Satélites', ['spc_rockets'], {});
+T('spc_probe', 'nav', 2065, 'Sondas lunares', ['spc_sat'], {});
+T('spc_landing', 'nav', 2080, 'Pouso tripulado', ['spc_probe'], { m: { stab: .05 } });
 T('nav_seastead', 'nav', 2090, 'Cidades flutuantes', ['nav_autonomous'], { m: { growth: .1, trade: .1 } });
+T('spc_base', 'nav', 2095, 'Base lunar', ['spc_landing'], {});
+T('spc_contact', 'nav', 2110, 'Protocolos de contato', ['spc_base'], {});
 T('nav_orbit', 'nav', 2150, 'Navegação orbital', ['nav_seastead'], { ship: 4, m: { speed: .3 } });
 // economia
 T('eco_heavyplough', 'eco', 900, 'Arado pesado', [], { bo: { farm: .15 } });
@@ -177,18 +217,28 @@ T('eco_interchangeable', 'eco', 1830, 'Peças intercambiáveis', ['eco_mechaniza
 T('eco_railways', 'eco', 1830, 'Ferrovias', ['eco_steam'], { b: ['railway'], slots: 1 });
 T('eco_bessemer', 'eco', 1856, 'Processo Bessemer', ['eco_railways'], { b: ['steel_mill'] });
 T('eco_oil', 'eco', 1870, 'Perfuração de petróleo', ['eco_bessemer'], { b: ['oil_well'] });
-T('eco_electricity', 'eco', 1885, 'Eletricidade', ['eco_oil'], { b: ['power_plant'], m: { research: .05 } });
+T('eco_electricity', 'eco', 1885, 'Eletricidade', ['eco_oil'], { b: ['power_plant', 'hydro'], m: { research: .05 } });
+T('eco_oil_power', 'eco', 1900, 'Termelétricas a óleo', ['eco_electricity'], { b: ['oil_plant'] });
+T('eco_pipelines', 'eco', 1905, 'Oleodutos e gasodutos', ['eco_oil'], { b: ['pipeline'], m: { trade: .03 } });
 T('eco_fertilizer', 'eco', 1910, 'Fertilizantes químicos', ['eco_electricity'], { bo: { farm: .35 }, m: { growth: .1 } });
 T('eco_assembly', 'eco', 1913, 'Linha de montagem', ['eco_electricity'], { m: { prod: .12 }, slots: 1 });
+T('eco_highways', 'eco', 1920, 'Rodovias', ['eco_assembly'], { b: ['highway'] });
+T('eco_nuclear', 'eco', 1955, 'Energia nuclear', ['eco_assembly', 'eco_electricity'], { b: ['nuclear'] });
+T('eco_hsr', 'eco', 1965, 'Trem de alta velocidade', ['eco_highways'], { b: ['hsr'] });
 T('eco_transistor', 'eco', 1950, 'Transistor', ['eco_assembly'], { b: ['electronics'] });
 T('eco_green_rev', 'eco', 1960, 'Revolução verde', ['eco_fertilizer'], { bo: { farm: .5 }, m: { growth: .15 } });
 T('eco_computers', 'eco', 1965, 'Computadores', ['eco_transistor'], { m: { research: .12 } });
 T('eco_automation', 'eco', 1980, 'Automação', ['eco_computers'], { m: { prod: .15 }, slots: 1 });
+T('eco_wind', 'eco', 1980, 'Energia eólica', ['eco_automation'], { b: ['wind'] });
 T('eco_internet', 'eco', 1993, 'Internet', ['eco_automation'], { m: { research: .12, trade: .1 } });
+T('eco_solar', 'eco', 1995, 'Energia solar', ['eco_wind'], { b: ['solar_plant'] });
+T('eco_maglev', 'eco', 2030, 'Maglev', ['eco_hsr', 'eco_internet'], { b: ['maglev'] });
 T('eco_ai', 'eco', 2030, 'Inteligência artificial', ['eco_internet'], { m: { research: .15, prod: .1 } });
-T('eco_fusion', 'eco', 2070, 'Fusão nuclear', ['eco_ai'], { m: { prod: .2 } });
+T('eco_fusion', 'eco', 2070, 'Fusão nuclear', ['eco_ai'], { b: ['fusion'], m: { prod: .1 } });
+T('eco_tubes', 'eco', 2080, 'Tubos a vácuo', ['eco_maglev', 'eco_fusion'], { b: ['tubes'] });
 T('eco_molecular', 'eco', 2110, 'Manufatura molecular', ['eco_fusion'], { m: { prod: .2 }, slots: 2 });
 T('eco_postscarcity', 'eco', 2150, 'Pós-escassez', ['eco_molecular'], { m: { prod: .25, stab: .1 } });
+T('eco_portals', 'eco', 2160, 'Portais', ['eco_tubes', 'eco_postscarcity'], { b: ['portal'] });
 // sociedade
 T('soc_feudal', 'soc', 860, 'Direito feudal', [], { g: ['feudal', 'elective'] });
 T('soc_monasteries', 'soc', 900, 'Mosteiros', ['soc_feudal'], { m: { stab: .03, research: .04 } });
@@ -408,6 +458,30 @@ const STATS = {                                              // o que cada atrib
 const ERAS = [[860, 'Alta Idade Média'], [1000, 'Idade Média'], [1450, 'Renascimento'], [1650, 'Era Moderna'], [1780, 'Era das Revoluções'], [1880, 'Era Industrial'], [1945, 'Guerra Fria'], [2000, 'Era Digital'], [2060, 'Futuro']];
 const eraOf = y => { let e = ERAS[0][1]; for (const [a, n] of ERAS) if (y >= a) e = n; return e; };
 const SHIPS = [['nav_longship', 'Barcos longos'], ['nav_knarr', 'Knarrs'], ['nav_cog', 'Cocas'], ['nav_caravel', 'Caravelas'], ['nav_galleon', 'Galeões'], ['nav_lineship', 'Naus de linha'], ['nav_steamship', 'Vapores'], ['nav_ironclad', 'Encouraçados'], ['nav_dreadnought', 'Dreadnoughts'], ['nav_carrier', 'Porta-aviões'], ['nav_nuclearsub', 'Submarinos nucleares'], ['nav_aegis', 'Destróieres de mísseis'], ['nav_autonomous', 'Frotas autônomas'], ['nav_orbit', 'Naves orbitais']];
+/* ---------- serviços públicos: nome do prédio muda com a era; cada nível atende SVC_CAP(ano) mil pessoas ---------- */
+const SVC = {
+  health: { n: 'Saúde', e: '🏥', b: 'hospital', names: [[860, 'Casa de caridade'], [1650, 'Hospital'], [1900, 'Hospital moderno'], [2000, 'Centro médico'], [2080, 'Clínica de regeneração']], d: 'Crescimento da população, teto populacional e resistência a pragas' },
+  edu:    { n: 'Educação', e: '📚', b: 'school', names: [[860, 'Escola monástica'], [1500, 'Escola'], [1850, 'Escola pública'], [2000, 'Campus digital'], [2080, 'Rede neural de ensino']], d: 'Pesquisa' },
+  adm:    { n: 'Administração', e: '🏛️', b: 'office', names: [[860, 'Chancelaria local'], [1500, 'Intendência'], [1850, 'Repartição pública'], [2000, 'Governo digital'], [2080, 'Administração algorítmica']], d: 'Impostos, menos corrupção e obras mais baratas' },
+  sec:    { n: 'Segurança', e: '🛡️', b: 'guard', names: [[860, 'Guarda'], [1600, 'Milícia urbana'], [1830, 'Polícia'], [2000, 'Segurança inteligente'], [2080, 'Vigilância preditiva']], d: 'Estabilidade e menos golpes' },
+};
+const SVC_CAP = y => 30 * (1 + (y - 860) / 250);
+const svcName = (k, y) => { let n = SVC[k].names[0][1]; for (const [a, x] of SVC[k].names) if (y >= a) n = x; return n; };
+
+/* ---------- leis (cada uma tem opções com modificadores; trocar custa estabilidade) ---------- */
+const LAWS = {
+  tax:   { n: 'Impostos', o: { low: { n: 'Baixos', m: { tax: -.2, stab: .08, growth: .03 } }, normal: { n: 'Normais', m: {} }, high: { n: 'Altos', m: { tax: .2, stab: -.08 } }, extort: { n: 'Extorsivos', m: { tax: .4, stab: -.2, growth: -.1 } } } },
+  draft: { n: 'Recrutamento', o: { volunteer: { n: 'Voluntários', m: { manpower: -.4, prod: .05 } }, limited: { n: 'Limitado', m: {} }, wide: { n: 'Amplo', m: { manpower: .3, prod: -.05 } }, total: { n: 'Mobilização total', m: { manpower: .8, prod: -.15, stab: -.05 }, req: 'mil_conscription' } } },
+  trade: { n: 'Comércio', o: { free: { n: 'Livre comércio', m: { trade: .15, prod: -.03 }, req: 'eco_mercantilism' }, normal: { n: 'Tarifas moderadas', m: {} }, protect: { n: 'Protecionismo', m: { trade: -.1, prod: .06 } }, autarky: { n: 'Autarquia', m: { trade: -.4, prod: .08, stab: .03 } } } },
+  spend: { n: 'Gastos públicos', o: { austerity: { n: 'Austeridade', m: { stab: -.05 }, svc: .5 }, normal: { n: 'Equilibrados', m: {}, svc: 1 }, welfare: { n: 'Bem-estar social', m: { stab: .08, growth: .05 }, svc: 1.6, req: 'soc_welfare' } } },
+  press: { n: 'Imprensa', o: { censored: { n: 'Censurada', m: { stab: .05, research: -.05 } }, regulated: { n: 'Regulada', m: {} }, free: { n: 'Livre', m: { research: .06, stab: -.03 }, req: 'soc_printing' } } },
+};
+const LAW_DEF = { tax: 'normal', draft: 'limited', trade: 'normal', spend: 'normal', press: 'regulated' };
+
+/* ---------- espaço: foguete de cada vertente e a lua sorteada em cada partida ---------- */
+const ROCKETS = { none: 'Foguete químico', clock: 'Foguete de corda', steam: 'Foguete a vapor', tesla: 'Canhão eletromagnético', diesel: 'Foguete a diesel', atom: 'Foguete nuclear', bio: 'Nave orgânica', cyber: 'Lançador em rede', solar: 'Vela solar', nano: 'Elevador de nanotubos', space: 'Nave estelar' };
+const MOON_TYPES = [['Rochosa', '#9a9890'], ['Gelada', '#cfe6f2'], ['Oceânica', '#3f78b8'], ['Vulcânica', '#a5452c'], ['Desértica', '#cfa96a'], ['Selvagem', '#4f8a43']];
+const ALIEN_ERAS = ['Idade da Pedra', 'Idade do Bronze', 'Idade Média', 'Renascimento', 'Era Industrial', 'Era Atômica', 'Era Digital', 'Era Interestelar'];
 const COUNCIL = [['chancellor', 'Chanceler', 'dip'], ['marshal', 'Marechal', 'mar'], ['steward', 'Tesoureiro', 'adm'], ['spymaster', 'Mestre espião', 'int'], ['scholar', 'Erudito', 'lea']];
 
 /* ---------- culturas: sílabas para nomes de lugares, pessoas e dinastias ---------- */

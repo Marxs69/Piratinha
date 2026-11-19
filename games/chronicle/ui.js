@@ -5,7 +5,7 @@
 'use strict';
 
 const $ = s => document.querySelector(s);
-const SPEEDS = [0, 2, 6, 15, 40, 120];                       // dias por segundo
+const SPEEDS = [0, 2, 6, 15, 40, 90];                       // dias por segundo
 const UI = { scr: 'menu', speed: 0, last: 1, win: null, side: null, lastMap: 0, acc: 0, keys: new Set(), chron: false, seenLog: 0 };
 
 /* ---------- utilidades de DOM ---------- */
@@ -33,7 +33,8 @@ function bTip(b) {
   const d = BUILDINGS[b], o = [d.e + ' ' + d.n];
   if (d.in) o.push('Consome: ' + Object.entries(d.in).map(([g, q]) => q + ' ' + GOODS[g].n).join(', '));
   if (d.out) o.push('Produz: ' + Object.entries(d.out).map(([g, q]) => q + ' ' + GOODS[g].n).join(', '));
-  if (d.fx) Object.entries(d.fx).forEach(([k, v]) => o.push({ tax: 'Impostos do país +' + v * 100 / 4 + '%', fort: 'Fortificação +' + v, port: 'Porto: frotas e comércio', trade: 'Comércio +' + v * 100 + '%', research: 'Pesquisa +' + v + '/mês', stab: 'Estabilidade +' + v * 2, prod: 'Produção do estado +' + v * 100 + '%', speed: 'Tropas mais rápidas no estado' }[k] || k));
+  if (d.fx) Object.entries(d.fx).forEach(([k, v]) => { const t = { tax: 'Impostos do país +' + v * 100 / 4 + '%', fort: 'Fortificação +' + v, port: 'Porto: frotas e comércio', trade: 'Comércio +' + Math.round(v * 100) + '%', research: 'Pesquisa +' + v + '/mês', stab: 'Estabilidade +' + v * 2, prod: 'Produção do estado +' + Math.round(v * 100) + '%', speed: 'Tropas ' + Math.round(v * 100) + '% mais rápidas no estado', infra: 'Aparece no mapa ligando estados vizinhos', pipe: 'Petróleo do estado +30%; aparece no mapa', svc: SVC[v] ? SVC[v].n + ': cada nível atende ' + Math.round(SVC_CAP(curYear())) + ' mil pessoas (' + SVC[v].d.toLowerCase() + ')' : '', yard: 'Navios 30% mais baratos neste estado', mp: 'Contingente +5% e recrutas 1 mês mais rápidos aqui', army: 'Força militar +' + Math.round(v * 100) + '%', launch: 'Lança foguetes e satélites' }[k]; if (t) o.push(t); });
+  if (d.in && d.in.power) o.push('Energia só é consumida a partir de 1885');
   o.push(d.w + ' mil trabalhadores por nível · ' + bMonths(b) + ' meses de obra');
   if (d.req) o.push('Exige: ' + ({ arable: 'terra cultivável', coast: 'litoral', forest: 'floresta', rocky: 'colinas ou montanhas', warm: 'clima quente' }[d.req] || 'recurso ' + (GOODS[d.req.slice(4)] || {}).n));
   return o.join('\n');
@@ -97,7 +98,7 @@ function startPlay(fresh) {
 }
 
 /* ---------- modos de mapa ---------- */
-const MODEBTN = [['pol', '🗺️', 'Político'], ['ter', '⛰️', 'Terreno'], ['dip', '🤝', 'Diplomático: verde é você, azul aliados, vermelho inimigos, laranja trégua'], ['pop', '👥', 'População'], ['reg', '🧩', 'Regiões e estados'], ['cont', '🌍', 'Continentes'], ['res', '⛏️', 'Recursos: cinza ferro, preto carvão, amarelo ouro, roxo-escuro petróleo, laranja cobre, verde urânio, lilás terras raras'], ['plague', '☠️', 'Peste: verde escuro doente agora, cinza já passou']];
+const MODEBTN = [['pol', '🗺️', 'Político'], ['ter', '⛰️', 'Terreno'], ['dip', '🤝', 'Diplomático: verde é você, azul aliados, vermelho inimigos, laranja trégua'], ['pop', '👥', 'População'], ['reg', '🧩', 'Regiões e estados'], ['cont', '🌍', 'Continentes'], ['res', '⛏️', 'Recursos: cinza ferro, preto carvão, amarelo ouro, roxo-escuro petróleo, laranja cobre, verde urânio, lilás terras raras'], ['plague', '☠️', 'Peste: verde escuro doente agora, cinza já passou'], ['svc:health', '🏥', 'Cobertura de saúde'], ['svc:edu', '📚', 'Cobertura de educação'], ['svc:adm', '🏛️', 'Cobertura de administração pública'], ['svc:sec', '🛡️', 'Cobertura de segurança']];
 function drawModes(box) { box.innerHTML = ''; MODEBTN.forEach(([m, e, t]) => box.append(btn(e, () => { R.mode = m; S.mapDirty = true; drawModes(box); }, R.mode === m ? 'on' : '', '', t))); }
 
 /* ---------- barra do topo ---------- */
@@ -106,14 +107,14 @@ function drawTop() {
   const f = flagEl(n.flag, 'flag'); tip(f, 'Bandeira: clique para editar (💰' + flagCost() + ')'); f.onclick = () => openWin('flag'); t.append(f);
   const nm = el('div', 'nname'); nm.append(el('b', '', natName(n)), el('small', '', titleOf(n) + ' ' + charName(n.ruler))); tip(nm, GOVS[n.gov].n + ' · ' + IDEOS[n.ideo].n + (n.senior != null ? '\nParceiro júnior de ' + natName(nat(n.senior)) : '')); t.append(nm);
   const res = (v, s, tt, cls = '') => { const d = el('div', 'res'); tip(d, tt); d.append(el('b', cls, v), el('small', '', s)); t.append(d); };
-  const lab = { tax: 'Impostos', trade: 'Exportações', imports: 'Importações', army: 'Exército', navy: 'Marinha', admin: 'Administração', interest: 'Juros', corrupt: 'Corrupção' };
+  const lab = { tax: 'Impostos', trade: 'Exportações', imports: 'Importações', army: 'Exército', navy: 'Marinha', admin: 'Administração', svc: 'Serviços públicos', interest: 'Juros', corrupt: 'Corrupção' };
   res('💰 ' + money(n.money), (n.income >= 0 ? '+' : '−') + money(Math.abs(n.income)) + '/mês', 'Tesouro\n' + Object.entries(n.inc).filter(([, v]) => Math.abs(v) >= .5).map(([k, v]) => lab[k] + ': ' + money(v)).join('\n') + (n.money > 2000 ? '\nAcima de 2.000, 1% ao mês se perde em corrupção' : ''), n.money < 0 ? 'bad' : '');
   const np = provsOf(n.id).length, cap = domCap(n); res('🏰 ' + np + (cap < 1e8 ? '/' + cap : ''), RANK_N[n.rank || 0], 'Título: ' + RANK_N[n.rank || 0] + ' (' + titleOf(n) + ')\nProvíncias que o título sustenta: ' + (cap < 1e8 ? cap : 'sem limite') + '\nAcima do limite: −0,5 de estabilidade por província, sem colonizar e sem anexar na paz.\nProclame um título maior na janela de Governo.', np > cap ? 'bad' : np > cap * .85 ? 'gold' : '');
   res('👥 ' + Math.floor(n.manpower) + 'k', 'de ' + Math.floor(n.mpMax || 0) + 'k', 'Contingente: homens disponíveis para recrutar (1k por regimento).\nCresce com a população; teto de 3% dela.');
   res('⚖️ ' + Math.round(n.stab), 'estabilidade', 'Estabilidade (0–100)\nMais alta: mais impostos, pesquisa e menos golpes.\nSobe com governo, ideologia, comida e bens; cai com guerra, dívida e território grande.', n.stab < 30 ? 'bad' : n.stab > 70 ? 'good' : '');
   const tr = n.res ? TECH[n.res] : null; res('🔬 ' + (tr ? Math.floor(n.rp / techCost(n, tr) * 100) + '%' : '—'), tr ? tr.n : 'sem pesquisa', tr ? techTip(n, tr) + '\n+' + researchRate(n).toFixed(1) + ' por mês' : 'Escolha uma pesquisa na Tecnologia', tr ? '' : 'bad');
   const w = warsOf(n.id); res('⚔️ ' + w.length, w.length ? 'em guerra' : 'em paz', w.length ? 'Contra ' + enemiesOf(n.id).map(e => nat(e).name).join(', ') : 'Nenhuma guerra', w.length ? 'bad' : '');
-  [['🏛️', 'gov', 'Governo'], ['💰', 'eco', 'Economia'], ['🔬', 'tech', 'Tecnologia'], ['⚔️', 'mil', 'Militar'], ['🤝', 'dip', 'Diplomacia']].forEach(([e, id, tt]) => t.append(btn(e + ' ' + tt, () => UI.win === id ? closeWin() : openWin(id), UI.win === id ? 'on' : '')));
+  [['🏛️', 'gov', 'Governo'], ['💰', 'eco', 'Economia'], ['🔬', 'tech', 'Tecnologia'], ['⚔️', 'mil', 'Militar'], ['🤝', 'dip', 'Diplomacia'], ...(curYear() >= 2040 || hasT(n, 'spc_rockets') ? [['🚀', 'space', 'Espaço']] : [])].forEach(([e, id, tt]) => t.append(btn(e + ' ' + tt, () => UI.win === id ? closeWin() : openWin(id), UI.win === id ? 'on' : '')));
   const unread = S.log.length - UI.seenLog; t.append(btn('📜 Crônica' + (unread > 0 && !UI.chron ? ' (' + Math.min(99, unread) + ')' : ''), () => { UI.chron = !UI.chron; drawChron(); drawTop(); }, UI.chron ? 'on' : unread > 0 ? 'new' : ''));
   t.append(el('span', 'grow'));
   const sp = el('div', 'speed'); [0, 1, 2, 3, 4, 5].forEach(k => sp.append(btn(k ? '▶'.repeat(Math.min(k, 3)) + (k > 3 ? k : '') : '⏸', () => setSpeed(k), UI.speed === k ? 'on' : '', '', k ? 'Velocidade ' + k + ' (tecla ' + k + ')' : 'Pausar (espaço)'))); t.append(sp);
@@ -155,7 +156,7 @@ function sideProv(sd, p) {
   const tt = el('div'); tt.append(el('h2', '', pr.n), el('small', 'dim', st.n + ' · ' + rg.n + ' · ' + ct.n)); h.append(tt); sd.append(h);
   if (!n.exP[p]) { sd.append(el('p', 'dim', 'Terra inexplorada.')); return; }
   const T = TERRAIN[pr.terr];
-  sd.append(kv([['Dono', o >= 0 ? natName(nat(o)) : 'Nativos'], ...(c !== o && c >= 0 ? [['Ocupada por', natName(nat(c))]] : []), ['Terreno', T.n + (pr.coast ? ' · litoral' : ''), T.n + '\nMovimento ×' + T.move + '\nDefesa +' + Math.round(T.def * 100) + '%\nComida ×' + T.food], ['Recurso', pr.res ? GOODS[pr.res].e + ' ' + GOODS[pr.res].n : '—', 'Permite minas ou poços desse recurso no estado'], ['População', popStr(S.pop[p])], ['Fortificação', fortOf(p) || '—', 'Cada nível deixa o cerco bem mais lento.\nVem do castelo na capital do estado e da capital do país.']]));
+  sd.append(kv([['Dono', o >= 0 ? natName(nat(o)) : 'Nativos'], ...(c !== o && c >= 0 ? [['Ocupada por', natName(nat(c))]] : []), ['Terreno', T.n + (pr.coast ? ' · litoral' : ''), T.n + '\nMovimento ×' + T.move + '\nDefesa +' + Math.round(T.def * 100) + '%\nComida ×' + T.food], ['Recurso', resVisible(p) ? GOODS[provRes(p)].e + ' ' + GOODS[provRes(p)].n : '—', 'Permite minas ou poços desse recurso no estado. Petróleo, urânio e terras raras ficam ocultos até prospectar.'], ['População', popStr(S.pop[p])], ['Fortificação', fortOf(p) || '—', 'Cada nível deixa o cerco bem mais lento.\nVem do castelo na capital do estado e da capital do país.']]));
   const msg = el('div', 'msg'), act = fn => () => { const e = fn(); msg.textContent = e || ''; if (!e) refresh(); };
   if (o === -1) {
     const col = S.cols.find(x => x.p === p);
@@ -191,6 +192,10 @@ function sideState(sd, st) {
     list.append(r);
   });
   box.append(list);
+  if (so >= 0 && S.scov && S.scov[st.id]) { const cvb = el('div', 'svcs'); for (const k in SVC) { const v = S.scov[st.id][k] || 0, r = el('div', 'brow'); r.append(el('span', 'e', SVC[k].e), el('span', 'nm', SVC[k].n), el('span', 'lv', pct(v))); tip(r, SVC[k].n + ' · ' + svcName(k, curYear()) + '\n' + SVC[k].d + '\nCada nível atende ' + Math.round(SVC_CAP(curYear())) + ' mil pessoas'); cvb.append(r, bar(v, '#7fc8e0')); } box.append(el('h3', '', 'Serviços'), cvb); }
+  const deps = st.provs.filter(p => resVisible(p)).map(p => GOODS[provRes(p)].e + ' ' + GOODS[provRes(p)].n + ' (' + WD.provs[p].n + ')'); if (deps.length) box.append(tip(el('div', 'dim', 'Jazidas: ' + deps.join(', ')), 'Petróleo, urânio e terras raras só aparecem depois de prospectar'));
+  if (so === n.id) box.append(btn('🔍 Prospectar (💰' + prospectCost() + ')', () => { const e = prospect(n, st.id); if (e) say(e, 'bad'); refresh(); }, 'sm', canProspect(n, st.id), 'Procura petróleo, urânio e terras raras (conforme suas tecnologias) por 6 meses; às vezes acha jazidas novas'));
+  if ((n.pros || []).some(x => x.s === st.id)) box.append(el('div', 'dim', 'Prospecção em andamento…'));
   if (so === n.id) n.cons.filter(c => c.s === st.id).forEach(c => { box.append(el('div', 'dim', BUILDINGS[c.b].n + ' · ' + c.m + ' meses')); box.append(bar(1 - c.m / c.tot)); });
   sd.append(box);
 }
@@ -278,13 +283,13 @@ function flagImgEl(f) { const im = new Image(); im.className = 'mini'; im.src = 
 function centerOn(wx, wy) { R.cam.x = wx - innerWidth / 2 / R.cam.z; R.cam.y = wy - innerHeight / 2 / R.cam.z; clampCam(); }
 
 /* ---------- janelas ---------- */
-const WTITLE = { gov: 'Governo', eco: 'Economia', tech: 'Tecnologia', mil: 'Militar', dip: 'Diplomacia', flag: 'Bandeira', peace: 'Paz' };
+const WTITLE = { gov: 'Governo', eco: 'Economia', tech: 'Tecnologia', mil: 'Militar', dip: 'Diplomacia', flag: 'Bandeira', peace: 'Paz', space: 'Espaço' };
 function openWin(id, arg) { UI.win = id; UI.warg = arg; $('#win').hidden = false; $('#win-t').textContent = WTITLE[id]; drawWin(); drawTop(); }
 function closeWin() { UI.win = null; $('#win').hidden = true; if (S && S.player >= 0) drawTop(); }
 $('#win-x').onclick = closeWin;
 function drawWin() {
   if (!UI.win) return; const b = $('#win-b'), keep = b.scrollTop; b.innerHTML = '';
-  ({ gov: winGov, eco: winEco, tech: winTech, mil: winMil, dip: winDip, flag: winFlag, peace: winPeace })[UI.win](b);
+  ({ gov: winGov, eco: winEco, tech: winTech, mil: winMil, dip: winDip, flag: winFlag, peace: winPeace, space: winSpace })[UI.win](b);
   b.scrollTop = keep;
 }
 function charCard(c, title, extra) {
@@ -313,6 +318,23 @@ function winGov(b) {
   const ladder = el('div', 'chips'); RANK_N.forEach((rn, k) => ladder.append(tip(el('span', 'chip' + (k === r ? ' p' : ''), rn + ': ' + rankFmt(n, k).replace('{}', n.name)), rn + '\nTítulo do governante: ' + rankTitle(n, k) + '\nSustenta ' + (RANK_CAP[k] < 1e8 ? RANK_CAP[k] : 'qualquer número de') + ' províncias\nProclamar exige ' + RANK_REQ[k] + ' províncias'))); tc.append(ladder);
   if (r < 4) tc.append(btn('👑 Proclamar ' + RANK_N[r + 1] + ' (💰' + rankCost(n) + ')', () => { const e = rankUp(n); msg.textContent = e; if (!e) { refresh(); renameAsk(); } }, 'grn', np < RANK_REQ[r + 1] ? 'Exige ' + RANK_REQ[r + 1] + ' províncias (tem ' + np + ')' : n.money < rankCost(n) ? 'Sem dinheiro' : '', 'Vira ' + rankFmt(n, r + 1).replace('{}', n.name) + ' · −5 de estabilidade'));
   b.append(tc);
+  // leis
+  b.append(el('h3', 'gold', 'Leis · mudar custa 💰' + lawCost() + ' e 3 de estabilidade'));
+  const lw = el('div', 'laws'); Object.entries(LAWS).forEach(([k, L]) => { const row = el('div', 'lawrow'); row.append(el('b', '', L.n));
+    Object.entries(L.o).forEach(([o, d]) => { const on = n.laws[k] === o, ok = !d.req || hasT(n, d.req), cd = (n.lawCd || {})[k] > S.t, op = el('div', 'opt law' + (on ? ' on' : '') + (ok ? '' : ' off'));
+      op.append(el('b', '', d.n), modChips(d.m)); tip(op, d.n + '\n' + (modLines(d.m).join('\n') || 'Sem modificadores') + (d.svc ? '\nServiços: efeito e custo ×' + d.svc : '') + (ok ? '' : '\n⛔ Exige ' + TECH[d.req].n) + (cd && !on ? '\n⛔ Mudada há pouco' : ''));
+      if (!on && ok && !cd) op.onclick = () => { const e = setLaw(n, k, o); msg.textContent = e; if (!e) refresh(); }; row.append(op); });
+    lw.append(row); });
+  b.append(lw);
+  // eleições
+  if (isElective(n) && n.sup) {
+    const ec = el('div', 'card'); ec.style.marginTop = '12px'; const g = GOVS[n.gov];
+    ec.append(el('h4', '', '🗳️ Eleitorado e apoio'), el('div', 'dim', g.succ === 'elect' ? 'Eleição quando o governante morrer' : 'Próxima eleição: ' + (n.termEnd || curYear())));
+    Object.entries(n.sup).sort((a, b) => b[1] - a[1]).forEach(([i, v]) => { const r = el('div', 'brow'); r.append(el('span', 'nm', 'Partido ' + IDEOS[i].n + (i === n.ideo ? ' (governo)' : '')), el('span', 'lv', pct(v))); tip(r, modLines(IDEOS[i].m).join('\n')); ec.append(r, bar(v, IDEOS[i].col)); });
+    ec.append(tip(el('small', 'dim', 'O apoio ao governo sobe com estabilidade e lucro; cai com guerra, fome e impostos altos.'), 'Se outro partido vencer, a ideologia muda e um novo governante assume.'));
+    ec.append(btn('📣 Campanha (💰' + campaignCost() + ')', () => { const e = campaign(n); msg.textContent = e; if (!e) refresh(); }, 'sm', (n.campCd > S.t) ? 'Campanha recente' : '', '+6% de apoio ao partido do governo; uma vez por ano'));
+    b.append(ec);
+  }
   b.append(el('h3', 'gold', 'Modificadores atuais'), modChips(n.m));
   b.append(el('h3', 'gold', 'Governo · reforma 💰' + Math.round(80 * eraScale())));
   byEraGroups(Object.keys(GOVS), govUnlockYear).forEach(([e, list]) => { b.append(el('h4', 'era', e)); const go = el('div', 'grid-opts');
@@ -346,11 +368,15 @@ function renameAsk() {
 function winEco(b) {
   const n = me(), sum = el('div', 'cols');
   const inc = el('div', 'card'); inc.append(el('h4', '', 'Balanço mensal'));
-  const t = el('table', 't'); const lab = { tax: ['Impostos', '6% do PIB, ajustado por governo, mercados e estabilidade'], trade: ['Exportações', 'Excedentes vendidos ao mercado mundial'], imports: ['Importações', 'O que falta é comprado, até um orçamento; comida primeiro'], army: ['Exército', 'Manutenção dos regimentos'], navy: ['Marinha', 'Manutenção dos navios'], admin: ['Administração', 'Cresce com população e províncias'], interest: ['Juros', '1% da dívida ao mês'], corrupt: ['Corrupção', '1% ao mês do que passa de 2.000'] };
+  const t = el('table', 't'); const lab = { svc: ['Serviços públicos', 'Manutenção de hospitais, escolas, repartições e guardas (lei de gastos muda isso)'], tax: ['Impostos', '6% do PIB, ajustado por governo, mercados e estabilidade'], trade: ['Exportações', 'Excedentes vendidos ao mercado mundial'], imports: ['Importações', 'O que falta é comprado, até um orçamento; comida primeiro'], army: ['Exército', 'Manutenção dos regimentos'], navy: ['Marinha', 'Manutenção dos navios'], admin: ['Administração', 'Cresce com população e províncias'], interest: ['Juros', '1% da dívida ao mês'], corrupt: ['Corrupção', '1% ao mês do que passa de 2.000'] };
   Object.entries(n.inc).forEach(([k, v]) => { const r = t.insertRow(), c0 = r.insertCell(); c0.textContent = lab[k][0]; tip(c0, lab[k][1]); const c = r.insertCell(); c.className = 'n ' + (v < 0 ? 'bad' : 'good'); c.textContent = money(v); });
   const tr = t.insertRow(); tr.insertCell().textContent = 'Total'; const tc = tr.insertCell(); tc.className = 'n gold'; tc.textContent = money(n.income); inc.append(t); sum.append(inc);
   const embs = S.nations.filter(o => o.alive && has(o, 'emb', n.id)).length;
   const g = el('div', 'card'); g.append(el('h4', '', 'Produção'), kv([['PIB', money(n.gdp) + '/mês'], ['População', popStr(n.popT)], ['Empregados', popStr(n.employed || 0)], ['Comida', pct(n.foodSat), 'Abaixo de 95% a população encolhe'], ['Canteiros', n.cons.length + ' / ' + consSlots(n), 'Obras ao mesmo tempo: tecnologia, população e tesouro dão mais'], ['Acordos comerciais', (n.trade || []).length + '', '+7% de eficiência de comércio cada'], ['Embargos contra você', embs + '', '−8% de eficiência de comércio cada']]), modChips({ tax: n.m.tax, prod: n.m.prod, trade: n.m.trade, food: n.m.food })); sum.append(g);
+  const sv = el('div', 'card'); sv.append(el('h4', '', 'Cobertura dos serviços'));
+  for (const k in SVC) { const v = (n.cov || {})[k] || 0, r = el('div', 'brow'); r.append(el('span', 'e', SVC[k].e), el('span', 'nm', SVC[k].n + ' · ' + svcName(k, curYear())), el('span', 'lv', pct(v))); tip(r, SVC[k].d + '\nConstrua ' + BUILDINGS[SVC[k].b].n.toLowerCase() + 's nos estados (painel do estado).'); sv.append(r, bar(v, '#7fc8e0')); }
+  const ps = n.mk.sup.power || 0, pd = n.mk.dem.power || 0; sv.append(tip(el('div', pd > ps ? 'bad' : 'dim', '⚡ Energia: produz ' + Math.round(ps) + ' · consome ' + Math.round(pd)), 'Fábricas e população consomem energia a partir de 1885.\nFontes: carvão, óleo, hidrelétrica, nuclear, eólica, solar, fusão e a usina da sua vertente.'));
+  sum.append(sv);
   b.append(sum);
   const gt = el('table', 't'); gt.style.marginTop = '12px'; const hr = gt.insertRow(); ['Bem', 'Produção', 'Consumo', 'Importa', 'Exporta', 'Preço mundial', 'Atendido'].forEach(x => hr.append(el('th', '', x)));
   GOOD_IDS.forEach(id => {
@@ -443,6 +469,35 @@ function winPeace(b) {
   r.append(btn('Render-se', () => modal(m => { m.append(el('h2', '', 'Render-se?'), el('p', '', natName(e) + ' fica com tudo o que ocupa.')); const row = el('div', 'row'); row.append(btn('Render-se', () => { makePeace(w, e.id, occupiedBy(w, e.id)); closeModal(); closeWin(); refresh(); }, 'red'), btn('Voltar', closeModal)); m.append(row); }), 'red'));
   b.append(r, msg);
 }
+/* espaço: foguete da vertente, satélites, missões à lua e civilizações alienígenas */
+function drawMoon(cv, M, known) {
+  const c = cv.getContext('2d'), w = cv.width, h = cv.height, r = Math.min(w, h) * .42; c.clearRect(0, 0, w, h);
+  c.fillStyle = '#05070d'; c.fillRect(0, 0, w, h); for (let i = 0; i < 60; i++) { c.fillStyle = 'rgba(255,255,255,' + (.2 + (i * 37 % 10) / 14) + ')'; c.fillRect((i * 97) % w, (i * 53) % h, 1.5, 1.5); }
+  const g = c.createRadialGradient(w / 2 - r * .35, h / 2 - r * .35, r * .1, w / 2, h / 2, r); g.addColorStop(0, known ? M.col : '#555'); g.addColorStop(1, '#000');
+  c.fillStyle = g; c.beginPath(); c.arc(w / 2, h / 2, r, 0, Math.PI * 2); c.fill();
+  if (known) { c.save(); c.beginPath(); c.arc(w / 2, h / 2, r, 0, Math.PI * 2); c.clip(); M.craters.forEach(([x, y, s]) => { c.fillStyle = 'rgba(0,0,0,.25)'; c.beginPath(); c.arc(w / 2 + x * r, h / 2 + y * r, s * r, 0, Math.PI * 2); c.fill(); }); if (M.life === 'complex' || M.life === 'intel') { c.fillStyle = 'rgba(70,160,60,.35)'; M.craters.slice(0, 5).forEach(([x, y, s]) => { c.beginPath(); c.arc(w / 2 - y * r, h / 2 + x * r, s * r * 1.6, 0, Math.PI * 2); c.fill(); }); } c.restore(); }
+  else { c.fillStyle = '#ddd'; c.font = '700 40px serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('?', w / 2, h / 2); }
+}
+function winSpace(b) {
+  const n = me(), M = S.moon, known = !!M.known[n.id], rk = ROCKETS[n.vert || 'none'], msg = el('div', 'msg');
+  const top = el('div', 'cols');
+  const mc = el('div', 'card'), cv = el('canvas'); cv.width = 320; cv.height = 220; cv.className = 'moon'; drawMoon(cv, M, known); mc.append(el('h4', '', '🌑 ' + (known ? M.n : 'Lua desconhecida')), cv);
+  if (known) mc.append(kv([['Tipo', M.type], ['Gravidade', M.grav + 'g'], ['Vida', { none: 'Nenhuma', micro: 'Microscópica', complex: 'Fauna e flora complexas', intel: 'Inteligente' }[M.life]], ['Bases', Object.keys(M.base).filter(k => M.base[k]).map(k => nat(+k).name).join(', ') || '—']]));
+  else mc.append(el('p', 'dim', 'Envie uma sonda para descobrir o que há lá.'));
+  top.append(mc);
+  const pc = el('div', 'card'); pc.append(el('h4', '', '🚀 Programa espacial · ' + rk), kv([['Centro de lançamento', launchOk(n) ? 'Sim' : 'Não', 'Construa um Centro de lançamento num estado' + (n.vert === 'space' ? ' (ou um Porto espacial)' : '')], ['Satélites', (n.sats || 0) + ' / 20', 'Cada satélite: pesquisa +1%, comércio +0,5%'], ['Em órbita no mundo', S.nations.reduce((a, x) => a + (x.sats || 0), 0) + '']]));
+  if (n.sproj) pc.append(el('div', 'gold', SPACE[n.sproj.k].n + ' · ' + n.sproj.m + ' meses'), bar(1 - n.sproj.m / n.sproj.tot));
+  const r = el('div', 'row'); Object.entries(SPACE).forEach(([k, d]) => r.append(btn(d.n + ' (💰' + spaceCost(k) + ')', () => { const e = spaceGo(n, k); msg.textContent = e; if (!e) refresh(); }, 'sm', canSpace(n, k), { sat: 'Pesquisa +1% e comércio +0,5%', probe: 'Revela a lua e se há vida', land: '+10 de estabilidade e glória', base: 'Pesquisa +5% e 2 de Hélio-3 por mês' }[k])));
+  pc.append(r, msg); top.append(pc); b.append(top);
+  if (known && M.life === 'intel') {
+    const cc = el('div', 'card'); cc.style.marginTop = '12px'; cc.append(el('h4', '', '👽 Civilizações de ' + M.n));
+    M.civs.forEach((c, i) => { const row = el('div', 'brow'); row.append(el('span', 'nm', c.n + ' · ' + ALIEN_ERAS[c.era] + (c.subj != null ? ' · subjugada por ' + nat(c.subj).name : c.aggro ? ' · agressiva' : ' · pacífica')), el('span', 'lv', 'rel ' + (c.rel[n.id] || 0)));
+      tip(row, 'Poder estimado: ' + c.pow + (c.aggro && c.era >= 4 ? '\nPode atacar bases lunares' + (c.era >= 7 ? ' e a Terra' : '') : '')); cc.append(row);
+      const rr = el('div', 'row'); [['gift', '🎁 Presente'], ['trade', '⚖️ Comércio'], ['war', '⚔️ Ofensiva']].forEach(([k, t]) => rr.append(btn(t, () => { const e = alienAct(n, i, k); msg.textContent = e; refresh(); }, 'sm', hasT(n, 'spc_contact') ? '' : 'Exige Protocolos de contato', { gift: '+25 de relação', trade: 'Pesquisa +5% (exige confiança)', war: 'Exige base lunar; se vencer, subjuga a civilização' }[k]))); cc.append(rr); });
+    b.append(cc);
+  }
+}
+
 /* editor de bandeira: partição, esmaltes, peça honrosa, móvel; aleatória infinita e SVG para baixar */
 function winFlag(b) {
   const n = me(); if (!UI.fdraft) UI.fdraft = JSON.parse(JSON.stringify(n.flag)); const f = UI.fdraft;
@@ -604,6 +659,7 @@ initRender(cv); menu(); requestAnimationFrame(loop);
   if (q.get('ctx')) { const p = provsOf(main.id).map(p => WD.provs[p].adj.find(o => S.own[o] >= 0 && S.own[o] !== main.id)).find(x => x != null); const [sx, sy] = toScreen(WD.provs[p].cx * K, WD.provs[p].cy * K); ctxMenu(sx, sy, p); }
   if (q.get('council')) councilPick('marshal', 'Marechal');
   if (q.get('setup')) { S.player = -1; show('setup'); R.view = -1; S.mapDirty = true; fitCam(); setupCard(main.id); drawModes($('#s-modes')); }
+  if (q.get('year')) { S.t = 360 * (+q.get('year') - START_YEAR); TECHS.forEach(t => { if (!t.v && t.y <= +q.get('year')) main.techs[t.id] = 1; }); main.money = 1e5; calcMods(main); econAll(); calcMods(main); if (q.get('moon')) { S.moon.known[main.id] = 1; S.moon.life = 'intel'; if (!S.moon.civs.length) S.moon.civs = [{ n: 'Xelari', era: 6, aggro: true, pow: 900, rel: {} }, { n: 'Oumu', era: 2, aggro: false, pow: 60, rel: {} }]; } drawTop(); if (UI.win) drawWin(); }
   if (q.get('scroll')) $('#win-b').scrollTop = 1e6;
   if (q.get('tip')) { const t = document.querySelector(q.get('tip')), r = t.getBoundingClientRect(); t.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })); document.dispatchEvent(new MouseEvent('mousemove', { clientX: r.left + 5, clientY: r.bottom - 5 })); }
   rebuildMap(); drawFrame(); drawMini(MINI);
