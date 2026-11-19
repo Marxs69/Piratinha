@@ -74,7 +74,7 @@ function ai(n) {
   }
   const rebP = Object.keys(S.rebels || {}).map(Number).filter(p => S.own[p] === n.id);
   if (rebP.length && !atWarN) myArmies.filter(a => !a.exp && !a.path.length && !rebP.includes(a.p) && regs(a) >= 3).slice(0, 2).forEach(a => { const o = WD.provs[a.p < WD.provs.length ? a.p : n.capital]; orderArmy(a, rebP.slice().sort((x, y) => Math.hypot(WD.provs[x].cx - o.cx, WD.provs[x].cy - o.cy) - Math.hypot(WD.provs[y].cx - o.cx, WD.provs[y].cy - o.cy))[0]); });
-  if (n.money < 0 && n.income < 0 && !atWarN && myArmies.length) { const a = myArmies[0]; UT.forEach(t => a[t] *= .85); }
+  if (n.money < 0 && n.income < 0 && !atWarN && myArmies.length) { const a = myArmies.filter(a => !a.exp).sort((x, y) => regs(y) - regs(x))[0]; if (a) { n.manpower += regs(a) * .15; UT.forEach(t => a[t] *= .85); a.max = regs(a); a.drill = false; } }   // em dívida: desmobiliza (os homens voltam à reserva e o exército não se refaz sozinho)
   aiRecruit(n, myArmies, myR, atWarN, P);
   mergeIdle(n.id);
   // frotas: exploração e transporte
@@ -108,7 +108,8 @@ function ai(n) {
 }
 
 /* ---------- IA militar: exércitos de campanha do tamanho da largura de combate, reunidos num depósito e distribuídos pelos fronts ---------- */
-const armyTarget = n => clamp(Math.round((WIDTH_BASE + n.fx.width) * 1.25), 6, 60);
+/* tamanho de um exército de campanha: pouco mais que a largura de combate, mas país pequeno não espera juntar o que não tem */
+const armyTarget = n => { const w = clamp(Math.round((WIDTH_BASE + n.fx.width) * 1.25), 6, 60), tot = S.armies.reduce((s, a) => s + (a.o === n.id && !a.exp ? regs(a) : 0), 0); return clamp(Math.min(w, tot * .5), 3, w); };
 /* depósito: onde recrutas se juntam antes de marchar (o front mais ameaçado; em paz, a fronteira mais perigosa; senão a capital) */
 function aiDepot(n) {
   const ok = p => S.own[p] === n.id && S.ctrl[p] === n.id;
@@ -150,7 +151,7 @@ function aiArmy(n, P, rebP) {
   for (const a of mine) if (slow && !armyBusy(a)) aiSupport(n, a, T);
   // exércitos pequenos não lutam sozinhos: vão ao depósito e se juntam
   const small = a => regs(a) < T * .35 && !armyBusy(a) && !(a.front != null && a.inBattle);
-  for (const a of mine) if (small(a) && !rebP.includes(a.p) && a.p !== depot && !(a.path.length && a.path[a.path.length - 1] === depot)) { a.front = null; orderArmy(a, depot); }
+  for (const a of mine) if (small(a) && !rebP.includes(a.p) && a.p !== depot && !(a.path.length && a.path[a.path.length - 1] === depot)) { a.front = null; orderArmy(a, depot, true); }
   // exércitos grandes demais para o suprimento se dividem
   for (const a of mine) if (!armyBusy(a) && !a.path.length && a.p < WD.provs.length && regs(a) > T * 1.8 && regs(a) > provSupply(a.p, n.id) * 1.3) {
     splitArmy(a, .5); }
@@ -167,7 +168,7 @@ function aiArmy(n, P, rebP) {
   // paz: tropas na fronteira mais perigosa (sem estourar o suprimento) e treinando se o caixa permitir
   const drill = n.money > 400 * eraScale() && n.income > 0;
   for (const a of field) { a.front = null; a.drill = drill; if (armyBusy(a) || a.path.length || rebP.includes(a.p)) continue;
-    if (a.p !== depot && chance(.15)) orderArmy(a, depot); a.st = 'bal'; }
+    if (a.p !== depot && chance(.15)) orderArmy(a, depot, true); a.st = 'bal'; }
 }
 /* guerra sem front (inimigo do outro lado do mar ou longe): marcha até a província inimiga alcançável mais próxima, ou invade por mar */
 function aiOverseas(n, field) {
@@ -177,7 +178,8 @@ function aiOverseas(n, field) {
     const pa = WD.provs[a.p], far = foes.flatMap(f => provsOf(f)).filter(p => n.exP[p]).sort((x, y) => Math.hypot(WD.provs[x].cx - pa.cx, WD.provs[x].cy - pa.cy) - Math.hypot(WD.provs[y].cx - pa.cx, WD.provs[y].cy - pa.cy)).slice(0, 4);
     if (far.some(p => orderArmy(a, p))) continue;
     if (n.invCd > S.t || regs(a) < armyTarget(n) * .5) continue;
-    const tgt = foes.flatMap(f => provsOf(f)).filter(p => n.exP[p] && WD.provs[p].coast && WD.provs[p].seas.some(z => n.exZ[z] && seaOk(n, z)))
+    const mine = armyPower(a) * Math.min(1, (S.fleets.filter(f => f.o === n.id && !f.inv).reduce((t, f) => t + fleetCap(f), 0) * .95) / Math.max(1, regs(a)));
+    const tgt = foes.flatMap(f => provsOf(f)).filter(p => n.exP[p] && WD.provs[p].coast && WD.provs[p].seas.some(z => n.exZ[z] && seaOk(n, z)) && foeNear(n.id, p) < mine * .6)   // só costa pouco defendida
       .sort((x, y) => (fortOf(x) - fortOf(y)) * 20 + Math.hypot(WD.provs[x].cx - pa.cx, WD.provs[x].cy - pa.cy) - Math.hypot(WD.provs[y].cx - pa.cx, WD.provs[y].cy - pa.cy))[0];
     const cap = S.fleets.filter(f => f.o === n.id && !f.inv && !carriedBy(f).length).reduce((t, f) => t + fleetCap(f), 0) * .95;
     let inv = a; if (tgt != null && cap < regs(a) && cap >= armyTarget(n) * .5 && a.p < WD.provs.length) {   // destacamento do tamanho que a frota leva

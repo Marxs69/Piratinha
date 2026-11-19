@@ -7,7 +7,7 @@ function canEnter(o, p) { if (!enterC) enterC = new Map(); let a = enterC.get(o)
 function canEnter0(o, p) { const ow = S.own[p], ct = S.ctrl[p]; return ow === o || ct === o || ow === -1 || atWar(o, ow) || atWar(o, ct); }
 /* caminho de um exército: só por terra, mais travessias de um único mar livre de inimigos (barcos locais, FERRY_DAYS).
    Mais de um mar exige invasão com frota (planInvasion). Sem exército (consultas), usa as mesmas regras. */
-function findPath(n, from, to, army) {
+function findPath(n, from, to, army, avoid) {
   const P = WD.provs.length; if (from >= P) return null;
   const dist = new Float32Array(P).fill(1e9), prev = new Int32Array(P).fill(-1), hp = new Heap(), fz = new Map();
   dist[from] = 0; hp.push(0, from);
@@ -17,9 +17,9 @@ function findPath(n, from, to, army) {
     const u = hp.pop(); if (u === to) break; const du = dist[u];
     const relax = (v, c) => { if (du + c < dist[v]) { dist[v] = du + c; prev[v] = u; hp.push(du + c, v); } };
     const pr = WD.provs[u];
-    for (const v of pr.adj) if (n.exP[v] && (v === to || canEnter(n.id, v))) relax(v, edgeDays(n, u, v) / speed);
+    for (const v of pr.adj) if (n.exP[v] && (v === to || canEnter(n.id, v)) && !(avoid && v !== to && avoid.has(v))) relax(v, edgeDays(n, u, v) / speed);
     if (ferry && pr.coast) for (const z of pr.seas) { if (!fz.has(z)) fz.set(z, canFerry(n, z)); if (!fz.get(z)) continue;
-      for (const v of WD.seas[z].provs) if (v !== u && n.exP[v] && !pr.adj.includes(v) && (v === to || canEnter(n.id, v))) relax(v, FERRY_DAYS); }
+      for (const v of WD.seas[z].provs) if (v !== u && n.exP[v] && !pr.adj.includes(v) && (v === to || canEnter(n.id, v)) && !(avoid && v !== to && avoid.has(v))) relax(v, FERRY_DAYS); }
   }
   if (dist[to] >= 1e9) return null;
   const path = []; for (let v = to; v !== from; v = prev[v]) path.unshift(v); return path;
@@ -37,7 +37,8 @@ function seaPath(n, from, to, blind) {                       // frotas: só por 
   while (hp.size) { const u = hp.pop(); if (u === to) break; for (const w of WD.seas[u].adj) { if (!(n.exZ[w] || w === to || blind) || !seaOk(n, w)) continue; const c = dist[u] + 5; if (c < dist[w]) { dist[w] = c; prev[w] = u; hp.push(c, w); } } }
   if (dist[to] >= 1e9) return null; const path = []; for (let v = to; v !== from; v = prev[v]) path.unshift(v); return path;
 }
-function orderArmy(a, to) { const n = nat(a.o); if (a.p === to) { a.path = []; return true; } const path = findPath(n, a.p, to, a); if (!path) return false; a.path = path; a.prog = 0; a.need = 0; a.retreat = false; return true; }
+/* safe: desvia de províncias onde o inimigo é mais forte que este exército (a IA usa; o jogador decide sozinho) */
+function orderArmy(a, to, safe) { const n = nat(a.o); if (a.p === to) { a.path = []; return true; } const path = findPath(n, a.p, to, a, safe ? dangerFor(a) : null); if (!path) return false; a.path = path; a.prog = 0; a.need = 0; a.retreat = false; return true; }
 function orderFleet(f, z) { const n = nat(f.o); const path = seaPath(n, f.z, z) || (seaExploreOk(n) ? seaPath(n, f.z, z, true) : null); if (!path) return false; f.path = path; f.prog = 0; f.need = 0; return true; }
 function explore(n, v) {
   const P = WD.provs.length;

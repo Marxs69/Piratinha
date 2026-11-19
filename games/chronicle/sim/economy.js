@@ -106,14 +106,14 @@ function econAll() {
       let x = w ? v / w : 1; if (nd.svc) x = x * .75 + .25 * Math.min(1, (cov.health + cov.edu) / 1.2 + .2); if (k === 'low' || k === 'mid') x *= 1 - Math.min(.3, (n.minC + n.minR) * .3); cs[k] = clamp(x, 0, 1); });
     n.csat = cs;
     const stabE = .55 + n.stab / 200, taxM = 1 + n.m.tax + Math.min(.3, mkts * .015);
-    const tax = gdp * ECON.taxBase * Math.max(.1, taxM) * stabE;
+    const taxR = ECON.taxBase * Math.max(.1, taxM) * stabE, tax = gdp * taxR, frT = Math.min(gdp, transport) * taxR;   // o frete é custo de quem produz: sai do PIB tributável, não do tesouro
     let upk = 0; S.armies.forEach(a => { if (a.o === n.id) upk += armyUpkeep(a); });
     upk *= eraScale() * .5;
     let navy = 0; S.fleets.forEach(f => { if (f.o === n.id) navy += f.ships * .6 * eraScale(); });
     const admin = (popT * .01 + provsOf(n.id).length * .05) * (1 - .3 * cov.adm), interest = n.money < 0 ? -n.money * .01 : 0, corrupt = n.money > 2000 ? (n.money - 2000) * .01 * (1 - .6 * cov.adm) : 0;
     const svcUp = svcLv * .5 * eraScale() * svcMul;
-    n.inc = { tax, trade: tradeInc, imports: -tradeCost, transport: -transport, army: -upk, navy: -navy, admin: -admin, svc: -svcUp, interest: -interest, corrupt: -corrupt };
-    n.income = tax + tradeInc - tradeCost - transport - upk - navy - admin - svcUp - interest - corrupt;
+    n.inc = { tax, trade: tradeInc, imports: -tradeCost, transport: -frT, army: -upk, navy: -navy, admin: -admin, svc: -svcUp, interest: -interest, corrupt: -corrupt };
+    n.income = tax + tradeInc - tradeCost - frT - upk - navy - admin - svcUp - interest - corrupt;
     n.money += n.income; n.gdp = gdp;
     if (n.money < -Math.max(400, gdp * 2)) {                   // falência: dívida perdoada, estabilidade despenca, metade do exército debanda
       n.money = 0; n.stab = Math.max(0, n.stab - 30); S.armies.forEach(a => { if (a.o === n.id) { a.inf /= 2; a.cav /= 2; a.art /= 2; a.vrt /= 2; } });

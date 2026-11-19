@@ -65,6 +65,7 @@ function invasionTick() {
     a.p = P + f.z;                                            // embarcado: anda com a frota
     if (I.st === 'sail' && f.z === I.z1 && !f.path.length && !zoneHostile(a.o, f.z)) {
       const def = S.armies.some(b => b.p === I.to && atWar(a.o, b.o));
+      if (a.o !== S.player && enemyPower(a.o).get(I.to) > armyPower(a) * .8) { I.st = 'back'; orderFleet(f, I.z0); continue; }   // a IA não desembarca em cima de um exército mais forte
       I.st = 'land'; I.t = S.t + Math.round((7 + (def ? 7 : 0)) * (a.sup && a.sup.eng ? .5 : 1));
     }
     if (I.st === 'land' && S.t >= I.t) {

@@ -115,7 +115,7 @@ function sideInfo(list, p, isDef) {
   const tot = { inf: 0, cav: 0, art: 0, vrt: 0 }; let regsT = 0, xp = 0, fat = 0, gen = null, big = list[0], has = {}, sat = 0, defW = 0, morW = 0;
   for (const a of list) { const r = regs(a), an = nat(a.o); UT.forEach(t => tot[t] += a[t]); regsT += r; xp += (a.xp || 0) * r; fat += (a.fat || 0) * r; sat += (an.tsat ? UT.reduce((s, t) => s + a[t] * (an.tsat[t] ?? 1), 0) : r) * (a.supOk === false ? .5 : 1);
     if (a.gen && (!gen || a.gen.st.mar > gen.st.mar)) gen = a.gen; if (r > regs(big)) big = a; for (const k in a.sup || {}) has[k] = 1;
-    UT.forEach(t => { defW += a[t] * unitStat(an, t, 'def'); morW += a[t] * unitStat(an, t, 'mor'); }); }
+    UT.forEach(t => { defW += a[t] * unitStat(an, t, 'def') * (an.up ? an.up[t] || 1 : 1); morW += a[t] * unitStat(an, t, 'mor'); }); }   // armadura e equipamento também protegem
   const R = Math.max(.01, regsT), W = Math.max(4, Math.round((WIDTH_BASE + (n.fx ? n.fx.width : 0)) * T.width));
   const fp = tot.inf + tot.cav + tot.vrt, k = fp > W ? W / fp : 1, eng = { inf: tot.inf * k, cav: tot.cav * k, vrt: tot.vrt * k, art: 0, artBack: 0 };
   const room = Math.max(0, W - fp * k); eng.art = Math.min(tot.art, room); eng.artBack = Math.min(tot.art - eng.art, W);
