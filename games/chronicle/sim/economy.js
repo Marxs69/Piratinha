@@ -224,7 +224,8 @@ function buySlot(n) { const c = slotCost(n); if (n.money < c) return 'Sem dinhei
 function build(n, s, b) { const e = canBuild(n, s, b); if (e) return e; n.money -= bCost(n, b); n.cons.push({ s, b, m: bMonths(b), tot: bMonths(b) }); return ''; }
 
 /* manutenção mensal de um exército: regimentos, companhias de apoio e treinamento */
-const armyUpkeep = a => (UT.reduce((s, t) => s + a[t] * UNIT_BASE[t].c, 0) * ECON.upkeep + Object.keys(a.sup || {}).reduce((s, k) => s + SUPPORT[k].up * eraScale(), 0)) * (drillOk(a) ? 1.5 : 1);
+const armyUpkeep = a => (nat(a.o).horde && curYear() <= nat(a.o).horde ? .15 : 1) * (   // hordas vivem de pilhagem
+  UT.reduce((s, t) => s + a[t] * UNIT_BASE[t].c, 0) * ECON.upkeep + Object.keys(a.sup || {}).reduce((s, k) => s + SUPPORT[k].up * eraScale(), 0)) * (drillOk(a) ? 1.5 : 1);
 const recCost = (n, type, k = 1) => Math.round(UNIT_BASE[type].c * 3 * eraScale() * k);
 function canRecruit(n, type, k = 1) {
   if (type === 'art' && !canArt(n)) return 'Exige Trabuco';

@@ -92,7 +92,8 @@ const MOD_SOURCES = [
     return [['Classes sociais', { research: mid * .8 * cs.mid, tax: mid * .5 * cs.mid + (cs.high - .7) * .1, coup: Math.max(0, 1 - cs.high) * 1.2 }]]; },
   n => (n.tmods || []).filter(x => x.u > S.t).map(x => ['Evento: ' + x.l, x.m]),
   n => faithMods(n),
-  n => courtMods(n),                                                                       // prestígio, conselho hostil e regência (sim/court.js)                                                                       // doutrina, fervor e excomunhão (sim/faith.js)          // modificadores temporários (EFF.mod)
+  n => courtMods(n),
+  n => coldMods(n),                                                                        // Guerra Fria (sim/history.js)                                                                       // prestígio, conselho hostil e regência (sim/court.js)                                                                       // doutrina, fervor e excomunhão (sim/faith.js)          // modificadores temporários (EFF.mod)
 ];
 const modList = n => MOD_SOURCES.flatMap(f => f(n)).filter(x => x[1]);
 /* de onde vem um modificador: [[rótulo, valor]] somando fontes com o mesmo rótulo */

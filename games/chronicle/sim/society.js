@@ -71,7 +71,7 @@ function slaveTick(n) {                                        // o estoque de e
   if (n.slv < target) n.slv += (target - n.slv) * .015; else n.slv -= (n.slv - target) * (L.sl ? .02 : .05);
   if (n.slv < .05) n.slv = 0;
 }
-const REVOLT = { slave: ['Revolta de escravos', '⛓️'], low: ['Revolta popular', '✊'], cul: ['Levante separatista', '🏴'] };
+const REVOLT = { slave: ['Revolta de escravos', '⛓️'], low: ['Revolta popular', '✊'], cul: ['Levante separatista', '🏴'], rev: ['Revolução liberal', '🗽'] };
 const slaveShare = n => (n.cls ? n.cls.slave : 0) / Math.max(1, n.popT || 0);
 function unrestTick(n) {
   const sl = slaveShare(n), cs = n.csat || {}, sec = (n.cov || {}).sec || 0, low = cs.low == null ? 1 : cs.low;
@@ -114,10 +114,14 @@ function rebelsWin(n, kind, ps) {
   else if (kind === 'low') {
     n.laws.tax = 'low'; const rg = Object.keys(GOVS).filter(g => GOVS[g].cat === 'Socialista' && govOk(n, g) && g !== n.gov);
     if (rg.length) { applyGov(n, pickR(rg)); succeed(n, false); txt = 'A revolução venceu em ' + natName(n) + '.'; } else { succeed(n, false); txt = 'A revolta popular derrubou o governo de ' + natName(n) + ' e baixou os impostos.'; }
+  } else if (kind === 'rev') {                                   // revolução liberal: república (ou monarquia constitucional) e ideologia liberal
+    const rg = ['presidential', 'parliamentary', 'federal', 'constitutional', 'parl_monarchy'].filter(g => GOVS[g] && govOk(n, g) && g !== n.gov);
+    if (rg.length) { applyGov(n, rg[0]); succeed(n, false); } if (n.fx.i.has('liberal')) n.ideo = 'liberal'; if (lawOk(n, 'vote', 'census')) n.laws.vote = 'census';
+    txt = 'A revolução venceu em ' + natName(n) + ': ' + GOVS[n.gov].n.toLowerCase() + '.';
   } else {
     const up = ['accepted', 'multi'].find(o => lawOk(n, 'culture', o) && n.laws.culture !== o);
     if (up) { n.laws.culture = up; txt = 'Os separatistas venceram em ' + natName(n) + ': a cidadania foi ampliada.'; }
-    else { ps.forEach(p => { S.own[p] = -1; }); txt = 'Os separatistas venceram: ' + ps.length + ' províncias deixaram ' + natName(n) + '.'; }
+    else { ps.forEach(p => delete S.rebels[p]); const m = spawnNation(ps, { cul: S.culg[ps[0]], from: n.id }); txt = 'Os separatistas venceram: ' + ps.length + ' províncias deixaram ' + natName(n) + ' e formaram ' + natName(m) + '.'; }
   }
   ps.forEach(p => { delete S.rebels[p]; if (S.own[p] >= 0) S.ctrl[p] = S.own[p]; else S.ctrl[p] = -1; });
   n.stab = Math.min(100, n.stab + 10); ownChanged(); checkDead(); calcMods(n);

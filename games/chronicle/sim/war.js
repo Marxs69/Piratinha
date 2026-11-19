@@ -165,6 +165,7 @@ function declareWar(n, t, s, cb) {                           // cb 'holy' = guer
   if (n.senior != null && !(n.subj && SUBJECTS[n.subj.tier].dip)) return 'Súdito sem diplomacia própria não declara guerras';
   if (t.id === n.senior || t.senior === n.id) return 'É seu suserano ou súdito';
   if ((n.allies || []).includes(t.id)) return 'Rompa a aliança antes';
+  if (coldBlocked(n.id, t.id)) return 'Guerra Fria: as superpotências não se enfrentam diretamente';
   if (cb === 'holy') { const e = holyWhy(n, t); if (e) return e; }
   const claim = (s != null && n.claims[s]) || cb === 'holy';
   const w = { id: S.id++, A: [n.id], D: [t.id], a: n.id, d: t.id, goal: s, start: S.t, loss: {}, bp: {}, score: 0, holy: cb === 'holy' ? n.relig : null };

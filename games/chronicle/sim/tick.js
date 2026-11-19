@@ -71,7 +71,7 @@ function warsTick() { S.wars.slice().forEach(w => { w.score = warScore(w); aiPea
 function yearTick() { if (S.t % 360 === 0) { relDrift(); religTick(); } }
 function endCheck() { if (curYear() >= END_YEAR && !S.over) { S.over = 'end'; log('O ano ' + END_YEAR + ' chegou. A crônica termina.', 'world'); } }
 /* o mundo, todo mês */
-const WORLD_MONTH = [plagueTick, alienTick, nanGuard, econAll, reparationsTick, subjectsTick, faithTick, mineStates, nationsMonth, rebelTick, generalsDie, attritionTick, reinforce, capitalOccupied, popTick, colonyTick, warsTick, yearTick, endCheck];
+const WORLD_MONTH = [plagueTick, alienTick, nanGuard, econAll, reparationsTick, subjectsTick, faithTick, histTick, mineStates, nationsMonth, rebelTick, generalsDie, attritionTick, reinforce, capitalOccupied, popTick, colonyTick, warsTick, yearTick, endCheck];
 function monthTick() { for (const f of WORLD_MONTH) f(); }
 
 /* fatores da estabilidade (alvo para onde ela anda até 2 pontos por mês) */

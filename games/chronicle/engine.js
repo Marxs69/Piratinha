@@ -38,6 +38,7 @@ const COND = {
   flag:    { ok: (n, v) => !!(n.flags || {})[v], txt: v => 'Marca: ' + v },
   noFlag:  { ok: (n, v) => !(n.flags || {})[v], txt: v => 'Sem a marca: ' + v },
   succ:    { ok: (n, v) => arr(v).includes(GOVS[n.gov].succ), txt: v => arr(v).includes('hered') ? 'Monarquia hereditária' : 'Sucessão: ' + arr(v).join(', ') },
+  heirAge: { ok: (n, v) => { const k = (n.kids || []).slice().sort((a, b) => a.born - b.born)[0]; return !!k && inR(ageOf(k), v); }, txt: v => rTxt('Idade do herdeiro', v) },
   govOld:  { ok: (n, v) => (govAge(n) > 0) === v, txt: v => v ? 'Governo ultrapassado' : 'Governo atual' },
   press:   { ok: (n, v) => inR(n.press || 0, v), txt: v => rTxt('Pressão do conselho', v) },
   any:     { ok: (n, v) => v.some(c => condOk(n, c)), txt: v => 'Uma destas: ' + v.map(c => condTxt(c).join(', ')).join(' | '), sub: v => v },
@@ -77,6 +78,7 @@ const EFF = {
   unflag:   { do: (n, v) => { if (n.flags) delete n.flags[v]; }, txt: () => '' },
   /* cadeia: agenda outro evento para este país daqui a 'mo' meses */
   chain:    { do: (n, v) => { (n.evNext = n.evNext || []).push({ id: v.id, t: S.t + (v.mo || 1) * 30 }); }, txt: () => '', ids: v => [['EVENT', v.id]] },
+  revolt:   { do: (n, v) => revolt(n, v), txt: v => '✊ ' + REVOLT[v][0] },
   govNext:  { do: n => { const g = govNextOf(n); if (g && g !== n.gov) { applyGov(n, g); if (GOVS[g].succ !== 'hered') succeed(n, false); } }, txt: () => 'Reforma o governo para a forma seguinte' },
   /* conselho: concede = atende a exigência mais pesada; purge = troca o conselheiro mais exigente */
   council:  { do: (n, v) => { const d = demandsOf(n).filter(x => x.slot !== 'ruler').sort((a, b) => b.w - a.w);

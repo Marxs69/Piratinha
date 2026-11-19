@@ -82,7 +82,7 @@ const inSupply = a => a.p >= WD.provs.length || supplyDist(a.o)[a.p] <= logiRang
 function provSupply(p, o) {
   const pr = WD.provs[p], n = nat(o), fr = friendsOf(o), ct = S.ctrl[p];
   const rel = S.own[p] === -1 ? .35 : fr.has(ct) ? (fr.has(S.own[p]) ? 1.5 : 1) : .6;   // em casa há depósitos; em terra ocupada, pilhagem; em terra sem dono, quase nada
-  return (6 + S.pop[p] / 6) * TERRAIN[pr.terr].sup * (1 + (S.stSpd ? S.stSpd[pr.state] : 0) * .5) * (1 + .15 * (n.fx ? n.fx.logi : 0)) * rel;
+  return (n.horde && curYear() <= n.horde ? 2 : 1) * (6 + S.pop[p] / 6) * TERRAIN[pr.terr].sup * (1 + (S.stSpd ? S.stSpd[pr.state] : 0) * .5) * (1 + .15 * (n.fx ? n.fx.logi : 0)) * rel;
 }
 /* atrito mensal de um exército (fração dos homens) e o porquê */
 function attritionOf(a) {
@@ -97,6 +97,7 @@ function attritionOf(a) {
   if (!a.exp && S.own[a.p] === -1) { x += .005; why.push('Terra sem dono'); }
   const le = diseaseLe(a.p); if (le) { x += le * 1.5 * (a.sup && a.sup.med ? .5 : 1); why.push('Doença'); }
   const s = a.sup || {}; x *= (s.med ? .7 : 1) * (s.recon ? .9 : 1) * (s.eng ? .9 : 1);
+  if (n.horde && curYear() <= n.horde) { x *= .25; if (x) why.push('Horda: vive da terra (atrito ×0,25)'); }
   return [x, why];
 }
 function attritionTick() {

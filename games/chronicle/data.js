@@ -715,6 +715,24 @@ const SUBJ_LAWS = {
   rule:    { n: 'Governo', o: { self: { n: 'Autogoverno', lib: -10, int: .5 }, advisors: { n: 'Conselheiros do suserano', lib: 0, int: 1 }, governor: { n: 'Governador nomeado', lib: 12, int: 2 } } },
 };
 const SUBJ_LAW_DEF = { tribute: 'normal', army: 'own', rule: 'advisors' };
+/* ---------- história: grandes acontecimentos em janelas de época (podem não acontecer se faltar condição) ----------
+   invasões: surgem como países novos com exército grande. from: 'cold' = costa do continente frio; 'edge' = ponta leste do continente principal.
+   army = múltiplo da força do vizinho mais forte; cav = parte de cavalaria; years = anos de fúria (IA agressiva) */
+const INVASIONS = [
+  { id: 'vikings', n: 'Grande Exército', y: [860, 920], from: 'cold', cul: 2, relig: 'norse', gov: 'tribal', army: 1.6, min: 22, cav: .1, ships: 1, years: 30, e: '🪓',
+    m: 'Os chefes do norte uniram-se num Grande Exército e cruzam o mar atrás de terras e ouro.' },
+  { id: 'magyars', n: 'Federação das Estepes', y: [895, 960], from: 'edge', cul: 18, relig: 'tengri', gov: 'horde', army: 1.8, min: 25, cav: .7, years: 40, e: '🏹',
+    m: 'Cavaleiros das estepes atravessaram a fronteira leste. Saqueiam tudo o que alcançam.' },
+  { id: 'mongols', n: 'Grande Horda', y: [1206, 1260], from: 'edge', cul: 18, relig: 'tengri', gov: 'horde', army: 3.5, min: 40, cav: .8, years: 60, e: '🐎',
+    m: 'Um grande cã uniu as tribos das estepes. Sua horda avança como uma tempestade.' },
+];
+/* ondas e guerras do mundo */
+const WORLD_EVENTS = {
+  revolutions: { n: 'Era das Revoluções', y: [1789, 1850], e: '🗽' },
+  greatwar:    { n: 'Grande Guerra', y: [1905, 1925], e: '💥' },
+  worldwar:    { n: 'Segunda Guerra Mundial', y: [1933, 1948], e: '☢️' },
+  coldwar:     { n: 'Guerra Fria', y: [1946, 1995], e: '🧊' },
+};
 /* ---------- corte ----------
    nomes dos cargos mudam com a era e o tipo de governo: [condição (cat = grupos de governo, y = a partir do ano), nome]; vale o último que servir */
 const ROLE_NAMES = {
