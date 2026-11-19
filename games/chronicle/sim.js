@@ -38,7 +38,7 @@ function hsl(h, s, l) { const a = s * Math.min(l, 1 - l), f = k => { const x = (
 function newGame(seed) {
   WD = generateWorld(seed); ownCache = null; warSet = null;
   const P = WD.provs.length, r = mkRng(seed ^ 0x5eed);
-  S = { v: 1, seed, t: 0, player: -1, nations: [], own: new Int16Array(P).fill(-1), ctrl: new Int16Array(P).fill(-1), pop: new Float32Array(P), bld: WD.states.map(() => ({})),
+  S = { v: 2, seed, t: 0, player: -1, nations: [], own: new Int16Array(P).fill(-1), ctrl: new Int16Array(P).fill(-1), pop: new Float32Array(P), bld: WD.states.map(() => ({})),
         armies: [], fleets: [], wars: [], cols: [], sieges: {}, log: [], news: [], id: 1, wp: {}, over: false };
   GOOD_IDS.forEach(g => S.wp[g] = GOODS[g].p);
   const stAdj = WD.states.map(() => new Set());
@@ -48,8 +48,8 @@ function newGame(seed) {
     const id = S.nations.length, name = nameGen(CULTURES[cul], r, usedN);
     const h = (hueBase + id * .618034) % 1, col = hsl(h, .4 + r() * .3, .42 + r() * .16);
     const n = { id, name, cul, home, kind, col, flag: flagRandom(r), gov: 'feudal', ideo: 'trad', money: 120, stab: 55, manpower: 5, techs: {}, res: null, rp: 0, vert: null, vlv: 0,
-                alive: true, claims: {}, truce: {}, rel: {}, cons: [], rec: [], fab: null, wex: 0, mk: { sup: {}, dem: {}, sat: {}, imp: {}, exp: {} }, inc: {}, exP: new Uint8Array(P), exZ: new Uint8Array(WD.seas.length), capital: -1 };
-    n.dyn = newDynasty(n); S.nations.push(n); return n;
+                alive: true, claims: {}, truce: {}, rel: {}, allies: [], marr: [], trade: [], emb: [], cd: {}, cons: [], rec: [], fab: null, wex: 0, mk: { sup: {}, dem: {}, sat: {}, imp: {}, exp: {} }, inc: {}, exP: new Uint8Array(P), exZ: new Uint8Array(WD.seas.length), capital: -1 };
+    n.dyn = newDynasty(n); n.vpref = r() < .6 ? null : VERTS[r() * VERTS.length | 0].id; S.nations.push(n); return n;
   };
   const grantTechs = (n, maxY, extra = []) => TECHS.forEach(t => { if (t.c !== 'vert' && t.y <= maxY && t.req.every(q => n.techs[q])) n.techs[t.id] = 1; extra.forEach(e => n.techs[e] = 1); });
   // continentes: o principal é todo dividido; o frio tem nórdicos; os outros têm tribos e muita terra livre
@@ -99,7 +99,7 @@ function newGame(seed) {
     const pop = provsOf(n.id).reduce((a, p) => a + S.pop[p], 0);
     const regs = Math.max(2, Math.round(pop * (n.kind === 'cold' ? .012 : .005)));
     addArmy(n.id, n.capital, { inf: Math.ceil(regs * .75), cav: Math.floor(regs * .25) });
-    n.manpower = pop * .01;
+    n.manpower = pop * .01; n.mpMax = pop * .03;
     const coastal = provsOf(n.id).find(p => WD.provs[p].coast);
     if (n.techs.nav_longship && coastal != null) addFleet(n.id, WD.provs[coastal].seas[0], n.kind === 'cold' ? 10 : n.kind === 'main' ? 3 : 2);
     initExplore(n);
@@ -125,9 +125,9 @@ function ownChanged() { ownCache = null; S.mapDirty = true; }
 const hasTech = (n, id) => !!n.techs[id];
 let warSet = null;                                          // pares em guerra (refeito quando guerras começam ou acabam)
 const warsChanged = () => { warSet = null; };
-const atWar = (a, b) => { if (a === b || a < 0 || b < 0) return false; if (!warSet) { warSet = new Set(); S.wars.forEach(w => { warSet.add(w.a * 4096 + w.d); warSet.add(w.d * 4096 + w.a); }); } return warSet.has(a * 4096 + b); };
-const warsOf = id => S.wars.filter(w => w.a === id || w.d === id);
-const enemiesOf = id => warsOf(id).map(w => w.a === id ? w.d : w.a);
+const atWar = (a, b) => { if (a === b || a < 0 || b < 0) return false; if (!warSet) { warSet = new Set(); S.wars.forEach(w => w.A.forEach(x => w.D.forEach(y => { warSet.add(x * 4096 + y); warSet.add(y * 4096 + x); }))); } return warSet.has(a * 4096 + b); };
+const warsOf = id => S.wars.filter(w => w.A.includes(id) || w.D.includes(id));
+const enemiesOf = id => [...new Set(warsOf(id).flatMap(w => w.A.includes(id) ? w.D : w.A))];
 const regs = a => a.inf + a.cav + a.art + a.vrt;
 function stateOwnerOf(s) { return S.own[WD.states[s].cap]; }
 function fortOf(p) {
@@ -136,7 +136,9 @@ function fortOf(p) {
   if (o >= 0 && nat(o).capital === p) f += 1;
   return f;
 }
-const techCount = n => Object.keys(n.techs).length;
+const hasT = (n, id) => n.eff ? n.eff.has(id) : !!n.techs[id];     // pesquisada direto ou trazida pela árvore da vertente
+const techCount = n => n.eff ? n.eff.size : Object.keys(n.techs).length;
+const vertLen = v => VERT[v].len;
 
 /* ---------- modificadores ---------- */
 function calcMods(n) {
@@ -144,27 +146,31 @@ function calcMods(n) {
   const add = o => { for (const k in o) m[k] = (m[k] || 0) + o[k]; };
   add(GOVS[n.gov].m); add(IDEOS[n.ideo].m);
   const fx = { sea: 0, col: 0, fort: 0, slots: 1, ship: 1, bo: {}, up: { inf: 1, cav: 1, art: 1, siege: 1 }, b: new Set(Object.keys(BUILDINGS).filter(b => !BUILDINGS[b].tech && !BUILDINGS[b].vert)), g: new Set(), i: new Set(['trad', 'warrior']) };
-  for (const id in n.techs) {
+  const eff = new Set(Object.keys(n.techs)); let vl = 0;
+  for (const id in n.techs) { const t = TECH[id]; if (t && t.v) { vl++; (t.src || []).forEach(x => eff.add(x)); } }
+  n.eff = eff; n.vlv = vl;
+  for (const id of eff) {
     const t = TECH[id]; if (!t) continue; const f = t.fx;
     if (f.m) add(f.m); if (f.sea) fx.sea = Math.max(fx.sea, f.sea); if (f.col) fx.col += f.col; if (f.fort) fx.fort += f.fort; if (f.slots) fx.slots += f.slots; if (f.ship) fx.ship += f.ship;
     if (f.bo) for (const k in f.bo) fx.bo[k] = (fx.bo[k] || 0) + f.bo[k]; if (f.u) for (const k in f.u) fx.up[k] = (fx.up[k] || 0) + f.u[k];
     (f.b || []).forEach(b => fx.b.add(b)); (f.g || []).forEach(g => fx.g.add(g)); (f.i || []).forEach(i => fx.i.add(i));
   }
-  if (n.vert) { const v = VERT[n.vert]; for (const k in v.m) m[k] += v.m[k] * n.vlv * (.5 + .5 * (n.vsat == null ? 1 : n.vsat)); }
+  if (n.vert) { const v = VERT[n.vert]; for (const k in v.m) m[k] += v.m[k] * n.vlv / v.len * (.5 + .5 * (n.vsat == null ? 1 : n.vsat)); }
   [n.ruler, ...Object.values(n.council || {})].forEach(c => c && c.tr.forEach(t => TRAITS[t] && add(TRAITS[t].m)));
   const R = n.ruler, C = n.council || {};
   if (R) { m.tax += (R.st.adm - 8) * .008; m.research += (R.st.lea - 8) * .008; m.army += (R.st.mar - 8) * .008; m.stab += (R.st.dip - 8) * .004; }
   if (C.steward) m.tax += (C.steward.st.adm - 8) * .006; if (C.scholar) m.research += (C.scholar.st.lea - 8) * .006; if (C.marshal) m.army += (C.marshal.st.mar - 8) * .006; if (C.chancellor) m.stab += (C.chancellor.st.dip - 8) * .003;
-  if (C.spymaster) m.coup -= (C.spymaster.st.int - 8) * .04;
+  if (C.spymaster) m.coup -= (C.spymaster.st.int - 8) * .04; if (R) m.coup -= (R.st.int - 8) * .02;
   const nP = provsOf(n.id).length; if (GOVS[n.gov].minProv && nP < GOVS[n.gov].minProv) m.stab -= .1;
   n.m = m; n.fx = fx;
-  const up = fx.up; n.up = { inf: up.inf, cav: up.cav, art: up.art, siege: up.siege, vrt: n.vert ? (up.inf * (1.5 + .35 * n.vlv)) * (.5 + .5 * (n.vsat == null ? 1 : n.vsat)) : 0 };
+  const up = fx.up; n.up = { inf: up.inf, cav: up.cav, art: up.art, siege: up.siege, vrt: n.vert ? (up.inf * (1.5 + 1.75 * n.vlv / VERT[n.vert].len)) * (.5 + .5 * (n.vsat == null ? 1 : n.vsat)) : 0 };
 }
 function unitName(n, type) {
-  if (type === 'vrt') return n.vert ? VERT[n.vert].unit[Math.max(0, n.vlv - 1)] : '—';
-  let nm = UNITS[type][0][1]; for (const [t, x] of UNITS[type]) if (n.techs[t]) nm = x; return nm;
+  if (type === 'vrt') { if (!n.vert) return '—'; const v = VERT[n.vert]; return v.unit[Math.min(v.unit.length - 1, Math.floor((n.vlv - 1) / v.len * v.unit.length))]; }
+  let nm = UNITS[type][0][1]; for (const [t, x] of UNITS[type]) if (hasT(n, t)) nm = x; return nm;
 }
-const canArt = n => n.techs.mil_trebuchet;
+function shipName(n) { let nm = SHIPS[0][1]; for (const [t, x] of SHIPS) if (hasT(n, t)) nm = x; if (n.vert && n.vlv > 2) nm += ' (' + VERT[n.vert].n + ')'; return nm; }
+const canArt = n => hasT(n, 'mil_trebuchet');
 
 /* ---------- economia ---------- */
 function econAll() {
@@ -173,7 +179,7 @@ function econAll() {
   // população controlada por nação e por estado
   const statePop = new Map(), natStates = S.nations.map(() => new Set());
   for (let p = 0; p < S.own.length; p++) { const o = S.own[p]; if (o < 0 || S.ctrl[p] !== o) continue; const st = WD.provs[p].state, k = st * 1000 + o; statePop.set(k, (statePop.get(k) || 0) + S.pop[p]); natStates[o].add(st); }
-  if (!WD.states[0].fert) WD.states.forEach(st => { st.fert = st.provs.reduce((a, p) => a + TERRAIN[WD.provs[p].terr].food, 0) / st.provs.length; });
+  if (!WD.states[0].fert) WD.states.forEach(st => { st.fert = st.provs.reduce((a, p) => a + TERRAIN[WD.provs[p].terr].food, 0) / st.provs.length; st.capK = st.provs.reduce((a, p) => a + WD.provs[p].size * TERRAIN[WD.provs[p].terr].pop * 4, 0) + 3; });
   S.nations.forEach(n => {
     if (!n.alive) return;
     const sup = {}, dem = {}; GOOD_IDS.forEach(g => { sup[g] = 0; dem[g] = 0; });
@@ -201,7 +207,8 @@ function econAll() {
       employedT += used;
       // subsistência dos não empregados (grãos e um pouco de bens)
       const fertS = st.fert;
-      sup.grain += (sp - used * .6) * (.72 + .4 * fertS) * (1 + n.m.food * .5);   // quem trabalha nos prédios ainda planta um pouco
+      const roomy = clamp(1.35 - sp / st.capK * .6, .92, 1.35);   // terra pouco povoada rende mais comida por pessoa
+      sup.grain += (sp - used * .6) * (.72 + .4 * fertS) * roomy * (1 + n.m.food * .5);   // quem trabalha nos prédios ainda planta um pouco
       if (st.coast) sup.fish += (sp - used) * .08;
       sup.wood += (sp - used) * .02; sup.goods += (sp - used) * .012; sup.cloth += (sp - used) * .034; sup.fiber += (sp - used) * .01;
     });
@@ -210,9 +217,10 @@ function econAll() {
     const fs = sup.grain + sup.fish || 1; dem.grain += food * Math.max(.3, sup.grain / fs); dem.fish += food * Math.min(.7, sup.fish / fs);
     let R = { inf: 0, cav: 0, art: 0, vrt: 0 }; S.armies.forEach(a => { if (a.o === n.id) { R.inf += a.inf; R.cav += a.cav; R.art += a.art; R.vrt += a.vrt; } });
     const totR = R.inf + R.cav + R.art + R.vrt;
-    if (n.techs.mil_crossbow) dem.arms += totR * .03; if (n.techs.mil_tank) dem.oil += R.cav * .15; if (n.vert) dem[VERT[n.vert].good] += R.vrt * .25 + provsOf(n.id).length * .01 * n.vlv;
+    if (hasT(n, 'mil_crossbow')) dem.arms += totR * .03; if (hasT(n, 'mil_tank')) dem.oil += R.cav * .15; if (n.vert) dem[VERT[n.vert].good] += R.vrt * .25 + provsOf(n.id).length * .01 * n.vlv;
     // comércio com o mercado mundial: exporta o excedente; importa o que falta dentro de um orçamento, comida primeiro
-    const eff = clamp(.35 + Math.min(5, ports) * .08 + n.m.trade, .15, 1.3);
+    const embs = S.nations.filter(o => o.alive && (o.emb || []).includes(n.id)).length;
+    const eff = clamp(.35 + Math.min(5, ports) * .08 + n.m.trade + Math.min(.3, (n.trade || []).length * .07) - Math.min(.4, embs * .08), .1, 1.4);
     let tradeInc = 0, tradeCost = 0;
     GOOD_IDS.forEach(g => { const net = sup[g] - dem[g]; n.mk.imp[g] = 0; n.mk.exp[g] = 0; if (net > 0) { const exp = net * Math.min(1, eff); n.mk.exp[g] = exp; tradeInc += exp * S.wp[g] * .55; } gdp += sup[g] * S.wp[g]; wsup[g] += sup[g]; wdem[g] += dem[g]; });
     let budget = Math.max(0, gdp * ECON.taxBase * .35 + tradeInc * .8 + Math.max(0, n.money) * .03);
@@ -284,19 +292,24 @@ function addFleet(o, z, ships) { const f = { id: S.id++, o, z, ships, path: [], 
 
 /* ---------- pesquisa ---------- */
 const techBase = y => 140 * Math.exp((y - 860) / 250);
-function techCost(n, t) { const ahead = Math.max(0, t.y - curYear()); return Math.round(techBase(t.y) * (1 + ahead * .03) * (t.c === 'vert' ? 1.3 : 1)); }
+function techCost(n, t) {
+  if (t.cb == null) t.cb = t.vt && t.src.length ? t.src.reduce((a, x) => a + techBase(TECH[x].y), 0) * .8 + techBase(t.y) * .3 : techBase(t.y) * (t.entry ? 1.2 : 1);
+  const ahead = Math.max(0, t.y - curYear()); return Math.round(t.cb * (1 + ahead * .03));
+}
 function techState(n, t) {                                  // '' = pode pesquisar
   if (n.techs[t.id]) return 'done';
-  if (!t.req.every(q => n.techs[q])) return 'Exige tecnologias anteriores';
+  if (t.v) { if (n.vert && n.vert !== t.v) return 'Outra vertente escolhida'; if (t.vt && n.vert !== t.v) return 'Exige escolher ' + VERT[t.v].n; }
+  else if (n.vert && t.c !== 'soc' && t.y > VERT[n.vert].entry.y) return 'Substituída pela árvore ' + VERT[n.vert].n;
+  if (!t.req.every(q => hasT(n, q))) return 'Exige tecnologias anteriores';
   const ahead = t.y - curYear();
-  if (t.c === 'vert') { if (n.vert && n.vert !== t.v) return 'Outra vertente escolhida'; if (ahead > 10) return 'Só a partir de ' + (t.y - 10); }
-  else if (ahead > 100) return 'Só a partir de ' + (t.y - 100);
+  if (t.entry && ahead > 20) return 'Só a partir de ' + (t.y - 20);
+  if (ahead > (t.vt ? 60 : 100)) return 'Só a partir de ' + (t.y - (t.vt ? 60 : 100));
   return '';
 }
 function researchRate(n) { return (2 + (n.popT || 0) * .004 + (n.univ || 0) * 2.5) * Math.max(.2, 1 + n.m.research) * (.6 + n.stab / 250) * (1 + techCount(n) * .012); }
 function finishTech(n, t) {
   n.techs[t.id] = 1;
-  if (t.c === 'vert') { n.vert = t.v; n.vlv = Math.max(n.vlv, t.lv); if (t.lv === 1) log(natName(n) + ' abraçou a vertente ' + VERT[t.v].n + '.', n.id === S.player ? 'good' : 'world', [n.id]); }
+  if (t.entry) { n.vert = t.v; log(natName(n) + ' abraçou a vertente ' + VERT[t.v].n + '.', n.id === S.player ? 'good' : 'world', [n.id]); }
   calcMods(n);
   if (n.id === S.player) log('Pesquisa concluída: ' + t.n + '.', 'good', [n.id]);
 }
@@ -304,6 +317,7 @@ function finishTech(n, t) {
 /* ---------- personagens: morte, sucessão, eleições e golpes ---------- */
 function charMonthly(n) {
   const g = GOVS[n.gov], R = n.ruler, y = curYear();
+  if (n.senior != null) { const s = nat(n.senior); if (s.alive && GOVS[s.gov].succ === 'hered') { n.ruler = s.ruler; n.dyn = s.dyn; return; } delete n.senior; succeed(n, false); return; }
   if (g.succ === 'ai') return;
   const age = ageOf(R), die = R.tr.reduce((a, t) => a * (TRAITS[t].die || 1), 1);
   const pDie = (age < 40 ? .0006 : .0006 * Math.exp((age - 40) / 9)) * die * (y > 1900 ? .5 : 1) * (y > 2050 ? .4 : 1);
@@ -312,13 +326,14 @@ function charMonthly(n) {
   if (g.succ === 'hered' && n.spouse && n.kids && S.t % 360 === 0 && age < 50 && ageOf(n.spouse) < 45 && chance(.22)) { const k = mkChar(n, { age: 0 }); n.kids.push(k); if (n.id === S.player) log('Nasceu ' + k.n + ', filho do governante.', 'good', [n.id]); }
   // golpe
   const risk = g.coup * .0012 * (n.stab < 40 ? 1 + (40 - n.stab) / 8 : .35) * Math.max(.1, 1 + (n.m.coup || 0));
-  if (chance(risk)) coup(n);
+  if (!(n.coupCd > S.t) && chance(risk)) coup(n);
 }
 function succeed(n, death) {
   const g = GOVS[n.gov], old = n.ruler;
   if (g.succ === 'hered') {
     const heirs = (n.kids || []).filter(k => ageOf(k) >= 0).sort((a, b) => a.born - b.born);
     if (heirs.length) { n.ruler = heirs[0]; n.kids = heirs.slice(1); n.spouse = ageOf(n.ruler) >= 16 ? mkChar(n, { f: !n.ruler.f, dyn: newDynasty(n), age: ageOf(n.ruler) }) : null; if (ageOf(n.ruler) < 16) { n.stab -= 8; log('Regência em ' + natName(n) + ': ' + charName(n.ruler) + ' tem só ' + ageOf(n.ruler) + ' anos.', 'info', [n.id]); } }
+    else if (tryUnion(n)) { calcMods(n); return; }
     else { n.ruler = mkChar(n, { ruler: true }); n.spouse = mkChar(n, { f: !n.ruler.f, dyn: newDynasty(n), age: ageOf(n.ruler) - 2 }); n.kids = []; n.stab -= 15; log('Crise de sucessão em ' + natName(n) + ': um parente distante assume.', n.id === S.player ? 'bad' : 'info', [n.id]); }
   } else {
     n.dyn = newDynasty(n); n.ruler = mkChar(n, { ruler: true, age: g.succ === 'theo' ? 50 + (Math.random() * 20 | 0) : undefined, boost: g.succ === 'junta' ? 'mar' : null });
@@ -332,16 +347,19 @@ function coup(n) {
   const g = GOVS[n.gov], y = curYear(), juntaOk = y >= 1500;
   n.dyn = newDynasty(n); n.ruler = mkChar(n, { ruler: true, boost: 'mar' }); n.ruler.tr = ['ambitious', pickR(['cruel', 'strategist', 'charismatic', 'paranoid'])];
   if (['Monarquia', 'República', 'Tribal'].includes(g.cat) && chance(.45)) { n.gov = juntaOk ? pickR(['junta', 'caudillo']) : (g.cat === 'Tribal' ? 'tribal' : 'feudal'); if (y > 1800 && chance(.4)) n.ideo = pickR(['natpop', 'warrior'].filter(i => i === 'warrior' || n.fx.i.has(i))); }
-  n.kids = []; n.spouse = null; n.stab = Math.max(0, n.stab - 20);
+  n.kids = []; n.spouse = null; n.stab = Math.max(20, n.stab - 15); n.coupCd = S.t + 360 * 10;
   log('Golpe em ' + natName(n) + '! ' + charName(n.ruler) + ' tomou o poder.', n.id === S.player ? 'bad' : 'world', [n.id]);
   calcMods(n);
 }
+const BASE_GOVS = ['tribal', 'tribal_conf', 'horde', 'feudal', 'elective', 'empire'];
+const govOk = (n, g) => n.fx.g.has(g) || BASE_GOVS.includes(g);
 function setGov(n, g) {
-  const ok = n.fx.g.has(g) || ['tribal', 'tribal_conf', 'horde', 'feudal', 'elective'].includes(g);
+  const ok = govOk(n, g);
   if (!ok) return 'Exige tecnologia'; if (GOVS[g].minProv && provsOf(n.id).length < GOVS[g].minProv) return 'Exige ' + GOVS[g].minProv + ' províncias';
   const c = Math.round(80 * eraScale()); if (n.money < c) return 'Sem dinheiro'; if (n.govCd > S.t) return 'Reforma recente';
   const sameCat = GOVS[g].cat === GOVS[n.gov].cat;
   n.money -= c; n.gov = g; n.stab = Math.max(0, n.stab - (sameCat ? 10 : 25)); n.govCd = S.t + 360 * 10;
+  if (GOVS[g].succ !== 'hered') { n.marr = []; S.nations.forEach(j => { if (j.senior === n.id) { delete j.senior; succeed(j, false); log(j.name + ' deixou a união pessoal.', 'world', [j.id, n.id]); } }); }
   if (GOVS[g].succ !== 'hered') { n.kids = []; n.spouse = null; succeed(n, false); }
   else if (!n.kids) { n.kids = []; n.spouse = mkChar(n, { f: !n.ruler.f, dyn: newDynasty(n) }); }
   calcMods(n); return '';
@@ -350,10 +368,12 @@ function setIdeo(n, i) {
   if (!n.fx.i.has(i)) return 'Exige tecnologia'; if (n.ideoCd > S.t) return 'Mudança recente';
   n.ideo = i; n.stab = Math.max(0, n.stab - 12); n.ideoCd = S.t + 360 * 5; calcMods(n); return '';
 }
-function swapCouncil(n, k) {
-  const c = Math.round(25 * eraScale()); if (n.money < c) return 'Sem dinheiro'; n.money -= c;
-  const s = COUNCIL.find(x => x[0] === k)[2]; n.council[k] = mkChar(n, { boost: s, dyn: newDynasty(n) }); calcMods(n); return '';
-}
+const councilCost = () => Math.round(25 * eraScale());
+function councilCands(n, k) { const s = COUNCIL.find(x => x[0] === k)[2]; return [0, 1, 2].map(() => mkChar(n, { boost: s, dyn: newDynasty(n) })); }
+function swapCouncil(n, k, c) { const cost = councilCost(); if (n.money < cost) return 'Sem dinheiro'; n.money -= cost; n.council[k] = c; calcMods(n); return ''; }
+const flagCost = () => Math.round(30 * eraScale());
+function setFlag(n, f) { const c = flagCost(); if (n.money < c) return 'Sem dinheiro'; n.money -= c; n.flag = JSON.parse(JSON.stringify(f)); return ''; }
+function rename(n, name) { name = (name || '').trim().replace(/\s+/g, ' '); if (name.length < 2 || name.length > 24) return 'Nome deve ter de 2 a 24 letras'; n.name = name; return ''; }
 
 /* ---------- caminhos (províncias 0..P-1, mares P..) ---------- */
 function canEnter(o, p) { const ow = S.own[p], ct = S.ctrl[p]; return ow === o || ct === o || ow === -1 || atWar(o, ow) || atWar(o, ct); }
@@ -444,12 +464,12 @@ function battle(p, A, B) {
   const lossB = pb > 0 ? pa * .016 * rand(.75, 1.25) : rb, lossA = pb * .016 * rand(.75, 1.25);
   const hit = (list, loss, tot) => { for (const a of list) { const f = Math.min(1, loss / Math.max(.01, tot)); a.inf -= a.inf * f; a.cav -= a.cav * f; a.art -= a.art * f; a.vrt -= a.vrt * f; a.mor = Math.max(0, a.mor - (loss / Math.max(1, tot)) * 2.6 - .025); a.inBattle = true; a.path = []; } };
   hit(A, lossA, ra); hit(B, lossB, rb);
-  const w = S.wars.find(w => (w.a === A[0].o && w.d === B[0].o) || (w.a === B[0].o && w.d === A[0].o));
-  if (w) { const sideA = w.a === A[0].o; w.cas = w.cas || [0, 0]; w.cas[sideA ? 1 : 0] += lossB; w.cas[sideA ? 0 : 1] += lossA; }
+  const w = S.wars.find(w => (w.A.includes(A[0].o) && w.D.includes(B[0].o)) || (w.A.includes(B[0].o) && w.D.includes(A[0].o)));
+  if (w) { const sideA = w.A.includes(A[0].o); w.cas = w.cas || [0, 0]; w.cas[sideA ? 1 : 0] += lossB; w.cas[sideA ? 0 : 1] += lossA; }
   const brokeA = A.every(a => a.mor < .08 || regs(a) < .3), brokeB = B.every(a => a.mor < .08 || regs(a) < .3);
   if (brokeA || brokeB) {
     const lose = brokeA ? A : B, win = brokeA ? B : A;
-    if (w) { const winA = w.a === win[0].o; w.bs = (w.bs || 0) + (winA ? 1 : -1) * clamp(Math.round((brokeA ? ra : rb) * .6), 1, 12); }
+    if (w) { const winA = w.A.includes(win[0].o); w.bs = (w.bs || 0) + (winA ? 1 : -1) * clamp(Math.round((brokeA ? ra : rb) * .6), 1, 12); }
     const ln = nat(lose[0].o), wn = nat(win[0].o);
     if (lose[0].o === S.player || win[0].o === S.player) log('Batalha em ' + WD.provs[p].n + ': ' + natName(wn) + ' venceu ' + natName(ln) + '.', win[0].o === S.player ? 'good' : 'bad', [S.player]);
     lose.forEach(a => retreat(a));
@@ -479,7 +499,7 @@ function siegeAt(p, list) {
   sg.v += force / (40 * Math.pow(1 + f, 2));
   if (sg.v >= 1) {
     delete S.sieges[p];
-    const liberate = own === o || (own >= 0 && S.wars.some(w => (w.a === o || w.d === o) && false));
+    const liberate = own === o;
     S.ctrl[p] = liberate ? own : o; S.mapDirty = true;
     if (o === S.player || own === S.player) log((liberate ? 'Libertamos ' : 'Cerco concluído: ') + WD.provs[p].n + (liberate ? '' : ' foi ocupada por ' + natName(n)) + '.', o === S.player ? 'good' : 'bad', [S.player]);
   }
@@ -490,19 +510,50 @@ function autoExplore(f) {
   f.auto = false; if (f.o === S.player) log('Uma frota terminou de explorar o que conseguia alcançar.', 'info', [S.player]);
 }
 
-/* ---------- guerra e paz ---------- */
+/* ---------- guerra e paz (cada guerra tem dois lados: A ataca, D defende; a e d são os líderes) ---------- */
+const sideOf = (w, id) => w.A.includes(id) ? 'A' : w.D.includes(id) ? 'D' : null;
+function joinWar(w, id, side) {
+  if (sideOf(w, id)) return; const other = side === 'A' ? w.D : w.A;
+  if (other.some(x => !atWar(id, x) && (nat(id).allies || []).includes(x))) return;   // não entra contra um aliado
+  (side === 'A' ? w.A : w.D).push(id); warsChanged();
+  other.forEach(x => { nat(x).rel[id] = -100; nat(id).rel[x] = -100; breakTies(nat(id), nat(x)); });
+  log(natName(nat(id)) + ' entrou na guerra ao lado de ' + natName(nat(side === 'A' ? w.a : w.d)) + '.', 'world', [id, w.a, w.d]);
+}
+function breakTies(a, b) { ['allies', 'trade', 'marr'].forEach(k => { a[k] = (a[k] || []).filter(x => x !== b.id); b[k] = (b[k] || []).filter(x => x !== a.id); }); }
+function callAllies(w, side) {                                // aliados e parceiros juniores são chamados; o jogador decide numa janela
+  const lead = nat(side === 'A' ? w.a : w.d), foe = side === 'A' ? w.d : w.a;
+  const calls = new Set([...(lead.allies || []), ...S.nations.filter(j => j.alive && j.senior === lead.id).map(j => j.id)]);
+  calls.forEach(id => {
+    const al = nat(id); if (!al.alive || sideOf(w, id) || id === foe) return;
+    if (al.senior === lead.id) { joinWar(w, id, side); return; }
+    if (id === S.player) { S.calls = S.calls || []; S.calls.push({ w: w.id, side, from: lead.id }); return; }
+    const p = (al.ruler.tr.includes('honest') ? 1 : side === 'D' ? .75 : .45) + (al.rel[lead.id] || 0) / 400 - (al.ruler.tr.includes('craven') ? .3 : 0);
+    if (chance(p)) joinWar(w, id, side);
+    else { breakTies(al, lead); al.rel[lead.id] -= 40; lead.rel[id] = (lead.rel[id] || 0) - 60; log(natName(al) + ' recusou o chamado de ' + natName(lead) + ' e a aliança acabou.', 'world', [id, lead.id]); }
+  });
+}
+function answerCall(c, yes) {
+  const w = S.wars.find(x => x.id === c.w), me = nat(S.player), lead = nat(c.from); if (!w) return;
+  if (yes) joinWar(w, S.player, c.side);
+  else { breakTies(me, lead); lead.rel[me.id] = (lead.rel[me.id] || 0) - 60; me.stab = Math.max(0, me.stab - 5); log('Você recusou o chamado de ' + natName(lead) + '. A aliança acabou.', 'bad', [S.player]); }
+}
 function declareWar(n, t, s) {
   if (atWar(n.id, t.id)) return 'Já em guerra'; if (n.truce[t.id] > S.t) return 'Trégua em vigor';
+  if (n.senior != null) return 'Parceiro júnior de união não declara guerras';
+  if ((n.allies || []).includes(t.id)) return 'Rompa a aliança antes';
   const claim = s != null && n.claims[s];
-  S.wars.push({ id: S.id++, a: n.id, d: t.id, goal: s, start: S.t, bs: 0, cas: [0, 0], score: 0 }); warsChanged();
-  n.stab = Math.max(0, n.stab - (claim ? 3 : 15)); t.rel[n.id] = -100; n.rel[t.id] = -100;
+  const w = { id: S.id++, A: [n.id], D: [t.id], a: n.id, d: t.id, goal: s, start: S.t, bs: 0, cas: [0, 0], score: 0 };
+  S.wars.push(w); warsChanged();
+  n.stab = Math.max(0, n.stab - (claim ? 3 : 15)); t.rel[n.id] = -100; n.rel[t.id] = -100; breakTies(n, t);
   log(natName(n) + ' declarou guerra a ' + natName(t) + '!', 'world', [n.id, t.id]);
+  callAllies(w, 'D'); callAllies(w, 'A');
   return '';
 }
-function warScore(w) {                                     // positivo = atacante vencendo
-  const side = (x, y) => { let tot = 0, occ = 0; for (const p of provsOf(y)) { tot += S.pop[p] + 1; if (S.ctrl[p] === x) occ += S.pop[p] + 1; } return tot ? occ / tot * 100 : 0; };
-  let sc = side(w.a, w.d) - side(w.d, w.a) + clamp(w.bs || 0, -40, 40);
-  if (w.goal != null && WD.states[w.goal].provs.every(p => S.own[p] !== w.d || S.ctrl[p] === w.a)) sc += Math.min(25, (S.t - w.start) / 360 * 4);
+const sideProvs = ids => { const out = []; ids.forEach(id => out.push(...provsOf(id))); return out; };
+function warScore(w) {                                     // positivo = lado atacante vencendo
+  const side = (X, Y) => { let tot = 0, occ = 0; for (const p of sideProvs(Y)) { tot += S.pop[p] + 1; if (X.includes(S.ctrl[p])) occ += S.pop[p] + 1; } return tot ? occ / tot * 100 : 0; };
+  let sc = side(w.A, w.D) - side(w.D, w.A) + clamp(w.bs || 0, -40, 40);
+  if (w.goal != null && WD.states[w.goal].provs.every(p => S.own[p] !== w.d || w.A.includes(S.ctrl[p]))) sc += Math.min(25, (S.t - w.start) / 360 * 4);
   return clamp(Math.round(sc), -100, 100);
 }
 function peaceCost(w, winner, provs) {
@@ -510,27 +561,31 @@ function peaceCost(w, winner, provs) {
   return provs.reduce((a, p) => a + Math.max(4, (S.pop[p] + 1) / tot * 110), 0);
 }
 function makePeace(w, winner, provs, money) {
-  const loser = winner == null ? null : (winner === w.a ? w.d : w.a);
+  const loser = winner == null ? null : (winner === w.a ? w.d : w.a), all = [...w.A, ...w.D];
   (provs || []).forEach(p => { S.own[p] = winner; });
-  // devolve ocupações e manda exércitos para casa
-  for (let p = 0; p < S.own.length; p++) { const o = S.own[p]; if ((o === w.a || o === w.d) && (S.ctrl[p] === w.a || S.ctrl[p] === w.d)) S.ctrl[p] = o; }
-  S.armies.forEach(a => { if ((a.o === w.a || a.o === w.d) && a.p < WD.provs.length && S.own[a.p] !== a.o) { a.p = nat(a.o).capital >= 0 ? nat(a.o).capital : a.p; a.path = []; } });
+  for (let p = 0; p < S.own.length; p++) { const o = S.own[p]; if (all.includes(o) && all.includes(S.ctrl[p])) S.ctrl[p] = o; }
+  S.armies.forEach(a => { if (all.includes(a.o) && a.p < WD.provs.length && S.own[a.p] !== a.o && nat(a.o).alive) { a.p = nat(a.o).capital; a.path = []; } });
   if (money && loser != null) { const amt = Math.max(0, Math.min(nat(loser).money, money)); nat(loser).money -= amt; nat(winner).money += amt; }
   S.wars = S.wars.filter(x => x !== w); warsChanged();
-  const A = nat(w.a), D = nat(w.d); A.truce[D.id] = S.t + 360 * 5; D.truce[A.id] = S.t + 360 * 5;
+  w.A.forEach(x => w.D.forEach(y => { nat(x).truce[y] = S.t + 360 * 5; nat(y).truce[x] = S.t + 360 * 5; }));
   if (w.goal != null && winner != null && nat(winner).claims[w.goal]) delete nat(winner).claims[w.goal];
   ownChanged(); checkDead();
+  const A = nat(w.a), D = nat(w.d);
   const txt = winner == null ? 'Paz branca entre ' + natName(A) + ' e ' + natName(D) + '.' : natName(nat(winner)) + ' venceu a guerra contra ' + natName(nat(loser)) + (provs && provs.length ? ' e tomou ' + provs.length + ' província' + (provs.length > 1 ? 's' : '') : '') + '.';
-  log(txt, 'world', [w.a, w.d]);
+  log(txt, 'world', all);
 }
 function checkDead() {
   S.nations.forEach(n => {
     if (!n.alive) return;
-    if (!provsOf(n.id).length) { n.alive = false; S.armies = S.armies.filter(a => a.o !== n.id); S.fleets = S.fleets.filter(f => f.o !== n.id); S.wars = S.wars.filter(w => w.a !== n.id && w.d !== n.id); warsChanged(); S.cols = S.cols.filter(c => c.o !== n.id); log(natName(n) + ' deixou de existir.', 'world', [n.id]); if (n.id === S.player) S.over = 'dead'; }
-    else if (S.own[n.capital] !== n.id) { const ps = provsOf(n.id); n.capital = ps.reduce((a, b) => S.pop[a] >= S.pop[b] ? a : b); }
+    if (!provsOf(n.id).length) {
+      n.alive = false; S.armies = S.armies.filter(a => a.o !== n.id); S.fleets = S.fleets.filter(f => f.o !== n.id); S.cols = S.cols.filter(c => c.o !== n.id);
+      S.wars = S.wars.filter(w => w.a !== n.id && w.d !== n.id); S.wars.forEach(w => { w.A = w.A.filter(x => x !== n.id); w.D = w.D.filter(x => x !== n.id); }); warsChanged();
+      S.nations.forEach(o => { breakTies(o, n); if (o.senior === n.id) delete o.senior; });
+      log(natName(n) + ' deixou de existir.', 'world', [n.id]); if (n.id === S.player) S.over = 'dead';
+    } else if (S.own[n.capital] !== n.id) { const ps = provsOf(n.id); n.capital = ps.reduce((a, b) => S.pop[a] >= S.pop[b] ? a : b); }
   });
 }
-function occupiedBy(w, winner) { const loser = winner === w.a ? w.d : w.a; return provsOf(loser).filter(p => S.ctrl[p] === winner); }
+function occupiedBy(w, winner) { const side = winner === w.a ? w.A : w.D, loser = winner === w.a ? w.d : w.a; return provsOf(loser).filter(p => side.includes(S.ctrl[p])); }
 function aiPeace(w) {                                        // propostas da IA (para IA x IA aplica direto)
   const sc = warScore(w); w.score = sc; const months = (S.t - w.start) / 30;
   const winner = sc > 0 ? w.a : w.d, abs = Math.abs(sc);
@@ -542,13 +597,109 @@ function aiPeace(w) {                                        // propostas da IA 
     if (winner !== S.player && !S.offer) S.offer = { w: w.id, winner, provs: take };
   } else if (months > 12 * 7 && abs < 15 && chance(.05)) { if (!human) makePeace(w, null, []); else if (!S.offer) S.offer = { w: w.id, winner: null, provs: [] }; }
 }
-function proposePeace(w, provs, money) {                     // proposta do jogador; '' = aceita
-  const me = S.player, sc = warScore(w) * (w.a === me ? 1 : -1);
+function proposePeace(w, provs, money) {                     // proposta do jogador (líder da guerra); '' = aceita
+  const me = S.player; if (w.a !== me && w.d !== me) return 'Só o líder da guerra negocia a paz';
+  const sc = warScore(w) * (w.a === me ? 1 : -1);
   if (!provs.length && !money) { if (sc > -10 || (S.t - w.start) > 360 * 4) { makePeace(w, null, []); return ''; } return 'Recusada: eles acham que estão vencendo'; }
   const c = peaceCost(w, me, provs) + (money ? 12 : 0); if (c <= sc + 2) { makePeace(w, me, provs, money); return ''; }
   return 'Recusada: exige ' + Math.ceil(c) + ' de placar (tem ' + sc + ')';
 }
 function fabricate(n, s) { if (n.fab) return 'Já fabricando'; const c = Math.round(40 * eraScale()); if (n.money < c) return 'Sem dinheiro'; n.money -= c; n.fab = { s, m: 6 }; return ''; }
+
+/* ---------- diplomacia: relações, alianças, casamentos, uniões pessoais, comércio e embargos ---------- */
+const has = (n, k, id) => (n[k] || []).includes(id);
+const link = (a, b, k) => { a[k] = a[k] || []; b[k] = b[k] || []; if (!a[k].includes(b.id)) a[k].push(b.id); if (!b[k].includes(a.id)) b[k].push(a.id); };
+const strength = n => S.armies.filter(a => a.o === n.id).reduce((s, a) => s + regs(a), 0) * (1 + n.m.army) * n.up.inf + 1;
+function neighbors(n) { const s = new Set(); for (const p of provsOf(n.id)) for (const o of WD.provs[p].adj) { const t = S.own[o]; if (t >= 0 && t !== n.id) s.add(t); } return s; }
+function accept(t, n, kind) {                                 // quanto t topa a proposta de n (≥ 0 aceita); devolve [valor, motivos]
+  const why = []; let v = 0; const add = (x, txt) => { if (x) { v += x; why.push((x > 0 ? '+' : '') + Math.round(x) + ' ' + txt); } };
+  add((t.rel[n.id] || 0) * .5, 'relação');
+  add(t.ideo === n.ideo ? 12 : 0, 'mesma ideologia'); add(GOVS[t.gov].cat === GOVS[n.gov].cat ? 8 : 0, 'governos parecidos');
+  add((n.ruler.st.dip - 8) * 2, 'diplomacia do seu governante');
+  const tr = t.ruler.tr;
+  add(tr.includes('charismatic') || tr.includes('generous') ? 10 : 0, 'temperamento'); add(tr.includes('paranoid') && kind === 'ally' ? -20 : 0, 'governante paranoico');
+  if (kind === 'ally') {
+    add(-15, 'base'); add(-(t.allies || []).length * 6, 'já tem aliados');
+    const common = enemiesOf(t.id).some(e => atWar(n.id, e)) || [...neighbors(t)].some(x => (n.claims && Object.keys(n.claims).length && false) || atWar(x, n.id)); add(common ? 20 : 0, 'inimigo em comum');
+    add(strength(n) > strength(t) * 1.5 ? 10 : 0, 'você é forte'); add(has(t, 'marr', n.id) ? 15 : 0, 'casamento real');
+  } else if (kind === 'marr') { add(-10, 'base'); add(has(t, 'allies', n.id) ? 10 : 0, 'aliados'); }
+  else if (kind === 'trade') { add(-5, 'base'); add(tr.includes('greedy') ? 10 : 0, 'governante ganancioso'); add((t.trade || []).length * -4, 'já tem acordos'); }
+  if (atWar(t.id, n.id)) add(-1000, 'em guerra');
+  return [Math.round(v), why];
+}
+const dipCost = k => Math.round({ improve: 15, gift: 40, ally: 0, marr: 20, trade: 10, integrate: 200 }[k] * eraScale());
+function dipAct(n, t, kind) {                                 // '' = feito/aceito; texto = motivo da recusa
+  if (!t.alive || t === n) return 'Inválido';
+  const c = dipCost(kind) || 0; if (n.money < c) return 'Sem dinheiro';
+  if (kind === 'improve') { if ((n.cd || {})[t.id] > S.t) return 'Já tentado este ano'; n.money -= c; n.cd = n.cd || {}; n.cd[t.id] = S.t + 360; t.rel[n.id] = clamp((t.rel[n.id] || 0) + 15, -100, 100); n.rel[t.id] = clamp((n.rel[t.id] || 0) + 8, -100, 100); return ''; }
+  if (kind === 'gift') { n.money -= c; t.money += c; t.rel[n.id] = clamp((t.rel[n.id] || 0) + 20, -100, 100); return ''; }
+  if (kind === 'insult') { t.rel[n.id] = clamp((t.rel[n.id] || 0) - 40, -100, 100); n.rel[t.id] = clamp((n.rel[t.id] || 0) - 20, -100, 100); return ''; }
+  if (kind === 'break') { breakTies(n, t); ['allies'].forEach(() => 0); t.rel[n.id] = clamp((t.rel[n.id] || 0) - 40, -100, 100); n.stab = Math.max(0, n.stab - 5); return ''; }
+  if (kind === 'unally') { n.allies = (n.allies || []).filter(x => x !== t.id); t.allies = (t.allies || []).filter(x => x !== n.id); t.rel[n.id] = clamp((t.rel[n.id] || 0) - 40, -100, 100); n.stab = Math.max(0, n.stab - 5); return ''; }
+  if (kind === 'untrade') { n.trade = (n.trade || []).filter(x => x !== t.id); t.trade = (t.trade || []).filter(x => x !== n.id); t.rel[n.id] = clamp((t.rel[n.id] || 0) - 10, -100, 100); return ''; }
+  if (kind === 'embargo') { n.emb = n.emb || []; if (n.emb.includes(t.id)) n.emb = n.emb.filter(x => x !== t.id); else { n.emb.push(t.id); n.trade = (n.trade || []).filter(x => x !== t.id); t.trade = (t.trade || []).filter(x => x !== n.id); t.rel[n.id] = clamp((t.rel[n.id] || 0) - 25, -100, 100); } return ''; }
+  if (kind === 'integrate') { if (t.senior !== n.id) return 'Não é seu parceiro júnior'; if (S.t - t.unionT < 360 * 50) return 'A união precisa de 50 anos'; if ((t.rel[n.id] || 0) < 50) return 'Exige relação 50+'; n.money -= c; provsOf(t.id).forEach(p => { S.own[p] = n.id; S.ctrl[p] = n.id; }); S.armies.forEach(a => { if (a.o === t.id) a.o = n.id; }); S.fleets.forEach(f => { if (f.o === t.id) f.o = n.id; }); ownChanged(); checkDead(); log(natName(n) + ' integrou ' + t.name + ' à coroa.', 'world', [n.id]); return ''; }
+  if (kind === 'ally' && has(n, 'allies', t.id)) return 'Já são aliados';
+  if (kind === 'marr') { if (GOVS[n.gov].succ !== 'hered' || GOVS[t.gov].succ !== 'hered') return 'Exige duas monarquias hereditárias'; if (has(n, 'marr', t.id)) return 'Já há casamento'; }
+  if (kind === 'trade') { if (has(n, 'trade', t.id)) return 'Já há acordo'; if (has(n, 'emb', t.id) || has(t, 'emb', n.id)) return 'Há embargo'; }
+  if (atWar(n.id, t.id)) return 'Em guerra';
+  if (t.id !== S.player) { const [v] = accept(t, n, kind); if (v < 0) return 'Recusado'; }
+  n.money -= c; link(n, t, kind === 'ally' ? 'allies' : kind === 'marr' ? 'marr' : 'trade');
+  const bonus = { ally: 25, marr: 25, trade: 10 }[kind]; t.rel[n.id] = clamp((t.rel[n.id] || 0) + bonus, -100, 100); n.rel[t.id] = clamp((n.rel[t.id] || 0) + bonus, -100, 100);
+  log({ ally: 'Aliança', marr: 'Casamento real', trade: 'Acordo comercial' }[kind] + ' entre ' + natName(n) + ' e ' + natName(t) + '.', n.id === S.player || t.id === S.player ? 'good' : 'none', [n.id, t.id]);
+  return '';
+}
+function aiPropose(n, t, kind) {                              // IA propõe; para o jogador vira uma janela
+  if (t.id === S.player) { S.dipOffers = S.dipOffers || []; if (S.dipOffers.length < 2 && !(n.offerCd > S.t)) { S.dipOffers.push({ from: n.id, kind }); n.offerCd = S.t + 360 * 5; } return; }
+  dipAct(n, t, kind);
+}
+function relDrift() {                                         // uma vez por ano: relações vão na direção do que as nações têm em comum
+  S.nations.forEach(n => {
+    if (!n.alive) return; const nb = neighbors(n);
+    for (const k in n.rel) {
+      const id = +k, t = nat(id); if (!t || !t.alive) continue;
+      const target = (has(n, 'allies', id) ? 50 : 0) + (has(n, 'marr', id) ? 30 : 0) + (has(n, 'trade', id) ? 15 : 0) + (n.ideo === t.ideo ? 10 : 0) - (nb.has(id) ? 10 : 0) - (has(n, 'emb', id) || has(t, 'emb', n.id) ? 40 : 0) - (atWar(n.id, id) ? 100 : 0) + (t.senior === n.id || n.senior === id ? 40 : 0);
+      n.rel[k] = clamp(n.rel[k] + (target - n.rel[k]) * .12, -100, 100);
+    }
+  });
+}
+function personality(n) {                                     // traços do governante mudam a IA
+  const P = { war: 1, build: 1, army: 1, colon: 1, claim: 1, ally: 1, gold: 1 }, t = n.ruler.tr, mul = (k, v) => { P[k] *= v; };
+  if (t.includes('brave')) mul('war', 1.3); if (t.includes('craven')) mul('war', .5); if (t.includes('ambitious')) { mul('war', 1.4); mul('claim', 1.5); } if (t.includes('content')) mul('war', .6);
+  if (t.includes('just')) mul('claim', .1); if (t.includes('cruel')) mul('war', 1.3); if (t.includes('greedy')) mul('gold', 2); if (t.includes('generous')) mul('ally', 1.3);
+  if (t.includes('diligent')) mul('build', 1.4); if (t.includes('lazy')) mul('build', .6); if (t.includes('schemer')) mul('claim', 1.8); if (t.includes('strategist')) mul('army', 1.25);
+  if (t.includes('builder')) mul('build', 1.5); if (t.includes('navigator')) mul('colon', 1.6); if (t.includes('paranoid')) { mul('army', 1.3); mul('ally', .5); } if (t.includes('charismatic')) mul('ally', 1.4);
+  return P;
+}
+function aiDiplomacy(n) {
+  const P = personality(n), nb = [...neighbors(n)].map(nat).filter(t => t.alive);
+  const known = S.nations.filter(t => t.alive && t !== n && n.exP[t.capital]);
+  if ((n.allies || []).length < 3 && chance(.04 * P.ally)) {
+    const c = known.filter(t => !has(n, 'allies', t.id) && !atWar(n.id, t.id)).map(t => [t, accept(t, n, 'ally')[0]]).sort((a, b) => b[1] - a[1])[0];
+    if (c && c[1] >= 0) aiPropose(n, c[0], 'ally');
+  }
+  if (GOVS[n.gov].succ === 'hered' && (n.marr || []).length < 3 && chance(.04 * P.ally)) {
+    const c = known.filter(t => GOVS[t.gov].succ === 'hered' && !has(n, 'marr', t.id)).map(t => [t, accept(t, n, 'marr')[0]]).sort((a, b) => b[1] - a[1])[0];
+    if (c && c[1] >= 0) aiPropose(n, c[0], 'marr');
+  }
+  if ((n.trade || []).length < 4 && chance(.05)) {
+    const c = known.filter(t => !has(n, 'trade', t.id) && !has(n, 'emb', t.id) && !has(t, 'emb', n.id)).map(t => [t, accept(t, n, 'trade')[0]]).sort((a, b) => b[1] - a[1])[0];
+    if (c && c[1] >= 0) aiPropose(n, c[0], 'trade');
+  }
+  if (chance(.05) && nb.length) { const t = pickR(nb); if (strength(t) > strength(n) && (n.rel[t.id] || 0) < 30) dipAct(n, t, n.ruler.tr.includes('generous') ? 'gift' : 'improve'); }
+  enemiesOf(n.id).forEach(e => { if (!has(n, 'emb', e) && chance(.3)) dipAct(n, nat(e), 'embargo'); });
+  if (n.emb && n.emb.length && chance(.05)) { const e = n.emb.find(x => !atWar(n.id, x)); if (e != null) dipAct(n, nat(e), 'embargo'); }
+  S.nations.forEach(j => { if (j.alive && j.senior === n.id && chance(.02)) dipAct(n, j, 'integrate'); });
+}
+function tryUnion(n) {                                        // sem herdeiros: um parceiro de casamento pode herdar (união pessoal)
+  if (n.id === S.player || GOVS[n.gov].succ !== 'hered') return false;
+  const cands = (n.marr || []).map(nat).filter(t => t.alive && t.senior == null && GOVS[t.gov].succ === 'hered' && t.id !== n.id);
+  if (!cands.length || !chance(.6)) return false;
+  const s = cands.sort((a, b) => strength(b) - strength(a))[0];
+  n.senior = s.id; n.unionT = S.t; n.ruler = s.ruler; n.dyn = s.dyn; n.kids = []; n.spouse = null; link(n, s, 'allies');
+  log('União pessoal: ' + natName(s) + ' herdou a coroa de ' + natName(n) + '.', 'world', [n.id, s.id]);
+  return true;
+}
 
 /* ---------- colonização ---------- */
 function canColonize(n, p) {
@@ -611,7 +762,7 @@ function monthTick() {
   S.cols = S.cols.filter(c => c.m > 0);
   // guerras
   S.wars.slice().forEach(w => { w.score = warScore(w); aiPeace(w); });
-  if (newYear) { S.nations.forEach(n => { for (const k in n.rel) n.rel[k] = clamp(n.rel[k] + (n.rel[k] < 0 ? 4 : -1), -100, 100); }); }
+  if (newYear) relDrift();
   if (y >= END_YEAR && !S.over) { S.over = 'end'; log('O ano ' + END_YEAR + ' chegou. A crônica termina.', 'world'); }
 }
 
@@ -621,26 +772,27 @@ function threatAt(p) {                                     // regimentos por don
   return S._threat.get(p) || [];
 }
 function ai(n) {
-  const y = curYear(), slow = ((S.t / 30 | 0) + n.id) % 3 === 0;   // decisões pesadas a cada 3 meses
+  const y = curYear(), slow = ((S.t / 30 | 0) + n.id) % 3 === 0, P = personality(n), tr = n.ruler.tr;   // decisões pesadas a cada 3 meses; P = temperamento do governante
   // pesquisa
   if (!n.res && (slow || n.rp > 50)) {
     const opts = TECHS.filter(t => techState(n, t) === '');
     let pickT = null;
-    if (n.vert) pickT = opts.find(t => t.c === 'vert' && t.v === n.vert);
-    if (!pickT && !n.vert) { const vs = opts.filter(t => t.c === 'vert'); if (vs.length && chance(.08)) pickT = pickR(vs); }
-    if (!pickT) { const main = opts.filter(t => t.c !== 'vert').sort((a, b) => a.y - b.y); pickT = main.length ? main[Math.min(main.length - 1, Math.random() * Math.min(3, main.length) | 0)] : null; }
+    if (n.vert && chance(.6)) pickT = opts.filter(t => t.v === n.vert).sort((a, b) => a.y - b.y)[0];
+    if (!pickT && !n.vert && n.vpref) pickT = opts.find(t => t.entry && t.v === n.vpref);   // cada IA tem uma vertente preferida (ou nenhuma)
+    if (!pickT) { const main = opts.filter(t => !t.entry).sort((a, b) => a.y - b.y); pickT = main.length ? main[Math.min(main.length - 1, Math.random() * Math.min(3, main.length) | 0)] : null; }
     if (pickT) n.res = pickT.id;
   }
   // governo e ideologia (raro)
   if (chance(.0012) && !(n.govCd > S.t)) {
-    const opts = [...n.fx.g].filter(g => g !== n.gov && GOVS[g] && (!GOVS[g].minProv || provsOf(n.id).length >= GOVS[g].minProv));
+    const opts = [...n.fx.g, 'empire'].filter(g => g !== n.gov && GOVS[g] && (!GOVS[g].minProv || provsOf(n.id).length >= GOVS[g].minProv));
     const same = opts.filter(g => GOVS[g].cat === GOVS[n.gov].cat), g = same.length && chance(.85) ? pickR(same) : opts.length && chance(.5) ? pickR(opts) : null;
     if (g && GOVS[g].m && Object.values(GOVS[g].m).reduce((a, b) => a + b, 0) >= Object.values(GOVS[n.gov].m).reduce((a, b) => a + b, 0) + .05) setGov(n, g);
   }
   if (chance(.003) && !(n.ideoCd > S.t)) { const opts = [...n.fx.i].filter(i => i !== n.ideo); if (opts.length) setIdeo(n, pickR(opts)); }
-  // obras
+  if (slow) aiDiplomacy(n);
+  // obras (ganancioso guarda mais ouro; diligente e construtor tentam mais)
   const mine = slow || n.money > 2000 ? S._mine[n.id] : [];
-  for (let tries = 0; tries < 3 && n.cons.length < consSlots(n) && n.money > 100; tries++) {
+  for (let tries = 0; tries < Math.round(3 * P.build) && n.cons.length < consSlots(n) && n.money > 100 * P.gold; tries++) {
     let best = null, bv = -1e9;
     for (let k = 0; k < 4 && mine.length; k++) {
       const s = pickR(mine);
@@ -649,7 +801,9 @@ function ai(n) {
         if (canBuild(n, s.id, b)) continue; const d = BUILDINGS[b];
         let v = 0; if (d.out) for (const g in d.out) v += d.out[g] * S.wp[g] * (n.mk.sat[g] < 1 ? 1.6 : 1); if (d.in) for (const g in d.in) v -= d.in[g] * S.wp[g] * (n.mk.sat[g] < .8 ? 2 : 1);
         if (d.fx) v += (d.fx.research || 0) * 4 + (d.fx.tax || 0) * (n.gdp || 0) * .15 + (d.fx.prod || 0) * 60 + (d.fx.fort ? (warsOf(n.id).length ? 25 : 4) : 0) + (d.fx.port ? 8 : 0) + (d.fx.stab ? (n.stab < 45 ? 20 : 3) : 0);
+        if (d.out && (d.out.goods || d.out.cloth) && ((n.mk.sat.goods || 1) < .85 || (n.mk.sat.cloth || 1) < .85)) v += 70;
         if ((b === 'farm' || b === 'fishery') && n.foodSat < 1.05) v += 120; else if (n.foodSat < .95 && d.w > 1) v -= 40;
+        if (b === 'university' && tr.includes('scholar')) v += 40; if (b === 'temple' && tr.includes('zealous')) v += 40; if (b === 'temple' && tr.includes('cynical')) v -= 30; if (b === 'market' && tr.includes('greedy')) v += 40;
         v = v / bCost(n, b) * 100 + Math.random() * 3; if (v > bv) { bv = v; best = [s.id, b]; }
       }
     }
@@ -658,7 +812,7 @@ function ai(n) {
   // exército (em dívida, desmobiliza um pouco)
   const myArmies = S.armies.filter(a => a.o === n.id), myR = myArmies.reduce((a, x) => a + regs(x), 0), atWarN = warsOf(n.id).length;
   if (n.money < 0 && n.income < 0 && !atWarN && myArmies.length) { const a = myArmies[0]; a.inf *= .85; a.cav *= .85; a.art *= .85; a.vrt *= .85; }
-  const want = clamp((n.popT || 0) * .006 * (atWarN ? 1.5 : 1) * (.7 + IDEOS[n.ideo].war * .25) * (n.money > 3000 ? 1.6 : 1), 2, 1200);
+  const want = clamp((n.popT || 0) * .006 * (atWarN ? 1.5 : 1) * (.7 + IDEOS[n.ideo].war * .25) * (n.money > 3000 ? 1.6 : 1) * P.army, 2, 1200);
   if (myR + n.rec.reduce((a, r) => a + (r.type !== 'ship' ? r.k : 0), 0) < want && (n.income > 0 || n.money > 500)) {
     const k = Math.max(1, Math.min(Math.floor(n.manpower), Math.ceil((want - myR) / 3)));
     const type = n.vert && chance(.2) && n.mk.sat[VERT[n.vert].good] > .5 ? 'vrt' : canArt(n) && chance(.2) ? 'art' : chance(.25) ? 'cav' : 'inf';
@@ -673,19 +827,21 @@ function ai(n) {
     const fl = S.fleets.filter(f => f.o === n.id); if (fl.length && !fl.some(f => f.auto) && chance(.05) && (n.fx.sea >= 2 || n.kind === 'cold')) { const f = pickR(fl); f.auto = true; }
   }
   // colonização
-  if (slow && chance(n.fx.col ? .6 : .15)) {
+  if (slow && chance((n.fx.col ? .6 : .15) * P.colon)) {
     const cand = []; for (const p of provsOf(n.id)) for (const o of WD.provs[p].adj) if (S.own[o] === -1) cand.push(o);
     if (n.fx.col) for (let k = 0; k < 40; k++) { const p = WD.provs[Math.random() * WD.provs.length | 0]; if (S.own[p.id] === -1 && n.exP[p.id] && p.coast) cand.push(p.id); }
     if (cand.length) { const p = pickR(cand); if (!canColonize(n, p)) colonize(n, p); }
   }
   // guerra: declarar
-  if (slow && !atWarN && n.stab > 35 && n.money > 0 && chance(.018 * IDEOS[n.ideo].war * (GOVS[n.gov].cat === 'Tribal' ? 1.4 : 1))) {
+  if (slow && !atWarN && n.senior == null && n.stab > 35 && n.money > 0 && chance(.012 * IDEOS[n.ideo].war * P.war * (GOVS[n.gov].cat === 'Tribal' ? 1.4 : 1))) {
     const nb = new Set(); for (const p of provsOf(n.id)) for (const o of WD.provs[p].adj) { const t = S.own[o]; if (t >= 0 && t !== n.id) nb.add(t); }
     if (n.kind === 'cold' || n.fx.col) S.nations.forEach(t => { if (t.alive && t.id !== n.id && provsOf(t.id).some(p => n.exP[p] && WD.provs[p].coast) && chance(.15)) nb.add(t.id); });
     const myP = myR * (1 + n.m.army) * n.up.inf;
-    const targets = [...nb].map(nat).filter(t => t.alive && !(n.truce[t.id] > S.t) && !atWar(n.id, t.id)).map(t => [t, S.armies.filter(a => a.o === t.id).reduce((s, a) => s + regs(a), 0) * (1 + t.m.army) * t.up.inf + 1]).filter(([, pw]) => myP > pw * 1.35);
+    const myAll = myP + (n.allies || []).map(nat).filter(x => x.alive).reduce((s, x) => s + strength(x) * .5, 0);
+    const targets = [...nb].map(nat).filter(t => t.alive && !(n.truce[t.id] > S.t) && !atWar(n.id, t.id) && !has(n, 'allies', t.id) && !(has(n, 'marr', t.id) && chance(.7)) && t.senior !== n.id)
+      .map(t => [t, strength(t) + (t.allies || []).map(nat).filter(x => x.alive).reduce((s, x) => s + strength(x) * .6, 0)]).filter(([, pw]) => myAll > pw * 1.35);
     if (targets.length) { const [t] = pickR(targets); const st = WD.states.find(s => s.provs.some(p => S.own[p] === t.id) && s.provs.some(p => WD.provs[p].adj.some(o => S.own[o] === n.id))); declareWar(n, t, st ? st.id : null); }
-  } else if (slow && !atWarN && !n.fab && chance(.06) && n.money > 80) {
+  } else if (slow && !atWarN && !n.fab && chance(.06 * P.claim) && n.money > 80) {
     const st = WD.states.find(s => !n.claims[s.id] && s.provs.some(p => S.own[p] >= 0 && S.own[p] !== n.id && WD.provs[p].adj.some(o => S.own[o] === n.id)));
     if (st) fabricate(n, st.id);
   }
@@ -729,15 +885,15 @@ const b64 = u8 => { let s = ''; for (let i = 0; i < u8.length; i += 8192) s += S
 const unb64 = (s, T = Uint8Array) => { const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return new T(u.buffer); };
 function saveGame() {
   const o = Object.assign({}, S, { own: b64(new Uint8Array(S.own.buffer)), ctrl: b64(new Uint8Array(S.ctrl.buffer)), pop: b64(new Uint8Array(S.pop.buffer)), news: [], offer: null, mapDirty: undefined,
-    nations: S.nations.map(n => Object.assign({}, n, { exP: b64(n.exP), exZ: b64(n.exZ), m: undefined, fx: undefined, up: undefined })) });
+    nations: S.nations.map(n => Object.assign({}, n, { exP: b64(n.exP), exZ: b64(n.exZ), m: undefined, fx: undefined, up: undefined, eff: undefined })), calls: [], dipOffers: [] });
   try { localStorage.setItem('chronicle-save', JSON.stringify(o)); return true; } catch (e) { return false; }
 }
 function loadGame() {
   let o; try { o = JSON.parse(localStorage.getItem('chronicle-save')); } catch (e) { return false; }
-  if (!o || o.v !== 1) return false;
+  if (!o || o.v !== 2) return false;
   WD = generateWorld(o.seed);
   o.own = unb64(o.own, Int16Array); o.ctrl = unb64(o.ctrl, Int16Array); o.pop = unb64(o.pop, Float32Array);
   o.nations.forEach(n => { n.exP = unb64(n.exP); n.exZ = unb64(n.exZ); });
   S = o; S.news = []; ownChanged(); warsChanged(); S.nations.forEach(n => { if (n.alive) calcMods(n); }); econAll(); return true;
 }
-const hasSave = () => { try { return !!localStorage.getItem('chronicle-save'); } catch (e) { return false; } };
+const hasSave = () => { try { const s = localStorage.getItem('chronicle-save'); return !!s && s.startsWith('{"v":2'); } catch (e) { return false; } };

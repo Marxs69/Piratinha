@@ -3,7 +3,7 @@
 'use strict';
 
 const K = 2;                                                 // pixels por célula na imagem-base
-const R = { cv: null, cx: null, base: null, bctx: null, img: null, mode: 'pol', cam: { x: 0, y: 0, z: 1 }, dirty: true, labels: [], sel: null, selArmy: null, selFleet: null, hl: null, view: -1 };
+const R = { cv: null, cx: null, base: null, bctx: null, img: null, mode: 'pol', cam: { x: 0, y: 0, z: 1 }, dirty: true, labels: [], sel: null, selArmies: [], selFleet: null, box: null, hl: null, view: -1 };
 let terrRGB = null;
 
 function initRender(cv) {
@@ -168,9 +168,9 @@ function drawFrame() {
     const [wx, wy] = armyXY(a); if (!vis(wx, wy)) continue;
     const k = Math.round(wx) + ',' + Math.round(wy), i = slot.get(k) || 0; slot.set(k, i + 1);
     let [sx, sy] = toScreen(wx, wy); sy -= 4 + i * 20;
-    const mine = me && a.o === me.id, war = me && atWar(me.id, a.o), sel = R.selArmy === a;
+    const mine = me && a.o === me.id, war = me && atWar(me.id, a.o), sel = R.selArmies.includes(a), ally = me && has(me, 'allies', a.o);
     if (mine && a.path.length) { c.strokeStyle = 'rgba(255,240,200,.7)'; c.lineWidth = 1.5; c.setLineDash([5, 4]); c.beginPath(); c.moveTo(sx, sy); a.path.forEach(v => { const [x, y] = nodeXY(v); const [a2, b2] = toScreen(x * K + K / 2, y * K + K / 2); c.lineTo(a2, b2); }); c.stroke(); c.setLineDash([]); }
-    c.fillStyle = war ? 'rgba(110,20,20,.92)' : mine ? 'rgba(26,36,24,.92)' : 'rgba(30,30,30,.85)'; c.strokeStyle = sel ? '#ffd257' : mine ? '#cfe8a0' : war ? '#ff8080' : '#999'; c.lineWidth = sel ? 2.2 : 1;
+    c.fillStyle = war ? 'rgba(110,20,20,.92)' : mine ? 'rgba(26,36,24,.92)' : ally ? 'rgba(20,34,60,.9)' : 'rgba(30,30,30,.85)'; c.strokeStyle = sel ? '#ffd257' : mine ? '#cfe8a0' : war ? '#ff8080' : ally ? '#8ec5ff' : '#999'; c.lineWidth = sel ? 2.2 : 1;
     rr(c, sx - 20, sy - 9, 46, 18, 4); c.fill(); c.stroke();
     const im = flagImg(nat(a.o).flag); if (im.complete) c.drawImage(im, sx - 18, sy - 6, 15, 10);
     c.fillStyle = '#fff'; c.font = '600 11px "Alegreya Sans", sans-serif'; c.textAlign = 'left'; c.fillText(fmtK(regs(a)), sx, sy + 1); c.textAlign = 'center';
@@ -179,6 +179,21 @@ function drawFrame() {
   // batalhas
   const bt = new Set(); for (const a of S.armies) if (a.inBattle && a.p < P) bt.add(a.p);
   bt.forEach(p => { const q = WD.provs[p]; const [sx, sy] = toScreen(q.cx * K + K / 2, q.cy * K + K / 2); c.font = '18px serif'; c.fillText('⚔️', sx + 30, sy - 4); });
+  if (R.box) { const b = R.box; c.fillStyle = 'rgba(255,210,87,.12)'; c.strokeStyle = '#ffd257'; c.lineWidth = 1; c.fillRect(b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0); c.strokeRect(b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0); }
+}
+/* minimapa: o mundo inteiro, o retângulo da câmera e as tropas como pontos */
+function drawMini(mc) {
+  const c = mc.getContext('2d'), w = mc.width, h = mc.height, sx = w / R.base.width, sy = h / R.base.height, me = S.player >= 0 ? nat(S.player) : null, P = WD.provs.length;
+  c.imageSmoothingEnabled = true; c.drawImage(R.base, 0, 0, w, h);
+  const dot = (wx, wy, col, r) => { c.fillStyle = col; c.fillRect(wx * sx - r, wy * sy - r, r * 2, r * 2); };
+  for (const f of S.fleets) { if (!me || (f.o !== me.id && !me.exZ[f.z])) continue; const [x, y] = fleetXY(f); dot(x, y, f.o === me.id ? '#8ec5ff' : atWar(me.id, f.o) ? '#ff6b6b' : '#ccc', 1.5); }
+  for (const a of S.armies) {
+    if (!me) continue; const mine = a.o === me.id, war = atWar(me.id, a.o), ally = has(me, 'allies', a.o);
+    if (!mine && !war && !ally) continue; if (!mine && !(a.p < P ? me.exP[a.p] : me.exZ[a.p - P])) continue;
+    const [x, y] = armyXY(a); dot(x, y, '#000', 2.6); dot(x, y, mine ? '#9cff7a' : war ? '#ff4d4d' : '#6fb4ff', 1.8);
+  }
+  const [x0, y0] = toWorld(0, 0), [x1, y1] = toWorld(innerWidth, innerHeight);
+  c.strokeStyle = '#ffd257'; c.lineWidth = 1.5; c.strokeRect(x0 * sx, y0 * sy, (x1 - x0) * sx, (y1 - y0) * sy);
 }
 function rr(c, x, y, w, h, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
 const fmtK = v => v >= 100 ? Math.round(v) + 'k' : (Math.round(v * 10) / 10) + 'k';

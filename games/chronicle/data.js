@@ -37,9 +37,10 @@ const GOOD_IDS = Object.keys(GOODS);
 
 /* necessidades da população por 1.000 habitantes/mês; crescem com o tempo (padrão de vida) */
 function popNeeds(year) {
-  const t = Math.max(0, Math.min(1, (year - 860) / 1100));            // 0 em 860, 1 em 1960
+  const t = Math.max(0, Math.min(1, (year - 860) / 900));             // pré-industrial: sobe devagar até 1760
+  const ti = Math.max(0, Math.min(1, (year - 1760) / 200));           // industrialização
   const t2 = Math.max(0, Math.min(1, (year - 1950) / 250));           // era digital e futura
-  return { food: 1, cloth: .04 + .1 * t, goods: .015 + .22 * t + .2 * t2, lux: .0012 + .012 * t, elec: year < 1950 ? 0 : .01 + .12 * t2 };
+  return { food: 1, cloth: .04 + .02 * t + .08 * ti, goods: .015 + .02 * t + .18 * ti + .2 * t2, lux: .0012 + .003 * t + .009 * ti, elec: year < 1950 ? 0 : .01 + .12 * t2 };
 }
 
 /* ---------- prédios (no estado; nível = quantas unidades) ----------
@@ -214,42 +215,65 @@ T('soc_galactic', 'soc', 2165, 'Hegemonia orbital', ['soc_posthuman', 'nav_orbit
 const TECH = Object.fromEntries(TECHS.map(t => [t.id, t]));
 const CATS = { mil: 'Militar', nav: 'Naval', eco: 'Economia', soc: 'Sociedade' };
 
-/* ---------- vertentes (exclusivas: a primeira pesquisada prende a nação a ela) ----------
-   y: ano de cada nível · m: bônus por nível · unit: nome da unidade especial por nível · good/bld: bem e prédio da vertente */
+/* ---------- vertentes ----------
+   Cada vertente entra na árvore normal por uma tecnologia de entrada (ex.: Clockpunk em Economia por volta de 1360, depois de Guildas).
+   Quem pesquisa a entrada fica preso a ela: as tecnologias militares, navais e econômicas posteriores da árvore normal são
+   substituídas pela árvore da vertente, que leva o mesmo "futuro" (até a colonização espacial) pelo caminho da vertente.
+   tree: [ano, área, nome] · m: bônus total da árvore completa · unit: nomes da unidade especial ao longo da árvore */
 const VERTS = [
-  { id: 'clock', n: 'Clockpunk', e: '⚙️', col: '#c9a227', y: [1400, 1520, 1680, 1900, 2120], good: 'gears', bld: 'clock_works', m: { prod: .04, research: .04 },
-    t: ['Mecanismos de relojoaria', 'Autômatos de corda', 'Golens de engrenagem', 'Androides de relojoaria', 'Titãs eternos'],
-    unit: ['Autômatos', 'Autômatos de guerra', 'Golens de engrenagem', 'Androides de corda', 'Titãs de relojoaria'] },
-  { id: 'steam', n: 'Steampunk', e: '♨️', col: '#a0522d', y: [1650, 1720, 1800, 1900, 2100], good: 'boilers', bld: 'steam_foundry', m: { prod: .06, army: .03 },
-    t: ['Caldeiras de alta pressão', 'Dirigíveis', 'Caminhantes a vapor', 'Encouraçados terrestres', 'Leviatãs a vapor'],
-    unit: ['Carros a vapor', 'Couraças a vapor', 'Caminhantes a vapor', 'Encouraçados terrestres', 'Leviatãs'] },
-  { id: 'tesla', n: 'Teslapunk', e: '⚡', col: '#4aa3df', y: [1880, 1920, 1980, 2060, 2150], good: 'coils', bld: 'tesla_tower', m: { research: .06, prod: .03 },
-    t: ['Energia sem fio', 'Raios da morte', 'Escudos elétricos', 'Rede planetária', 'Tempestade controlada'],
+  { id: 'clock', n: 'Clockpunk', e: '⚙️', col: '#c9a227', good: 'gears', bld: 'clock_works', m: { prod: .2, research: .2 },
+    entry: { y: 1360, c: 'eco', req: ['eco_guilds'], n: 'Mecanismos de relojoaria' },
+    tree: [[1420, 'mil', 'Bestas de corda'], [1450, 'eco', 'Moinhos de engrenagem'], [1500, 'nav', 'Caravelas de relojoaria'], [1560, 'mil', 'Autômatos de guerra'], [1620, 'eco', 'Manufatura autômata'], [1700, 'nav', 'Navios de corda'], [1780, 'eco', 'Fábricas de relojoaria'], [1850, 'mil', 'Golens de engrenagem'], [1880, 'eco', 'Motores diferenciais'], [1920, 'nav', 'Submarinos de corda'], [1950, 'mil', 'Androides de corda'], [1980, 'eco', 'Cérebros analíticos'], [2020, 'eco', 'Relojoaria quântica'], [2050, 'mil', 'Colossos mecânicos'], [2075, 'nav', 'Dirigíveis de engrenagem'], [2100, 'eco', 'Engrenagens perpétuas'], [2150, 'nav', 'Arcas celestes de relojoaria'], [2190, 'mil', 'Titãs eternos']],
+    unit: ['Autômatos', 'Autômatos de guerra', 'Golens de engrenagem', 'Androides de corda', 'Colossos mecânicos', 'Titãs eternos'] },
+  { id: 'steam', n: 'Steampunk', e: '♨️', col: '#a0522d', good: 'boilers', bld: 'steam_foundry', m: { prod: .3, army: .15 },
+    entry: { y: 1640, c: 'eco', req: ['eco_manufactory'], n: 'Caldeiras primitivas' },
+    tree: [[1700, 'eco', 'Caldeiras de alta pressão'], [1730, 'nav', 'Navios a roda'], [1760, 'mil', 'Canhões a vapor'], [1800, 'eco', 'Cidades de vapor'], [1830, 'nav', 'Dirigíveis'], [1870, 'mil', 'Caminhantes a vapor'], [1890, 'eco', 'Locomotivas colossais'], [1920, 'eco', 'Megafornalhas'], [1960, 'nav', 'Encouraçados aéreos'], [2000, 'mil', 'Encouraçados terrestres'], [2030, 'eco', 'Vapor sintético'], [2060, 'eco', 'Caldeiras etéreas'], [2110, 'nav', 'Dirigíveis orbitais'], [2160, 'mil', 'Leviatãs a vapor'], [2190, 'nav', 'Colônias espaciais a vapor']],
+    unit: ['Carros a vapor', 'Couraças a vapor', 'Caminhantes a vapor', 'Encouraçados terrestres', 'Leviatãs a vapor'] },
+  { id: 'tesla', n: 'Teslapunk', e: '⚡', col: '#4aa3df', good: 'coils', bld: 'tesla_tower', m: { research: .3, prod: .15 },
+    entry: { y: 1890, c: 'eco', req: ['eco_electricity'], n: 'Bobinas de Tesla' },
+    tree: [[1910, 'eco', 'Energia sem fio'], [1925, 'mil', 'Raios da morte'], [1945, 'nav', 'Navios voltaicos'], [1970, 'eco', 'Rede de torres'], [2000, 'mil', 'Escudos elétricos'], [2040, 'nav', 'Frotas de arco'], [2080, 'eco', 'Rede planetária'], [2120, 'mil', 'Tempestade controlada'], [2170, 'nav', 'Velas de plasma']],
     unit: ['Lanceiros de raio', 'Tropas de bobina', 'Andarilhos de arco', 'Colossos voltaicos', 'Tempestades vivas'] },
-  { id: 'atom', n: 'Atompunk', e: '☢️', col: '#4caf50', y: [1900, 1940, 1970, 2030, 2120], good: 'cores', bld: 'reactor', m: { prod: .05, army: .04 },
-    t: ['Radiação domada', 'Carros atômicos', 'Robôs atômicos', 'Cidades-cúpula', 'Era do átomo eterno'],
-    unit: ['Soldados de rádio', 'Tanques atômicos', 'Robôs atômicos', 'Gigantes de cobalto', 'Titãs nucleares'] },
-  { id: 'diesel', n: 'Dieselpunk', e: '🛞', col: '#6d6d6d', y: [1915, 1940, 1975, 2040, 2130], good: 'engines', bld: 'diesel_works', m: { army: .06, manpower: .04 },
-    t: ['Motores pesados', 'Supertanques', 'Fortalezas voadoras', 'Cidades-fábrica', 'Megamáquinas'],
+  { id: 'diesel', n: 'Dieselpunk', e: '🛞', col: '#6d6d6d', good: 'engines', bld: 'diesel_works', m: { army: .3, manpower: .2 },
+    entry: { y: 1890, c: 'mil', req: ['eco_oil'], n: 'Motores de combustão' },
+    tree: [[1910, 'mil', 'Motores pesados'], [1925, 'eco', 'Cidades-fábrica'], [1940, 'nav', 'Couraçados a diesel'], [1955, 'mil', 'Supertanques'], [1975, 'eco', 'Refinarias colossais'], [2000, 'nav', 'Fortalezas voadoras'], [2040, 'mil', 'Megatanques'], [2090, 'eco', 'Megamáquinas'], [2140, 'nav', 'Foguetes a diesel'], [2185, 'mil', 'Moloques de aço']],
     unit: ['Couraçados de lagarta', 'Supertanques', 'Fortalezas rolantes', 'Megatanques', 'Moloques de aço'] },
-  { id: 'bio', n: 'Biopunk', e: '🧬', col: '#8bc34a', y: [1960, 1990, 2030, 2090, 2160], good: 'biomass', bld: 'biovat', m: { growth: .08, food: .06 },
-    t: ['Engenharia genética', 'Colheitas sintéticas', 'Bioarmas', 'Organismos-cidade', 'Hivemente'],
+  { id: 'atom', n: 'Atompunk', e: '☢️', col: '#4caf50', good: 'cores', bld: 'reactor', m: { prod: .25, army: .2 },
+    entry: { y: 1930, c: 'eco', req: ['eco_assembly'], n: 'Radiação domada' },
+    tree: [[1945, 'mil', 'Soldados de rádio'], [1955, 'eco', 'Energia atômica barata'], [1965, 'nav', 'Frotas atômicas'], [1980, 'mil', 'Robôs atômicos'], [2000, 'eco', 'Cidades-cúpula'], [2030, 'nav', 'Foguetes nucleares'], [2070, 'mil', 'Gigantes de cobalto'], [2110, 'eco', 'Era do átomo eterno'], [2160, 'nav', 'Arcas atômicas'], [2190, 'mil', 'Titãs nucleares']],
+    unit: ['Soldados de rádio', 'Tanques atômicos', 'Robôs atômicos', 'Gigantes de cobalto', 'Titãs nucleares'] },
+  { id: 'bio', n: 'Biopunk', e: '🧬', col: '#8bc34a', good: 'biomass', bld: 'biovat', m: { growth: .4, food: .3 },
+    entry: { y: 1960, c: 'eco', req: ['eco_green_rev'], n: 'Engenharia genética' },
+    tree: [[1975, 'eco', 'Colheitas sintéticas'], [1990, 'mil', 'Soldados aprimorados'], [2010, 'nav', 'Cascos vivos'], [2030, 'eco', 'Fábricas orgânicas'], [2060, 'mil', 'Quimeras'], [2090, 'nav', 'Leviatãs vivos'], [2120, 'eco', 'Organismos-cidade'], [2160, 'nav', 'Naves orgânicas'], [2190, 'mil', 'Hivemente']],
     unit: ['Soldados aprimorados', 'Feras de laboratório', 'Quimeras', 'Leviatãs vivos', 'Enxame orgânico'] },
-  { id: 'cyber', n: 'Cyberpunk', e: '💾', col: '#e040fb', y: [2000, 2025, 2060, 2110, 2170], good: 'chips', bld: 'chipfab', m: { research: .06, tax: .05 },
-    t: ['Implantes neurais', 'Megacorporações', 'Ciberespaço total', 'Consciência digital', 'Singularidade de neon'],
+  { id: 'cyber', n: 'Cyberpunk', e: '💾', col: '#e040fb', good: 'chips', bld: 'chipfab', m: { research: .3, tax: .25 },
+    entry: { y: 1995, c: 'eco', req: ['eco_internet'], n: 'Implantes neurais' },
+    tree: [[2005, 'eco', 'Megacorporações'], [2015, 'mil', 'Ciborgues'], [2030, 'nav', 'Frotas em rede'], [2050, 'eco', 'Ciberespaço total'], [2075, 'mil', 'Mechas urbanos'], [2100, 'nav', 'Drones orbitais'], [2130, 'eco', 'Consciência digital'], [2165, 'mil', 'Fantasmas de rede'], [2195, 'nav', 'Singularidade estelar']],
     unit: ['Ciborgues', 'Mercenários cromados', 'Mechas urbanos', 'Fantasmas de rede', 'Avatares'] },
-  { id: 'solar', n: 'Solarpunk', e: '☀️', col: '#ffca28', y: [2050, 2080, 2110, 2150, 2190], good: 'panels', bld: 'solar_array', m: { growth: .05, stab: .04, prod: .03 },
-    t: ['Cidades-jardim', 'Energia abundante', 'Arcologias verdes', 'Gaia restaurada', 'Era dourada'],
+  { id: 'solar', n: 'Solarpunk', e: '☀️', col: '#ffca28', good: 'panels', bld: 'solar_array', m: { growth: .25, stab: .2, prod: .15 },
+    entry: { y: 2040, c: 'eco', req: ['eco_ai'], n: 'Energia solar abundante' },
+    tree: [[2055, 'eco', 'Cidades-jardim'], [2070, 'mil', 'Guardiões verdes'], [2090, 'nav', 'Velas solares'], [2110, 'eco', 'Arcologias verdes'], [2140, 'mil', 'Sentinelas de luz'], [2165, 'nav', 'Esferas solares'], [2190, 'eco', 'Era dourada']],
     unit: ['Guardiões verdes', 'Drones solares', 'Andarilhos de jardim', 'Sentinelas de luz', 'Coros solares'] },
-  { id: 'nano', n: 'Nanopunk', e: '🔬', col: '#00bcd4', y: [2100, 2120, 2145, 2170, 2195], good: 'nanites', bld: 'nanoforge', m: { prod: .07, army: .04 },
-    t: ['Nanomáquinas', 'Autorreparo', 'Matéria programável', 'Nuvem cinza', 'Forja infinita'],
+  { id: 'nano', n: 'Nanopunk', e: '🔬', col: '#00bcd4', good: 'nanites', bld: 'nanoforge', m: { prod: .35, army: .2 },
+    entry: { y: 2080, c: 'eco', req: ['eco_fusion'], n: 'Nanomáquinas' },
+    tree: [[2095, 'mil', 'Nanotropa'], [2110, 'eco', 'Matéria programável'], [2130, 'nav', 'Cascos autorreparáveis'], [2150, 'mil', 'Nuvem cinza'], [2170, 'eco', 'Forja infinita'], [2190, 'nav', 'Naves de matéria']],
     unit: ['Nanotropa', 'Legião autorreparável', 'Soldados de matéria', 'Nuvem cinza', 'Exército fluido'] },
-  { id: 'space', n: 'Spacepunk', e: '🚀', col: '#7e57c2', y: [2150, 2165, 2180, 2190, 2199], good: 'he3', bld: 'spaceport', m: { research: .05, trade: .06, army: .04 },
-    t: ['Estações orbitais', 'Mineração lunar', 'Frotas estelares', 'Colônias marcianas', 'Império estelar'],
+  { id: 'space', n: 'Spacepunk', e: '🚀', col: '#7e57c2', good: 'he3', bld: 'spaceport', m: { research: .25, trade: .3, army: .2 },
+    entry: { y: 2120, c: 'nav', req: ['nav_seastead'], n: 'Elevadores orbitais' },
+    tree: [[2135, 'nav', 'Estações orbitais'], [2150, 'eco', 'Mineração lunar'], [2165, 'mil', 'Tropas de queda'], [2180, 'nav', 'Colônias marcianas'], [2195, 'eco', 'Império estelar']],
     unit: ['Fuzileiros orbitais', 'Tropas de queda', 'Naves de assalto', 'Legiões estelares', 'Armada do vazio'] },
 ];
 const VERT = Object.fromEntries(VERTS.map(v => [v.id, v]));
-VERTS.forEach(v => v.y.forEach((y, i) => TECHS.push(TECH['v_' + v.id + i] = { id: 'v_' + v.id + i, c: 'vert', v: v.id, lv: i + 1, y, n: v.t[i], req: i ? ['v_' + v.id + (i - 1)] : [], fx: i ? {} : { b: [v.bld] } })));
+VERTS.forEach(v => {
+  const add = t => { TECHS.push(t); TECH[t.id] = t; };
+  add({ id: 'v_' + v.id, c: v.entry.c, v: v.id, entry: true, y: v.entry.y, n: v.entry.n, req: v.entry.req, fx: { b: [v.bld] }, src: [] });
+  const last = {}; v.len = v.tree.length + 1;
+  v.tree.forEach(([y, c, n], k) => { const id = 'v_' + v.id + '_' + k; add({ id, c, v: v.id, vt: true, y, n, req: [last[c] || 'v_' + v.id], fx: {}, src: [] }); last[c] = id; });
+  // cada tecnologia da árvore normal substituída vai para a primeira da vertente na mesma área com ano igual ou maior
+  TECHS.filter(t => !t.v && ['mil', 'nav', 'eco'].includes(t.c) && t.y > v.entry.y).forEach(t => {
+    const opts = TECHS.filter(x => x.v === v.id && x.vt && x.c === t.c); if (!opts.length) return;
+    (opts.find(x => x.y >= t.y) || opts[opts.length - 1]).src.push(t.id);
+  });
+});
 
 /* ---------- governos ----------
    cat: grupo · succ: sucessão (hered herança · elect eleito vitalício · term eleições a cada `term` anos · party partido · junta · council · theo · ai)
@@ -339,19 +363,29 @@ const TERRAIN = {
 
 /* ---------- traços de personagens (m: modificadores da nação enquanto governa) ---------- */
 const TRAITS = {
-  brave:     { n: 'Bravo', m: { army: .05 } }, craven: { n: 'Covarde', m: { army: -.05 } },
+  brave:     { n: 'Bravo', m: { army: .05 }, ai: 'guerreia mais' }, craven: { n: 'Covarde', m: { army: -.05 }, ai: 'evita guerras' },
   genius:    { n: 'Gênio', m: { research: .1 } }, slow: { n: 'Lento', m: { research: -.06 } },
-  ambitious: { n: 'Ambicioso', m: { prod: .04, stab: -.03 } }, content: { n: 'Contente', m: { stab: .04 } },
-  just:      { n: 'Justo', m: { stab: .06 } }, cruel: { n: 'Cruel', m: { stab: -.04, manpower: .05 } },
-  greedy:    { n: 'Ganancioso', m: { tax: .06, stab: -.02 } }, generous: { n: 'Generoso', m: { tax: -.04, stab: .05 } },
-  zealous:   { n: 'Zeloso', m: { stab: .03, research: -.03 } }, cynical: { n: 'Cínico', m: { research: .03 } },
-  diligent:  { n: 'Diligente', m: { prod: .05, tax: .03 } }, lazy: { n: 'Preguiçoso', m: { prod: -.04 } },
-  schemer:   { n: 'Conspirador', m: { coup: -.3 } }, honest: { n: 'Honesto', m: { stab: .03 } },
-  strategist:{ n: 'Estrategista', m: { army: .08 } }, builder: { n: 'Construtor', m: { admin: .1 } },
-  navigator: { n: 'Navegador', m: { colon: .15, trade: .05 } }, scholar: { n: 'Erudito', m: { research: .06 } },
-  paranoid:  { n: 'Paranoico', m: { coup: -.5, stab: -.03 } }, charismatic: { n: 'Carismático', m: { stab: .05, manpower: .03 } },
-  sickly:    { n: 'Doente', m: { stab: -.02 }, die: 2 }, robust: { n: 'Robusto', m: {}, die: .5 },
+  ambitious: { n: 'Ambicioso', m: { prod: .04, stab: -.03 }, ai: 'busca expansão e reivindicações' }, content: { n: 'Contente', m: { stab: .04 }, ai: 'prefere a paz' },
+  just:      { n: 'Justo', m: { stab: .06 }, ai: 'não fabrica reivindicações' }, cruel: { n: 'Cruel', m: { stab: -.04, manpower: .05 }, ai: 'guerreia mais' },
+  greedy:    { n: 'Ganancioso', m: { tax: .06, stab: -.02 }, ai: 'acumula ouro e ergue mercados' }, generous: { n: 'Generoso', m: { tax: -.04, stab: .05 }, ai: 'aceita mais acordos e dá presentes' },
+  zealous:   { n: 'Zeloso', m: { stab: .03, research: -.03 }, ai: 'ergue templos' }, cynical: { n: 'Cínico', m: { research: .03 }, ai: 'ignora templos' },
+  diligent:  { n: 'Diligente', m: { prod: .05, tax: .03 }, ai: 'constrói mais' }, lazy: { n: 'Preguiçoso', m: { prod: -.04 }, ai: 'constrói menos' },
+  schemer:   { n: 'Conspirador', m: { coup: -.3 }, ai: 'fabrica mais reivindicações' }, honest: { n: 'Honesto', m: { stab: .03 }, ai: 'sempre honra alianças' },
+  strategist:{ n: 'Estrategista', m: { army: .08 }, ai: 'mantém exército maior' }, builder: { n: 'Construtor', m: { admin: .1 }, ai: 'prioriza obras' },
+  navigator: { n: 'Navegador', m: { colon: .15, trade: .05 }, ai: 'explora e coloniza mais' }, scholar: { n: 'Erudito', m: { research: .06 }, ai: 'ergue universidades' },
+  paranoid:  { n: 'Paranoico', m: { coup: -.5, stab: -.03 }, ai: 'exército maior, desconfia de alianças' }, charismatic: { n: 'Carismático', m: { stab: .05, manpower: .03 }, ai: 'faz mais alianças e casamentos' },
+  sickly:    { n: 'Doente', m: { stab: -.02 }, die: 2, ai: 'morre mais cedo' }, robust: { n: 'Robusto', m: {}, die: .5, ai: 'vive mais' },
 };
+const STATS = {                                              // o que cada atributo faz (governante e conselho)
+  dip: { n: 'Diplomacia', d: 'Governante: +0,4 de estabilidade por ponto acima de 8.\nChanceler: +0,3 por ponto.\nAjuda a convencer outros países em propostas.' },
+  mar: { n: 'Marcial', d: 'Governante: +0,8% de força militar por ponto acima de 8.\nMarechal: +0,6% por ponto.' },
+  adm: { n: 'Administração', d: 'Governante: +0,8% de impostos por ponto acima de 8.\nTesoureiro: +0,6% por ponto.' },
+  int: { n: 'Intriga', d: 'Governante: −2% de risco de golpe por ponto acima de 8.\nMestre espião: −4% por ponto.' },
+  lea: { n: 'Saber', d: 'Governante: +0,8% de pesquisa por ponto acima de 8.\nErudito: +0,6% por ponto.' },
+};
+const ERAS = [[860, 'Alta Idade Média'], [1000, 'Idade Média'], [1450, 'Renascimento'], [1650, 'Era Moderna'], [1780, 'Era das Revoluções'], [1880, 'Era Industrial'], [1945, 'Guerra Fria'], [2000, 'Era Digital'], [2060, 'Futuro']];
+const eraOf = y => { let e = ERAS[0][1]; for (const [a, n] of ERAS) if (y >= a) e = n; return e; };
+const SHIPS = [['nav_longship', 'Barcos longos'], ['nav_knarr', 'Knarrs'], ['nav_cog', 'Cocas'], ['nav_caravel', 'Caravelas'], ['nav_galleon', 'Galeões'], ['nav_lineship', 'Naus de linha'], ['nav_steamship', 'Vapores'], ['nav_ironclad', 'Encouraçados'], ['nav_dreadnought', 'Dreadnoughts'], ['nav_carrier', 'Porta-aviões'], ['nav_nuclearsub', 'Submarinos nucleares'], ['nav_aegis', 'Destróieres de mísseis'], ['nav_autonomous', 'Frotas autônomas'], ['nav_orbit', 'Naves orbitais']];
 const COUNCIL = [['chancellor', 'Chanceler', 'dip'], ['marshal', 'Marechal', 'mar'], ['steward', 'Tesoureiro', 'adm'], ['spymaster', 'Mestre espião', 'int'], ['scholar', 'Erudito', 'lea']];
 
 /* ---------- culturas: sílabas para nomes de lugares, pessoas e dinastias ---------- */
