@@ -8,8 +8,6 @@ CONTENT.DEFINES = {
   END_YEAR: 2200,
   VERT_DECLINE: .1, // parte do bônus da vertente que fica para quem a recusa
   BUILD_SLOW: 2.4, // obras, recrutas, navios e prospecção: prazos ×2,4 (base de 2–3 meses vira 5–7)
-  RANK_KING: .75, // Reino sustenta 3/4 dos estados do continente; Império exige 2/3 das províncias dele
-  RANK_EMP: 0.6666666666666666,
   WIDTH_BASE: 12, // largura de combate, alcance da linha de suprimento (províncias), regimentos por navio
   LOGI_BASE: 2,
   SHIP_CAP: 1,

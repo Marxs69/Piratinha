@@ -49,6 +49,15 @@ const COND = {
   spyTech: { ok: n => !!spyTechOf(n), txt: () => 'Eles estão à frente em alguma técnica que você pode pesquisar' },
   plotting:{ ok: (n, v) => !!n.plot === v, txt: v => v ? 'Plano em andamento' : 'Sem plano' },
   clsShare:{ ok: (n, v) => !!n.cls && inR((n.cls[v[0]] || 0) / Math.max(1, n.popT || 0), v.slice(1)), txt: v => rTxt('Classe ' + (CLASSES[v[0]] || { n: v[0] }).n.toLowerCase(), v.slice(1), x => Math.round(x * 100) + '% da população') },
+  /* súditos: subject (true/false ou lista de níveis) · lib (faixa da barra) · subjLaw ({lei: [opções]}) · seniorWeak (suserano instável ou perdendo) · backer (com apoio estrangeiro) */
+  subject: { ok: (n, v) => typeof v === 'boolean' ? isSubj(n) === v : isSubj(n) && arr(v).includes(n.subj.tier), txt: v => v === true ? 'É súdito' : v === false ? 'Independente' : 'Súdito do tipo ' + orTxt(arr(v).map(t => SUBJECTS[t].n)) },
+  lib:     { ok: (n, v) => isSubj(n) && inR(n.subj.lib, v), txt: v => rTxt('Desejo de liberdade', v) },
+  subjLaw: { ok: (n, v) => isSubj(n) && Object.keys(v).every(k => arr(v[k]).includes(n.subj.laws[k])), txt: v => Object.keys(v).map(k => SUBJ_LAWS[k].n + ': ' + orTxt(arr(v[k]).map(o => SUBJ_LAWS[k].o[o].n))).join('; ') },
+  seniorWeak: { ok: (n, v) => isSubj(n) && seniorWeak(n) === v, txt: v => v ? 'Suserano instável ou perdendo uma guerra' : 'Suserano firme' },
+  backer:  { ok: (n, v) => isSubj(n) && !!backerOf(n) === v, txt: v => v ? 'Com apoio estrangeiro' : 'Sem apoio estrangeiro' },
+  /* escravidão: slaves (há escravos e a lei permite) · slvReb (faixa da rebeldia) */
+  slaves:  { ok: (n, v) => slavesOn(n) === v, txt: v => v ? 'Com escravos' : 'Sem escravos' },
+  slvReb:  { ok: (n, v) => slavesOn(n) && inR(n.slvReb || 0, v), txt: v => rTxt('Rebeldia dos escravos', v) },
   any:     { ok: (n, v) => v.some(c => condOk(n, c)), txt: v => 'Uma destas: ' + v.map(c => condTxt(c).join(', ')).join(' | '), sub: v => v },
   not:     { ok: (n, v) => !condOk(n, v), txt: v => 'Não: ' + condTxt(v).join(', '), sub: v => [v] },
 };
@@ -104,6 +113,16 @@ const EFF = {
                 if (v === 'concede' && d[0]) { const x = d[0]; if (x.ty === 'gov') applyGov(n, x.v); else if (x.ty === 'law') n.laws[x.k] = x.v; else n.ideo = x.v; calcMods(n); }
                 if (v === 'purge' && d[0]) n.council[d[0].slot] = councilChar(n, d[0].slot); if (v === 'form') formCouncil(n); },
               txt: v => v === 'concede' ? 'Atende a exigência mais forte do conselho' : v === 'form' ? 'Um conselho novo, escolhido pelo novo regime' : 'Troca o conselheiro mais exigente' },
+  /* súdito: lib = barra agora (pontos) · libPush { l, v, mo } = empurra o alvo da barra por mo meses · relSenior = relação dos dois lados
+     petition = pede ao suserano uma lei mais leve · backer = uma potência rival passa a apoiar a independência */
+  lib:      { do: (n, v) => { if (isSubj(n)) n.subj.lib = clamp(n.subj.lib + v, 0, 100); }, txt: v => '🏴 Desejo de liberdade ' + sgnN(v) },
+  libPush:  { do: (n, v) => { if (isSubj(n)) (n.subj.push = n.subj.push || []).push({ l: v.l, v: v.v, u: S.t + v.mo * 30 }); }, txt: v => '🏴 ' + v.l + ': alvo da liberdade ' + sgnN(v.v) + ' por ' + durTxt(v.mo) },
+  relSenior:{ do: (n, v) => { if (!isSubj(n)) return; const o = nat(n.senior); relAdd(n, o, v); relAdd(o, n, v); }, txt: v => 'Relação com o suserano ' + sgnN(v) },
+  petition: { do: (n, v) => petition(n, v), txt: v => '📜 Pede ao suserano: ' + SUBJ_LAWS[v].n.toLowerCase() + ' mais leve' },
+  backer:   { do: n => findBacker(n), txt: () => '🤝 Uma potência rival do suserano pode apoiar a independência' },
+  /* escravidão: slvReb = pontos na barra de rebeldia · slvFree = liberta essa fração dos escravos (viram classe baixa) */
+  slvReb:   { do: (n, v) => { if (slavesOn(n)) n.slvReb = clamp((n.slvReb || 0) + v, 0, 100); }, txt: v => '⛓️ Rebeldia dos escravos ' + sgnN(v) },
+  slvFree:  { do: (n, v) => { n.slv = Math.max(0, (n.slv || 0) * (1 - v)); }, txt: v => '⛓️ Liberta ' + Math.round(v * 100) + '% dos escravos' },
   /* sorteio: [[chance, efeitos], ...]; o que sobrar da chance não faz nada */
   roll:     { do: (n, v) => { let x = rnd(); for (const [p, fx] of v) { if (x < p) { applyFx(n, fx); return; } x -= p; } },
               txt: v => v.map(([p, fx]) => Math.round(p * 100) + '%: ' + (fxTxt(fx).join(', ') || 'nada')).join(' · '), sub: v => v.map(x => x[1]) },
@@ -160,6 +179,7 @@ function validateData() {
   EVENTS.forEach(ev => { const w = 'evento ' + ev.id; if (ids.has(ev.id)) err.push(w + ': id repetido'); ids.add(ev.id);
     ['t', 'e', 'm'].forEach(k => { if (ev[k] == null) err.push(w + ': falta ' + k); }); if (ev.p == null) err.push(w + ': falta p (0 = só por cadeia)'); if (!(ev.opts || []).length) err.push(w + ': sem escolhas');
     chkC(ev.when, w); (ev.opts || []).forEach((o, i) => { chkC(o.when, w + ' escolha ' + i); chkF(o.fx, w + ' escolha ' + i); if (!o.n) err.push(w + ' escolha ' + i + ': sem nome'); }); });
+  for (const k in SUBJ_ACTS) { const A = SUBJ_ACTS[k], w = 'ação de súdito ' + k; chkC(A.when, w); chkF(A.fx, w); if (!['loyal', 'rebel'].includes(A.g)) err.push(w + ': g deve ser loyal ou rebel'); }
   const modOk = (m, w) => Object.keys(m || {}).forEach(k => { if (!MODS[k] && k !== 'coup') err.push(w + ': modificador desconhecido ' + k); });
   for (const g in GOVS) modOk(GOVS[g].m, 'governo ' + g); for (const i in IDEOS) modOk(IDEOS[i].m, 'ideologia ' + i); for (const t in TRAITS) modOk(TRAITS[t].m, 'traço ' + t);
   for (const k in LAWS) for (const o in LAWS[k].o) { modOk(LAWS[k].o[o].m, 'lei ' + k + '.' + o); chkC(LAWS[k].o[o].when, 'lei ' + k + '.' + o); }

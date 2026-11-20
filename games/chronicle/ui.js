@@ -35,7 +35,7 @@ function bTip(b) {
   const d = BUILDINGS[b], o = [d.e + ' ' + d.n];
   if (d.in) o.push('Consome: ' + Object.entries(d.in).map(([g, q]) => q + ' ' + GOODS[g].n).join(', '));
   if (d.out) o.push('Produz: ' + Object.entries(d.out).map(([g, q]) => q + ' ' + GOODS[g].n).join(', '));
-  if (d.fx) Object.entries(d.fx).forEach(([k, v]) => { const t = { tax: 'Impostos do país +' + +(v * 100).toFixed(1) + '% (até +' + BFX_CAP.tax * 100 + '%)', fort: 'Fortificação +' + v, port: 'Porto: frotas e comércio', trade: 'Comércio +' + Math.round(v * 100) + '% (até +' + BFX_CAP.trade * 100 + '%)', research: 'Pesquisa +' + v + '/mês', stab: 'Estabilidade +' + v + ' (até +' + BFX_CAP.stab + ')', ferv: 'Fervor desejado +' + v + ' (até +' + BFX_CAP.ferv + ')', prod: 'Produção do estado +' + Math.round(v * 100) + '%', speed: 'Tropas ' + Math.round(v * 100) + '% mais rápidas no estado', infra: 'Aparece no mapa ligando estados vizinhos', boost: v && typeof v === 'object' ? Object.entries(v).filter(([x]) => BUILDINGS[x]).map(([x, k]) => BUILDINGS[x].n + ' do estado +' + Math.round(k * 100) + '% por nível').join('; ') : '', sub: 'Subsistência do estado +' + Math.round(v * 100) + '% por nível', pipe: 'Aparece no mapa', svc: SVC[v] ? SVC[v].n + ': cada nível atende ' + Math.round(SVC_CAP(curYear())) + ' mil pessoas (' + SVC[v].d.toLowerCase() + ')' : '', yard: 'Navios ' + Math.round(v * 100) + '% mais baratos neste estado', mp: 'Contingente +' + Math.round(v * 100) + '%', rec: 'Recrutas ' + v + ' mês mais rápidos aqui', army: 'Força militar +' + Math.round(v * 100) + '%', launch: 'Lança foguetes e satélites' }[k]; if (t) o.push(t); });
+  if (d.fx) Object.entries(d.fx).forEach(([k, v]) => { const t = { tax: 'Impostos do país +' + +(v * 100).toFixed(1) + '% (até +' + BFX_CAP.tax * 100 + '%)', fort: 'Fortificação +' + v, port: 'Porto: frotas e comércio', trade: 'Comércio +' + Math.round(v * 100) + '% (até +' + BFX_CAP.trade * 100 + '%)', research: 'Pesquisa +' + v + '/mês', stab: 'Estabilidade +' + v + ' (até +' + BFX_CAP.stab + ')', ferv: 'Fervor desejado +' + v + ' (até +' + BFX_CAP.ferv + ')', prod: 'Produção do estado +' + Math.round(v * 100) + '%', speed: 'Tropas ' + Math.round(v * 100) + '% mais rápidas no estado', infra: 'Estrada no mapa ligando estados vizinhos', rail: 'Trilhos no mapa ligando estados vizinhos', frt: 'Frete entre estados mais barato (insumos chegam com menos perda)', svcP: v && typeof v === 'object' ? Object.entries(v).filter(([x]) => SVC[x]).map(([x, k]) => SVC[x].n + ' (' + Math.round(k * 100) + '% de um prédio de serviço)').join(', ') : '', boost: v && typeof v === 'object' ? Object.entries(v).filter(([x]) => BUILDINGS[x]).map(([x, k]) => BUILDINGS[x].n + ' do estado +' + Math.round(k * 100) + '% por nível').join('; ') : '', sub: 'Subsistência do estado +' + Math.round(v * 100) + '% por nível', pipe: 'Aparece no mapa', svc: SVC[v] ? SVC[v].n + ': cada nível atende ' + Math.round(SVC_CAP(curYear())) + ' mil pessoas (' + SVC[v].d.toLowerCase() + ')' : '', yard: 'Navios ' + Math.round(v * 100) + '% mais baratos neste estado', mp: 'Contingente +' + Math.round(v * 100) + '%', rec: 'Recrutas ' + v + ' mês mais rápidos aqui', army: 'Força militar +' + Math.round(v * 100) + '%', launch: 'Lança foguetes e satélites' }[k]; if (t) o.push(t); });
   if (d.tl) o.push('Usa ' + d.tl + ' de Ferramentas: sem elas rende até 20% menos');
   if (d.in) for (const g in d.in) if (GOODS[g].y0) o.push(GOODS[g].n + ' só é consumida a partir de ' + GOODS[g].y0);
   const J = JOBS[jobGroup(b)]; o.push(d.w + ' mil empregos por nível (' + JOB_N[jobGroup(b)].toLowerCase() + ': ' + CLASS_IDS.filter(k => J[k]).map(k => Math.round(J[k] * 100) + '% ' + CLASSES[k].n.toLowerCase()).join(', ') + ') · ' + bMonths(b) + ' meses de obra');
@@ -170,12 +170,20 @@ function drawModes(box, game) {
 }
 
 /* ---------- barra do topo ---------- */
+/* transição de era: faixa que aparece e some sozinha (não bloqueia cliques nem pausa) */
+function eraFlash(name) { const d = el('div', 'erafx'); d.append(el('small', '', 'Nova era'), el('b', '', name)); document.body.append(d); setTimeout(() => d.remove(), 3800); }
 function drawTop() {
   const t = $('#top'), n = me(); t.innerHTML = '';
+  if (UI.eraNat !== n.id) { UI.eraNat = n.id; UI.era = n.era || 0; } else if ((n.era || 0) > UI.era) { UI.era = n.era; eraFlash(ERAS[n.era][1]); }
   const f = flagEl(n.flag, 'flag'); tip(f, 'Bandeira: clique para editar (💰' + flagCost() + ')'); f.onclick = () => openWin('flag'); t.append(f);
   const nm = el('div', 'nname'); nm.append(el('b', '', natName(n)), el('small', '', titleOf(n) + ' ' + charName(n.ruler))); tip(nm, GOVS[n.gov].n + ' · ' + IDEOS[n.ideo].n + (n.senior != null ? '\n' + (n.subj ? SUBJECTS[n.subj.tier].n : 'Súdito') + ' de ' + natName(nat(n.senior)) : '')); t.append(nm);
-  const res = (v, s, tt, cls = '', sc = '', click) => { const d = el('div', 'res'); tip(d, tt); d.append(el('b', cls, v), el('small', sc, s)); if (click) { d.style.cursor = 'pointer'; d.onclick = click; } t.append(d); };
-  const lab = { tax: 'Impostos', trade: 'Exportações', imports: 'Importações', transport: 'Frete entre estados', tribute: 'Tributo', rep: 'Reparações', plunder: 'Pilhagem', army: 'Exército', navy: 'Marinha', admin: 'Administração', svc: 'Serviços públicos', interest: 'Juros', corrupt: 'Corrupção' };
+  /* cada número da barra leva à aba dele (pelo rótulo ou pelo ícone) */
+  const CLK = { 'domínio': ['gov', 'gov'], 'população': ['pop', 'cls'], 'estabilidade': ['gov', 'mods'], 'pressão': ['gov', 'council'], 'rebeldes': ['mil', 'army'], 'em guerra': ['mil', 'fronts'], 'em paz': ['mil', 'army'] },
+    ICLK = { '👑': ['gov', 'gov'], '💰': ['eco', 'over'], '🔬': ['tech', null] };
+  const goW = ([w, tab]) => () => { if (tab) UI[w + 'Tab'] = tab; openWin(w); };
+  const res = (v, s, tt, cls = '', sc = '', click) => { const d = el('div', 'res'); tip(d, tt); d.append(el('b', cls, v), el('small', sc, s)); const k = CLK[s] || ICLK[[...v][0]]; if (!click && k) click = goW(k); if (click) { d.style.cursor = 'pointer'; d.onclick = click; } t.append(d); };
+  const lab = { tax: 'Impostos', trade: 'Exportações', imports: 'Importações', transport: 'Frete entre estados', tribute: 'Tributo', subjSales: 'Vendas aos súditos', rep: 'Reparações', plunder: 'Pilhagem', army: 'Exército', navy: 'Marinha', admin: 'Administração', svc: 'Serviços públicos', interest: 'Juros', corrupt: 'Corrupção' };
+  if (isSubj(n)) { const L = n.subj.lib; res('🏴 ' + Math.round(L) + '%', 'liberdade', 'Desejo de liberdade (Liberty Desire) · ' + SUBJECTS[n.subj.tier].n + ' de ' + natName(nat(n.senior)) + '\n0% = integrado · 100% = rompe e declara independência\nAlvo ' + Math.round(n.subj.tg ?? L) + '%:\n' + libParts(n).map(([k, v]) => k + ' ' + (v > 0 ? '+' : '') + v).join('\n'), L > 75 ? 'bad' : '', '', () => { UI.dipTab = 'subj'; openWin('dip'); }); }
   res('👑 ' + Math.round(n.pres ?? 50), presName(n).toLowerCase(), presName(n) + ' (0–100): volta devagar a 50.\nSobe com vitórias, investidura e segredos expostos; cai com derrotas e planos descobertos. Gasto ao elogiar e dar honrarias.\nCada 10 acima de 50: estabilidade +2% e risco de golpe −10%; também melhora a opinião da corte.', (n.pres ?? 50) < 30 ? 'bad' : '');
   res('💰 ' + money(n.money), (n.income >= 0 ? '+' : '−') + money(Math.abs(n.income)) + '/mês', 'Tesouro\n' + Object.entries(n.inc).filter(([, v]) => Math.abs(v) >= .5).map(([k, v]) => lab[k] + ': ' + money(v)).join('\n') + '\nTeto do tesouro: ' + money(hoardCap(n)) + ' (' + HOARD_MONTHS + ' meses de impostos); acima dele, ' + Math.round(HOARD_LEAK * 100) + '% do excesso some por mês em corrupção', n.money < 0 ? 'bad' : '', n.income >= 0 ? 'incg' : 'incb');
   const np = statesOf(n), cap = domCap(n); res('🏰 ' + np + (cap < 1e8 ? '/' + cap : ''), 'domínio', 'Limite de domínio (Domain Limit)\nTítulo: ' + RANK_N[n.rank || 0] + ' (' + titleOf(n) + ')\nEstados controlados, inteiros ou não: ' + np + ' de ' + (cap < 1e8 ? cap : 'sem limite') + '\nAcima do limite: −3 de estabilidade por estado, sem colonizar e sem anexar além disso na paz.\nProclame um título maior na janela de Governo.', np > cap ? 'bad' : np > cap * .85 ? 'gold' : '');
@@ -241,7 +249,7 @@ function sideProv(sd, p) {
   const tt = el('div'), sub = el('small', 'dim hier'), nSt = st.provs.length, nRg = WD.states.filter(x => WD.provs[x.cap].region === pr.region).length;
   sub.append(tip(el('span', '', '🧩 ' + st.n), 'Estado: ' + st.n + ' (' + nSt + ' províncias)\nA unidade da economia: prédios, empregos, recursos e canteiros são do estado. Quem controla a capital do estado constrói nele.\nO limite de domínio conta estados.'), ' · ',
     tip(el('span', '', '🗺️ ' + rg.n), 'Região: ' + rg.n + ' (' + nRg + ' estados)\nGrupo de estados vizinhos, com cultura e nome em comum. Aparece no modo de mapa Regiões e estados.'), ' · ',
-    tip(el('span', '', '🌍 ' + ct.n), 'Continente: ' + ct.n + (ct.main ? ' (o principal, mais desenvolvido)' : ct.cold ? ' (o do frio)' : '') + '\nO título de Império exige 2/3 das províncias do seu continente; outros continentes ficam escondidos até navegar.'));
+    tip(el('span', '', '🌍 ' + ct.n), 'Continente: ' + ct.n + (ct.main ? ' (o principal, mais desenvolvido)' : ct.cold ? ' (o do frio)' : '') + '\nOutros continentes ficam escondidos até navegar até eles.'));
   tt.append(el('h2', '', pr.n), sub); h.append(tt); sd.append(h);
   if (!n.exP[p]) { sd.append(el('p', 'dim', 'Terra inexplorada.')); return; }
   const T = TERRAIN[pr.terr];
@@ -256,22 +264,22 @@ function sideProv(sd, p) {
     tile('👥', 'População', popStr(S.pop[p]), 'Gente que vive nesta província'),
     tile('🏰', 'Fortificação', (fortOf(p) || '—') + '', 'Cada nível deixa o cerco bem mais lento.\nVem do castelo na capital do estado e da capital do país.'));
   sd.append(pg);
-  const msg = el('div', 'msg'), act = fn => () => { const e = fn(); msg.textContent = e || ''; if (!e) refresh(); };
+  const msg = el('div', 'msg'), run = fn => () => { const e = fn(); msg.textContent = e || ''; if (!e) refresh(); };
   if (o >= 0 && nat(o).capital === p) sd.append(tip(el('div', 'gold', '⭐ Capital de ' + nat(o).name), 'Fortificação +2. Se cair: −2 de estabilidade por mês e +25% de rendição.'));
-  else if (o === n.id && c === n.id) sd.append(btn('⭐ Tornar capital (💰' + capCost() + ')', act(() => act('setCapital', p)), 'sm', n.capCd > S.t ? 'Só a cada 10 anos (até ' + yearOf(n.capCd) + ')' : S.ctrl[n.capital] !== n.id ? 'A capital atual está ocupada' : n.money < capCost() ? 'Sem dinheiro' : '', 'Muda a capital para cá: −5 de estabilidade; uma vez a cada 10 anos'));
+  else if (o === n.id && c === n.id) sd.append(btn('⭐ Tornar capital (💰' + capCost() + ')', run(() => act('setCapital', p)), 'sm', n.capCd > S.t ? 'Só a cada 10 anos (até ' + yearOf(n.capCd) + ')' : S.ctrl[n.capital] !== n.id ? 'A capital atual está ocupada' : n.money < capCost() ? 'Sem dinheiro' : '', 'Muda a capital para cá: −5 de estabilidade; uma vez a cada 10 anos'));
   if (o === -1) {
     const col = S.cols.find(x => x.p === p);
     if (col) sd.append(sec('Colonização', el('div', '', natName(nat(col.o)) + ' · faltam ' + col.m + ' meses'), bar(1 - col.m / col.tot)));
-    else sd.append(sec('Colonização', btn('Colonizar (💰' + colCost(n, p) + ')', act(() => act('colonize', p)), 'grn', canColonize(n, p), 'Envia colonos; vira sua província em alguns meses.'), msg));
+    else sd.append(sec('Colonização', btn('Colonizar (💰' + colCost(n, p) + ')', run(() => act('colonize', p)), 'grn', canColonize(n, p), 'Envia colonos; vira sua província em alguns meses.'), msg));
     return;
   }
   if (o === n.id && c === n.id) {
     const r = trainGrid(n, p, null), r5 = el('div', 'row');   // cada treino aqui forma um exército novo
-    if (pr.coast) r5.append(btn('⛵ ' + shipName(n) + ' ×2 (💰' + shipCost(n) * 2 + ')', act(() => act('buildShips', 2, p)), 'sm', !n.fx.sea ? 'Exige Barcos longos' : n.money < shipCost(n) * 2 ? 'Sem dinheiro' : '', 'Navios ficam prontos em 4 meses no mar ao lado.'));
+    if (pr.coast) r5.append(btn('⛵ ' + shipName(n) + ' ×2 (💰' + shipCost(n) * 2 + ')', run(() => act('buildShips', 2, p)), 'sm', !n.fx.sea ? 'Exige Barcos longos' : n.money < shipCost(n) * 2 ? 'Sem dinheiro' : '', 'Navios ficam prontos em 4 meses no mar ao lado.'));
     sd.append(sec('Treinar novo exército', r, r5, msg));
   } else if (o !== n.id) {
     const has0 = n.claims[st.id], fab = n.fab && n.fab.s === st.id;
-    sd.append(sec('Reivindicação', has0 ? el('div', 'good', 'Você reivindica ' + st.n + '.') : fab ? el('div', 'dim', 'Fabricando… ' + n.fab.m + ' meses') : btn('Fabricar reivindicação em ' + st.n + ' (💰' + Math.round(40 * eraScale()) + ')', act(() => fabricate(n, st.id)), 'sm', n.fab ? 'Já fabricando' : '', 'Com reivindicação, declarar guerra custa só 3 de estabilidade (sem: 15).'), msg));
+    sd.append(sec('Reivindicação', has0 ? el('div', 'good', 'Você reivindica ' + st.n + '.') : fab ? el('div', 'dim', 'Fabricando… ' + n.fab.m + ' meses') : btn('Fabricar reivindicação em ' + st.n + ' (💰' + Math.round(40 * eraScale()) + ')', run(() => act('fabricate', st.id)), 'sm', n.fab ? 'Já fabricando' : '', 'Com reivindicação, declarar guerra custa só 3 de estabilidade (sem: 15).'), msg));
   }
   sideState(sd, st);
 }
@@ -291,7 +299,7 @@ function buildingRows(n, st, groupsOnly) {                   // prédios do esta
     const err = so === n.id ? canBuild(n, st.id, b) : 'Não é seu';
     if (!L && !inCons.length && err && err !== 'Sem dinheiro' && err !== 'Sem canteiros livres' && err !== 'Sem trabalhadores livres no estado') return;
     const r = el('div', 'brow'); tip(r, bTip(b)); r.append(el('span', 'e', d.e), el('span', 'nm', d.n + (inCons.length ? ' (+' + inCons.length + ' em obra)' : '')), el('span', 'lv', L || '—'));
-    if (so === n.id) { if (L) r.append(btn('−', () => { S.bld[st.id][b] = L - 1; if (!S.bld[st.id][b]) delete S.bld[st.id][b]; const f = d.fx; if (f && (f.infra || f.pipe)) S.mapDirty = true; refresh(); }, 'sm', '', 'Desmontar um nível (sem reembolso): libera trabalhadores')); r.append(btn('+ 💰' + bCost(n, b), () => { const e = act('build', st.id, b); if (e) say(e, 'bad'); refresh(); }, 'sm', err, bTip(b))); }
+    if (so === n.id) { if (L) r.append(btn('−', () => { S.bld[st.id][b] = L - 1; if (!S.bld[st.id][b]) delete S.bld[st.id][b]; const f = d.fx; if (f && (f.infra || f.rail || f.pipe)) S.mapDirty = true; refresh(); }, 'sm', '', 'Desmontar um nível (sem reembolso): libera trabalhadores')); r.append(btn('+ 💰' + bCost(n, b), () => { const e = act('build', st.id, b); if (e) say(e, 'bad'); refresh(); }, 'sm', err, bTip(b))); }
     const g = bGroupOf(b); (groups[g] = groups[g] || []).push(r);
   });
   BGROUPS.forEach(([g, name]) => { if (!groups[g] || (groupsOnly ? !groupsOnly.includes(g) : PROD_G.includes(g))) return; wrap.append(el('h4', 'bgrp', name)); groups[g].forEach(r => wrap.append(r)); });
@@ -305,7 +313,9 @@ function sideState(sd, st) {
   const pc = BGROUPS.filter(([g]) => PROD_G.includes(g)).map(([, , l]) => l).flat().reduce((t, b) => t + (B[b] || 0), 0), open = UI.prodOpen === st.id;
   box.append(btn('🏭 Produção e indústria' + (pc ? ' · ' + pc + ' níveis' : '') + (open ? '  ◀' : '  ▶'), () => { UI.prodOpen = open ? null : st.id; drawSide(); }, 'prodbtn' + (open ? ' on' : ''), '', 'Produção e extração, indústria e energia do estado, num painel ao lado'));
   box.append(buildingRows(n, st));
-  if (so >= 0 && S.scov && S.scov[st.id]) { const cvb = el('div', 'svcs'); for (const k in SVC) { const v = S.scov[st.id][k] || 0, r = el('div', 'brow'); r.append(el('span', 'e', SVC[k].e), el('span', 'nm', SVC[k].n), el('span', 'lv', pct(v))); tip(r, SVC[k].n + ' · ' + svcName(k, curYear()) + '\n' + SVC[k].d + '\nCada nível atende ' + Math.round(SVC_CAP(curYear())) + ' mil pessoas'); cvb.append(r, bar(v, '#7fc8e0')); } box.append(el('h3', '', 'Serviços'), cvb); }
+  if (so === n.id) { const no = Object.keys(BUILDINGS).filter(b => { const d = BUILDINGS[b], R = d.req && REQS[d.req]; if (!R || (d.vert ? n.vert !== d.vert : !n.fx.b.has(b))) return false; const e = canBuild(n, st.id, b); return e.startsWith('Impossível') || e === 'Exige ' + R.n; });
+    if (no.length) box.append(tip(el('small', 'dim', '🚫 Impossível aqui: ' + no.map(b => BUILDINGS[b].e + ' ' + BUILDINGS[b].n).join(', ')), no.map(b => BUILDINGS[b].n + ': exige ' + REQS[BUILDINGS[b].req].n).join('\n'))); }
+  if (so >= 0 && S.scov && S.scov[st.id]) { const cvb = el('div', 'svcs'); for (const k in SVC) { const v = S.scov[st.id][k] || 0, r = el('div', 'brow'); r.append(el('span', 'e', SVC[k].e), el('span', 'nm', SVC[k].n), el('span', 'lv', pct(v))); tip(r, SVC[k].n + ' · ' + svcSrc(me(), k) + '\n' + SVC[k].d + '\nCada nível atende ' + Math.round(SVC_CAP(curYear())) + ' mil pessoas'); cvb.append(r, bar(v, '#7fc8e0')); } box.append(el('h3', '', 'Serviços'), cvb); }
   const deps = st.provs.filter(p => resVisible(p)).map(p => GOODS[provRes(p)].e + ' ' + GOODS[provRes(p)].n + ' (' + WD.provs[p].n + ')'); if (deps.length) box.append(tip(el('div', 'dim', 'Jazidas: ' + deps.join(', ')), 'Petróleo, urânio e terras raras só aparecem depois de prospectar'));
   if (so === n.id) box.append(btn('🔍 Prospectar (💰' + prospectCost() + ')', () => { const e = act('prospect', st.id); if (e) say(e, 'bad'); refresh(); }, 'sm', canProspect(n, st.id), 'Procura petróleo, urânio e terras raras (conforme suas tecnologias) por 6 meses; às vezes acha jazidas novas'));
   if ((n.pros || []).some(x => x.s === st.id)) box.append(el('div', 'dim', 'Prospecção em andamento…'));
@@ -333,12 +343,12 @@ function dipButtons(t) {
   const accTip = kind => { const [v, why] = accept(t, n, kind); return (v >= 0 ? '✅ Aceitariam' : '❌ Recusariam') + ' (' + v + ')\n' + why.join('\n'); };
   box.append(btn('🤝 Melhorar relações (💰' + dipCost('improve') + ')', go('improve'), 'sm', (n.cd || {})[t.id] > S.t ? 'Já tentado este ano' : '', '+15 de relação com eles, uma vez por ano'));
   box.append(btn('🎁 Presente (💰' + dipCost('gift') + ')', go('gift'), 'sm', '', '+20 de relação; o ouro vai para eles'));
-  box.append(has(n, 'allies', t.id) ? btn('Romper aliança', go('unally'), 'sm red', '', '−40 de relação e −5 de estabilidade') : btn('🛡️ Propor aliança', go('ally'), 'sm', '', 'Aliados são chamados para as guerras um do outro.\n' + accTip('ally')));
+  box.append(has(n, 'allies', t.id) ? btn('Romper aliança', go('unally'), 'sm red', subjFixed(n, t) ? 'Laço de súdito: só a independência desfaz' : '', '−40 de relação e −5 de estabilidade\nNenhum dos dois pode declarar guerra ao outro por ' + DIPLO.unally.noWar + ' anos') : btn('🛡️ Propor aliança', go('ally'), 'sm', '', 'Aliados são chamados para as guerras um do outro.\n' + accTip('ally')));
   if (GOVS[n.gov].succ === 'hered' && GOVS[t.gov].succ === 'hered' && !has(n, 'marr', t.id)) box.append(btn('💍 Casamento real (💰' + dipCost('marr') + ')', go('marr'), 'sm', '', '+25 de relação. Se uma das casas ficar sem herdeiro, a outra pode herdar a coroa (união pessoal).\n' + accTip('marr')));
-  box.append(has(n, 'trade', t.id) ? btn('Cancelar acordo comercial', go('untrade'), 'sm') : btn('⚖️ Acordo comercial (💰' + dipCost('trade') + ')', go('trade'), 'sm', has(n, 'emb', t.id) ? 'Há embargo' : '', 'Eficiência de comércio +7% para os dois.\n' + accTip('trade')));
-  box.append(btn(has(n, 'emb', t.id) ? 'Suspender embargo' : '🚫 Embargo', go('embargo'), 'sm', '', 'Embargos cortam 8% da eficiência de comércio deles e −25 de relação'));
+  box.append(has(n, 'trade', t.id) ? btn('Cancelar acordo comercial', go('untrade'), 'sm', subjFixed(n, t) ? 'Laço de súdito: só a independência desfaz' : '') : btn('⚖️ Acordo comercial (💰' + dipCost('trade') + ')', go('trade'), 'sm', has(n, 'emb', t.id) ? 'Há embargo' : '', 'Eficiência de comércio +7% para os dois.\n' + accTip('trade')));
+  box.append(btn(has(n, 'emb', t.id) ? 'Suspender embargo' : '🚫 Embargo', go('embargo'), 'sm', subjFixed(n, t) ? 'Laço de súdito' : '', 'Embargos cortam 8% da eficiência de comércio deles e −25 de relação'));
   box.append(btn('😠 Insultar', go('insult'), 'sm', '', '−40 de relação'));
-  if (t.senior === n.id) box.append(btn('👑 Súdito: liberdade ' + Math.round(t.subj ? t.subj.lib : 0) + '%', () => { UI.dipTab = 'subj'; openWin('dip'); }, 'sm grn', '', 'Leis, nível e integração na aba Súditos da diplomacia'));
+  if (t.senior === n.id) box.append(btn('👑 Súdito: liberdade ' + Math.round(t.subj ? t.subj.lib : 0) + '%', () => { UI.dipTab = 'subj'; openWin('dip'); }, 'sm grn', '', 'Leis, progresso e relação na aba Súditos da diplomacia'));
   out.append(box);
   const w = S.wars.find(w => sideOf(w, t.id) && sideOf(w, n.id) && sideOf(w, t.id) !== sideOf(w, n.id));
   if (w) out.append(btn('🕊️ Negociar paz', () => { UI.peaceL = t.id; UI.peacePick = null; openWin('peace', w.id); }, 'sm grn'));
@@ -347,7 +357,7 @@ function dipButtons(t) {
     const sel = el('select'); sel.append(new Option('Sem reivindicação (−15 estabilidade)', '')); claims.forEach(s => sel.append(new Option('Reivindicação: ' + s.n, s.id)));
     const allies = (t.allies || []).map(nat).filter(x => x.alive).map(x => x.name);
     if (!holyWhy(n, t)) sel.append(new Option('⚔️ ' + holyName(n.relig) + ' (−3 estabilidade)', 'holy'));
-    out.append(sel, btn('⚔️ Declarar guerra', () => { const e = sel.value === 'holy' ? act('declareWar', t.id, null, 'holy') : act('declareWar', t.id, sel.value === '' ? null : +sel.value); msg.textContent = e; if (!e) { S.mapDirty = true; refresh(); } }, 'red', n.truce[t.id] > S.t ? 'Trégua até ' + yearOf(n.truce[t.id]) : has(n, 'allies', t.id) ? 'São aliados' : '', allies.length ? 'Aliados deles podem entrar: ' + allies.join(', ') : 'Eles não têm aliados'));
+    out.append(sel, btn('⚔️ Declarar guerra', () => { const e = sel.value === 'holy' ? act('declareWar', t.id, null, 'holy') : act('declareWar', t.id, sel.value === '' ? null : +sel.value); msg.textContent = e; if (!e) { S.mapDirty = true; refresh(); } }, 'red', n.truce[t.id] > S.t ? 'Trégua até ' + yearOf(n.truce[t.id]) : has(n, 'allies', t.id) ? 'São aliados' : noWarUntil(n, t) ? 'Aliança rompida: guerra só a partir de ' + yearOf(noWarUntil(n, t)) : '', allies.length ? 'Aliados deles podem entrar: ' + allies.join(', ') : 'Eles não têm aliados'));
   }
   out.append(msg); return out;
 }
@@ -478,6 +488,15 @@ function drawFbIcons() {
   [...L.children].forEach(d => { if (!keep.has(d.id)) d.remove(); });
 }
 /* grade de treino: primeira linha 1k de cada tipo, segunda linha 5k; g = exército que recebe (null = cada clique cria um exército novo) */
+/* novo exército: tudo o que for treinado nesta janela forma o mesmo exército */
+function newArmyModal(n) {
+  const g = S.id++, own = provsOf(n.id).filter(p => S.ctrl[p] === n.id).sort((a, b) => (b === n.capital) - (a === n.capital) || S.pop[b] - S.pop[a]); let at = own[0];
+  modal(m => { const draw = () => { m.innerHTML = ''; m.append(el('h2', '', '➕ Novo exército'));
+      const sel = el('select'); own.slice(0, 80).forEach(p => sel.append(new Option(WD.provs[p].n + ' (' + WD.states[WD.provs[p].state].n + ')' + (p === n.capital ? ' ⭐' : ''), p))); sel.value = at; sel.onchange = () => { at = +sel.value; draw(); };
+      const pend = n.rec.filter(r => r.g === g);
+      m.append(el('small', 'dim', 'Onde treinar'), sel, trainGrid(n, at, g, draw), el('small', 'dim', pend.length ? 'Em treino: ' + pend.map(r => r.k + 'k ' + unitName(n, r.type)).join(', ') : 'Nada em treino ainda'), btn('Fechar', closeModal)); };
+    draw(); });
+}
 function trainGrid(n, at, g, done) {
   const ts = UT.filter(t => t !== 'vrt' || n.vert), wrap = el('div', 'rgrid2'); wrap.style.gridTemplateColumns = 'repeat(' + ts.length + ', 1fr)';
   [1, 5].forEach(k => ts.forEach(t => { const b0 = btn('', () => { const e = act('recruit', t, k, at, g ?? S.id++); if (e) say(e, 'bad'); else if (done) done(); refresh(); }, 'rbtn r-' + t, canRecruit(n, t, k), unitTip(n, t) + '\nPronta em ' + Math.max(1, Math.round((t === 'vrt' ? 5 : 3) * BUILD_SLOW) - (S.bld[WD.provs[at].state].barracks ? 2 : 0)) + ' meses em ' + WD.provs[at].n + (g == null ? '\nForma um exército novo' : '\nEntra neste exército'));
@@ -782,16 +801,36 @@ function winGov(b) {
   enactCard(b, n, msg);
   if (n.senior != null) b.append(el('p', 'gold', (n.subj ? SUBJECTS[n.subj.tier].n : 'Súdito') + ' de ' + natName(nat(n.senior)) + ' · liberdade ' + Math.round(n.subj ? n.subj.lib : 0) + '%.'));
   const tc = el('div', 'card'), ns = statesOf(n), r = n.rank || 0, cap = domCap(n); tc.style.marginTop = '12px';
-  tc.append(el('h4', '', 'Título · ' + RANK_N[r]), el('div', '', natName(n) + ' · ' + titleOf(n)), tip(el('small', ns > cap ? 'bad' : 'dim', 'Limite de domínio: ' + ns + ' de ' + cap + ' estados · ' + WD.conts[homeCont(n)].n + ': ' + Math.round(contShare(n) * 100) + '% controlado'), 'Limite de domínio (Domain Limit): quantos estados o título sustenta, inteiros ou não.\nO Reino sustenta 3/4 dos estados do continente de origem; o Império (com 2/3 dele) sustenta o continente inteiro e mais.\nAcima do limite: −3 de estabilidade por estado a mais, sem colonizar e sem anexar além disso na paz.'), bar(cap < 1e8 ? ns / cap : .2, ns > cap ? '#e5636b' : '#d9b45a'));
-  const ladder = el('div', 'chips'); RANK_N.forEach((rn, k) => ladder.append(tip(el('span', 'chip' + (k === r ? ' p' : ''), rn + ': ' + rankFmt(n, k).replace('{}', n.name)), rn + '\nTítulo do governante: ' + rankTitle(n, k) + '\nLimite de domínio: ' + rankCap(n, k) + ' estados' + (k >= 3 ? ' (pelo tamanho de ' + WD.conts[homeCont(n)].n + ')' : '') + '\nProclamar exige ' + rankReqTxt(n, k)))); tc.append(ladder);
-  if (r < 4) tc.append(btn('👑 Proclamar ' + RANK_N[r + 1] + ' (💰' + rankCost(n) + ')', () => { const e = act('rankUp'); msg.textContent = e; if (!e) refresh(); }, 'grn', r + 1 < 4 && ns < RANK_REQ[r + 1] ? 'Exige ' + RANK_REQ[r + 1] + ' estados (tem ' + ns + ')' : r + 1 === 4 && contShare(n) < RANK_EMP ? 'Exige controlar 2/3 de ' + WD.conts[homeCont(n)].n + ' (tem ' + Math.round(contShare(n) * 100) + '%)' : n.money < rankCost(n) ? 'Sem dinheiro' : '', 'Vira ' + rankFmt(n, r + 1).replace('{}', n.name) + ' · −5 de estabilidade'));
+  tc.append(el('h4', '', 'Título · ' + RANK_N[r]), el('div', '', natName(n) + ' · ' + titleOf(n)), tip(el('small', ns > cap ? 'bad' : 'dim', 'Limite de domínio: ' + ns + ' de ' + cap + ' estados'), 'Limite de domínio (Domain Limit): quantos estados o título sustenta, inteiros ou não.\nBase do título ' + RANK_CAP[r] + ' × ' + domainMul(n).toFixed(2) + ' (era até +' + Math.round(DOMAIN.era * 100) + '%, administração até +' + Math.round(DOMAIN.adm * 100) + '%).\nAcima do limite: −3 de estabilidade por estado a mais, sem colonizar e sem anexar além disso na paz.'), bar(cap < 1e8 ? ns / cap : .2, ns > cap ? '#e5636b' : '#d9b45a'));
+  const ladder = el('div', 'chips'); RANK_N.forEach((rn, k) => ladder.append(tip(el('span', 'chip' + (k === r ? ' p' : ''), rn + ': ' + rankFmt(n, k).replace('{}', n.name)), rn + '\nTítulo do governante: ' + rankTitle(n, k) + '\nLimite de domínio: ' + rankCap(n, k) + ' estados (base ' + RANK_CAP[k] + ')' + '\nProclamar exige ' + rankReqTxt(n, k)))); tc.append(ladder);
+  if (r < 4) tc.append(btn('👑 Proclamar ' + RANK_N[r + 1] + ' (💰' + rankCost(n) + ')', () => { const e = act('rankUp'); msg.textContent = e; if (!e) refresh(); }, 'grn', ns < RANK_REQ[r + 1] ? 'Exige ' + RANK_REQ[r + 1] + ' estados (tem ' + ns + ')' : n.money < rankCost(n) ? 'Sem dinheiro' : '', 'Vira ' + rankFmt(n, r + 1).replace('{}', n.name) + ' · −5 de estabilidade'));
   tc.append(tip(el('div', 'dim', '⭐ Capital: ' + WD.provs[n.capital].n + (n.capCd > S.t ? ' · nova mudança em ' + yearOf(n.capCd) : '')), 'A capital tem +2 de fortificação. Se for ocupada: −2 de estabilidade por mês e +25% de rendição na guerra.\nPara mudar, clique numa província sua e use "Tornar capital" (uma vez a cada 10 anos).'));
   b.append(tc, succCard(n));
   govTree(b, n, msg);
 }
+/* importações: de onde vem cada bem (suserano primeiro, se for súdito) e quanto custa; o suserano vê o que vendeu aos súditos */
+function winImports(b, n) {
+  const mk = n.mk, sen = isSubj(n) ? nat(n.senior) : null;
+  if (sen) { const r = el('div', 'row'); r.append(el('small', 'dim', 'Comprar primeiro de:'));
+    [['senior', '👑 ' + natName(sen)], ['world', '🌍 Mercado mundial']].forEach(([k, l]) => r.append(btn(l, () => { act('setImpPref', k); drawWin(); }, 'sm' + ((n.impPref || 'senior') === k ? ' on' : ''), '', k === 'senior' ? 'O excedente do suserano sai a preço mundial, sem frete; ele ganha com a venda' : 'Ignora o suserano e compra do exportador mais barato')));
+    b.append(r); }
+  const t = el('table', 't'), hr = t.insertRow(); ['Bem', 'Importa', 'Do suserano', 'Origem', 'Preço', 'Custo/mês'].forEach(x => hr.append(el('th', '', x)));
+  let tot = 0, any = false;
+  GOOD_IDS.forEach(g => { const q = (mk.imp || {})[g] || 0; if (q < .05) return; any = true;
+    const qs = (mk.impS || {})[g] || 0, src = (mk.src || {})[g], pw = S.wp[g], cost = qs * pw + (q - qs) * pw * 1.05 * (src && !src.sen ? src.m : 1); tot += cost;
+    const r = t.insertRow(); r.insertCell().textContent = GOODS[g].e + ' ' + GOODS[g].n;
+    [q, qs].forEach(v => { const c = r.insertCell(); c.className = 'n'; c.textContent = v < .05 ? '—' : v >= 10 ? Math.round(v) : v.toFixed(1); });
+    const o = r.insertCell(); o.textContent = q - qs < .05 ? '👑 suserano' : src && src.o >= 0 && !src.sen ? natName(nat(src.o)) + (src.sea ? ' ⛵' : ' 🐎') : '🌍 mercado mundial';
+    const p = r.insertCell(); p.className = 'n'; p.textContent = pw.toFixed(1); const c = r.insertCell(); c.className = 'n bad'; c.textContent = money(cost); });
+  if (!any) { b.append(el('p', 'dim', 'Nada importado: a produção cobre o consumo.')); }
+  else { const r = t.insertRow(); r.insertCell().textContent = 'Total'; for (let i = 0; i < 4; i++) r.insertCell(); const c = r.insertCell(); c.className = 'n gold'; c.textContent = money(tot); b.append(t); }
+  const sold = Object.entries(mk.subT || {}).filter(([, v]) => v > .05);
+  if (sold.length) { b.append(el('h4', 'bgrp', '👑 Vendido aos súditos')); const t2 = el('table', 't'); sold.forEach(([g, v]) => { const r = t2.insertRow(); r.insertCell().textContent = GOODS[g].e + ' ' + GOODS[g].n; const c = r.insertCell(); c.className = 'n'; c.textContent = v >= 10 ? Math.round(v) : v.toFixed(1); }); b.append(t2); }
+}
 function winEco(b) {
-  const n = me(), msg = el('div', 'msg'), tab = tabs(b, 'ecoTab', [['over', '📊 Visão geral'], ['goods', '📦 Bens'], ['laws', '⚖️ Leis econômicas']]);
+  const n = me(), msg = el('div', 'msg'), tab = tabs(b, 'ecoTab', [['over', '📊 Visão geral'], ['goods', '📦 Bens'], ['imp', '🚢 Importações'], ['laws', '⚖️ Leis econômicas']]);
   if (tab === 'laws') { lawGrid(b, n, true, msg); return; }
+  if (tab === 'imp') { winImports(b, n); return; }
   if (tab === 'goods') {
     const gt = el('table', 't'); const hr = gt.insertRow(); ['Bem', 'Produção', 'Consumo', 'Importa', 'Exporta', 'Preço mundial', 'Atendido'].forEach(x => hr.append(el('th', '', x)));
     GOOD_IDS.forEach(id => {
@@ -806,13 +845,13 @@ function winEco(b) {
   }
   const sum = el('div', 'cols');
   const inc = el('div', 'card'); inc.append(el('h4', '', 'Balanço mensal'));
-  const t = el('table', 't'); const lab = { tax: ['Impostos', '6% do PIB, ajustado por governo, leis, administração, mercados e estabilidade.\nMais impostos: mais ouro, porém leis de imposto alto custam estabilidade.'], trade: ['Exportações', 'Excedentes vendidos ao mercado mundial; portos, acordos e leis de comércio ajudam'], imports: ['Importações', 'O que falta é comprado até um orçamento; comida primeiro.\nO preço sobe com a distância até o país exportador: por mar (os dois com litoral) sai bem mais barato que por terra; acordos comerciais e portos ajudam.\nSem dinheiro, o que falta derruba estabilidade e produção.'], tribute: ['Tributo', 'Pago pelo súdito ao suserano: parte dos impostos, pelo nível e pela lei de tributo.'], rep: ['Reparações', 'Parte dos impostos paga ao vencedor de uma guerra por 10 anos.'], transport: ['Frete entre estados', 'Prédios usam primeiro o que o próprio estado produz (barato e na hora).\nO resto vem de outros estados: chega com perdas e paga frete. O frete encarece a produção e sai do PIB tributável — aqui aparece o imposto que deixa de entrar.\nEstradas, ferrovias e rodovias no estado reduzem perdas e frete.'], army: ['Exército', 'Manutenção dos regimentos; sobe com a era'], navy: ['Marinha', 'Manutenção dos navios'], admin: ['Administração', 'Cresce com população e províncias; a cobertura de administração reduz em até 30%'], svc: ['Serviços públicos', 'Manutenção de hospitais, escolas, repartições e guardas (a lei de gastos muda isso)'], interest: ['Juros', '1% da dívida ao mês. Dívida grande demais leva à falência: estabilidade despenca e metade do exército debanda.'], corrupt: ['Corrupção', Math.round(HOARD_LEAK * 100) + '% ao mês do que passa do teto do tesouro (' + HOARD_MONTHS + ' meses de impostos) se perde.\nA cobertura de administração reduz em até 60%. Gaste em obras, exército ou pesquisa em vez de acumular.'] };
+  const t = el('table', 't'); const lab = { tax: ['Impostos', '6% do PIB, ajustado por governo, leis, administração, mercados e estabilidade.\nMais impostos: mais ouro, porém leis de imposto alto custam estabilidade.'], trade: ['Exportações', 'Excedentes vendidos ao mercado mundial; portos, acordos e leis de comércio ajudam'], imports: ['Importações', 'O que falta é comprado até um orçamento; comida primeiro.\nO preço sobe com a distância até o país exportador: por mar (os dois com litoral) sai bem mais barato que por terra; acordos comerciais e portos ajudam.\nSem dinheiro, o que falta derruba estabilidade e produção.'], tribute: ['Tributo', 'Pago pelo súdito ao suserano: parte dos impostos, pelo nível e pela lei de tributo.'], subjSales: ['Vendas aos súditos', 'Súditos compram o seu excedente antes do mercado mundial: você ganha um extra sobre essas vendas.'], rep: ['Reparações', 'Parte dos impostos paga ao vencedor de uma guerra por 10 anos.'], transport: ['Frete entre estados', 'Prédios usam primeiro o que o próprio estado produz (barato e na hora).\nO resto vem de outros estados: chega com perdas e paga frete. O frete encarece a produção e sai do PIB tributável — aqui aparece o imposto que deixa de entrar.\nEstradas, ferrovias e rodovias no estado reduzem perdas e frete.'], army: ['Exército', 'Manutenção dos regimentos; sobe com a era'], navy: ['Marinha', 'Manutenção dos navios'], admin: ['Administração', 'Cresce com população e províncias; a cobertura de administração reduz em até 30%'], svc: ['Serviços públicos', 'Manutenção de hospitais, escolas, repartições e guardas (a lei de gastos muda isso)'], interest: ['Juros', '1% da dívida ao mês. Dívida grande demais leva à falência: estabilidade despenca e metade do exército debanda.'], corrupt: ['Corrupção', Math.round(HOARD_LEAK * 100) + '% ao mês do que passa do teto do tesouro (' + HOARD_MONTHS + ' meses de impostos) se perde.\nA cobertura de administração reduz em até 60%. Gaste em obras, exército ou pesquisa em vez de acumular.'] };
   Object.entries(n.inc).forEach(([k, v]) => { const r = t.insertRow(), c0 = r.insertCell(); c0.textContent = lab[k][0]; tip(c0, lab[k][1]); const c = r.insertCell(); c.className = 'n ' + (v < 0 ? 'bad' : 'good'); c.textContent = money(v); tip(c, lab[k][1]); });
   const tr = t.insertRow(); tr.insertCell().textContent = 'Total'; const tc = tr.insertCell(); tc.className = 'n gold'; tc.textContent = money(n.income); inc.append(t); sum.append(inc);
   const embs = S.nations.filter(o => o.alive && has(o, 'emb', n.id)).length;
   const g = el('div', 'card'); g.append(el('h4', '', 'Produção'), kv([['PIB', money(n.gdp) + '/mês', 'Valor de tudo o que o país produz por mês; base dos impostos'], ['População', popStr(n.popT)], ['Empregados', popStr(n.employed || 0), 'Quem trabalha nos prédios; o resto vive da subsistência.\nCada prédio exige trabalhadores livres no estado.'], ['Comida', pct(n.foodSat), 'Abaixo de 95% a população encolhe e a estabilidade cai'], ['Canteiros', n.cons.length + ' / ' + consSlots(n), 'Obras ao mesmo tempo: tecnologia, população, tesouro e canteiros comprados (janela de Construção)'], ['Acordos comerciais', (n.trade || []).length + '', '+7% de eficiência de comércio cada'], ['Embargos contra você', embs + '', '−8% de eficiência de comércio cada']]), modChips({ tax: n.m.tax, prod: n.m.prod, trade: n.m.trade, food: n.m.food })); sum.append(g);
   const sv = el('div', 'card'); sv.append(el('h4', '', 'Cobertura dos serviços'));
-  for (const k in SVC) { const v = (n.cov || {})[k] || 0, r = el('div', 'brow'); r.append(el('span', 'e', SVC[k].e), el('span', 'nm', SVC[k].n + ' · ' + svcName(k, curYear())), el('span', 'lv', pct(v))); tip(r, SVC[k].d + '\nConstrua no painel do estado. Estados com a capital ocupada perdem os serviços.'); sv.append(r, bar(v, '#7fc8e0')); }
+  for (const k in SVC) { const v = (n.cov || {})[k] || 0, r = el('div', 'brow'); r.append(el('span', 'e', SVC[k].e), el('span', 'nm', SVC[k].n + ' · ' + svcSrc(me(), k)), el('span', 'lv', pct(v))); tip(r, SVC[k].d + '\nConstrua no painel do estado. Estados com a capital ocupada perdem os serviços.'); sv.append(r, bar(v, '#7fc8e0')); }
   const ps = n.mk.sup.power || 0, pd = n.mk.dem.power || 0; sv.append(tip(el('div', pd > ps ? 'bad' : 'dim', '⚡ Energia: produz ' + Math.round(ps) + ' · consome ' + Math.round(pd)), 'Fábricas e população consomem energia a partir de 1885; sem energia, as fábricas produzem menos.\nFontes: carvão, óleo, hidrelétrica, nuclear, eólica, solar, fusão e a usina da sua vertente.'));
   sum.append(sv); b.append(sum);
 }
@@ -825,6 +864,8 @@ function winTech(b) {
     tip(el('small', 'dim', tr ? Math.floor(n.rp) + ' / ' + techCost(n, tr) + ' · +' + researchRate(n).toFixed(1) + '/mês · ~' + (mon > 24 ? Math.round(mon / 12) + ' anos' : mon + ' meses') : '+' + researchRate(n).toFixed(1) + ' por mês'), 'Pontos de pesquisa vêm da população, universidades, educação, classe média, estabilidade e modificadores.\nPesquisar antes do tempo custa muito mais (⚠).'));
   if (tr) tip(cur, techTip(n, tr));
   const side = el('div', 'tside');
+  { const e = n.era || 0, nx = ERAS[e + 1], miss = nx ? ERA_CORE[e + 1].filter(id => !hasT(n, id)) : [], lim = k => ERA_LIM[k][Math.min(ERA_LIM[k].length - 1, e)] + (nx ? ' → ' + ERA_LIM[k][Math.min(ERA_LIM[k].length - 1, e + 1)] : '');
+    side.append(tip(el('div', 'gold', '🏺 ' + ERAS[e][1] + (nx ? ' · faltam ' + miss.length + ' para ' + nx[1] : '')), 'Era do país: avança ao completar todas as técnicas comuns da era atual.\nCanteiros ' + lim('slots') + ' · prédios por estado ' + lim('bld') + ' · serviços por estado ' + lim('svc') + (miss.length ? '\nFaltam: ' + miss.map(id => TECH[id].n).join(', ') : ''))); }
   const lg = el('div', 'chips'); [['done', '✓ Pesquisada', 'Já é sua'], ['av', '▶ Disponível', 'Clique para pesquisar'], ['lock', '🔒 Bloqueada', 'Falta pré-requisito, recurso ou outra vertente'], ['early', '⚠ Fora de época', 'Muito adiantada: custo multiplicado']].forEach(([c, t, d]) => lg.append(tip(el('span', 'chip lg-' + c, t), d)));
   const sb = el('input', 'tsearch'); sb.placeholder = '🔍 Buscar tecnologia (nome ou efeito)'; sb.value = UI.techQ || ''; sb.oninput = () => { UI.techQ = sb.value; const keep = sb.selectionStart; drawWin(); const nb = $('.tsearch'); if (nb) { nb.focus(); nb.setSelectionRange(keep, keep); } };
   const fl = btn(UI.techAv ? '▶ Só disponíveis' : '☰ Todas', () => { UI.techAv = !UI.techAv; drawWin(); }, 'sm' + (UI.techAv ? ' on' : ''), '', 'Alterna entre mostrar tudo ou só o que dá para pesquisar agora');
@@ -923,21 +964,38 @@ function libBar(t) {
   const s = t.subj, d = el('div', 'libbar'), f = el('div', 'libfill'), m = el('div', 'libtg'); f.style.width = s.lib + '%'; f.style.background = s.lib > 75 ? '#e5636b' : s.lib > 50 ? '#e5a35b' : '#8fd17f'; m.style.left = (s.tg ?? s.lib) + '%'; d.append(f, m);
   return tip(d, 'Liberdade: ' + Math.round(s.lib) + '% (alvo ' + Math.round(s.tg ?? s.lib) + '%)\n0% = integrado · 100% = livre (rompe e declara independência)\n' + libParts(t).map(([k, v]) => k + ' ' + (v > 0 ? '+' : '') + v).join('\n'));
 }
+/* trilha do súdito: o nível atual e os próximos até a integração; abaixo, a barra de progresso */
+function subjPath(t) {
+  const s = t.subj, row = el('div', 'chips'), path = [s.tier]; let k = s.tier; while (SUBJECTS[k] && SUBJECTS[k].next && SUBJECTS[k].next !== 'int' && path.length < 6) { k = SUBJECTS[k].next; path.push(k); } path.push('int');
+  path.forEach((k, i) => { if (i) row.append(el('span', 'dim', '›')); row.append(tip(el('span', 'chip' + (i === 0 ? ' p' : ''), k === 'int' ? '🔗 Integrado' : SUBJECTS[k].e + ' ' + SUBJECTS[k].n), k === 'int' ? 'Anexado em paz ao suserano' : SUBJECTS[k].d)); });
+  const nx = nextTier(t), r = progRate(t), why = nx === 'int' ? integWhy(t) : '', box = el('div');
+  box.append(row, tip(el('small', why && s.prog >= 100 ? 'bad' : 'dim', 'Progresso para ' + (nx === 'int' ? 'a integração' : SUBJECTS[nx].n.toLowerCase()) + ': ' + Math.round(s.prog || 0) + '% (' + (r >= 0 ? '+' : '') + r.toFixed(1) + '/mês)' + (why ? ' · ' + why : '')),
+    'Os níveis sobem sozinhos enquanto a liberdade fica abaixo de 50% (mais rápido perto de 0%); acima de 50% o progresso volta.\nA integração final exige relação do súdito com o suserano de ' + SUBJ_PROG.rel + ' ou mais.'), bar((s.prog || 0) / 100, '#8ec5ff'));
+  return box;
+}
 function winSubjects(b, n) {
-  if (isSubj(n)) { const o = nat(n.senior), T = SUBJECTS[n.subj.tier], c = el('div', 'card'); c.append(el('h4', '', T.e + ' ' + T.n + ' de ' + natName(o)), libBar(n), el('div', 'dim', T.d));
-    c.append(btn('🏴 Declarar independência', () => modal(m => { m.append(el('h2', '', 'Declarar independência?'), el('p', '', natName(o) + ' vai declarar guerra.')); const r = el('div', 'row'); r.append(btn('Romper', () => { independence(n); closeModal(); refresh(); }, 'red'), btn('Voltar', closeModal)); m.append(r); }), 'red sm', '', 'Rompe o laço e começa uma guerra de independência' + (n.subj.tier === 'union' ? ' (na união pessoal, a coroa só se separa)' : '')));
+  if (isSubj(n)) { const o = nat(n.senior), T = SUBJECTS[n.subj.tier], c = el('div', 'card'), bk = backerOf(n);
+    c.append(el('h4', '', T.e + ' ' + T.n + ' de ' + natName(o)), libBar(n), subjPath(n), el('div', 'dim', T.d + ' Aliança e acordo comercial com o suserano.' + (bk ? ' · 🤝 Apoio de ' + natName(bk) : '')));
+    const acts = g => { const r = el('div', 'row'); for (const k in SUBJ_ACTS) { const A = SUBJ_ACTS[k]; if (A.g !== g) continue;
+      r.append(btn(A.e + ' ' + A.n + (A.cost ? ' (💰' + Math.round(A.cost * eraScale()) + ')' : ''), () => { const e = act('subjAct', k); if (e) say(e, 'bad'); drawWin(); refresh(); }, 'sm' + (g === 'rebel' ? ' red' : ' grn'), subjActWhy(n, k),
+        A.d + '\n' + fxTxt(A.fx).join('\n') + (A.cd ? '\nRepete a cada ' + A.cd + ' anos' : ''))); } return r; };
+    c.append(el('small', 'dim', '🙇 Lealdade'), acts('loyal'), el('small', 'dim', '🔥 Rebelião'), acts('rebel'));
+    c.append(btn('🏴 Declarar independência', () => modal(m => { m.append(el('h2', '', 'Declarar independência?'), el('p', '', 'Guerra contra ' + natName(o) + (bk ? ', com ' + natName(bk) + ' do seu lado.' : '.') + ' A aliança e o acordo comercial acabam.')); const r = el('div', 'row'); r.append(btn('Romper', () => { act('independence'); closeModal(); refresh(); }, 'red'), btn('Voltar', closeModal)); m.append(r); }), 'red sm', '', 'Rompe o laço e começa uma guerra de independência' + (n.subj.tier === 'union' ? ' (na união pessoal, a coroa só se separa)' : '')));
     b.append(c); }
   const list = subjectsOf(n.id);
+  if (!list.length && isSubj(n)) return;
   if (!list.length) { b.append(el('p', 'dim', 'Nenhum súdito. Na paz, você pode exigir que o inimigo vire fantoche, vassalo, protetorado ou domínio; casamentos reais podem trazer uniões pessoais.')); return; }
-  list.forEach(t => { const s = t.subj, T = SUBJECTS[s.tier], c = el('div', 'card'); c.style.marginTop = '10px';
-    c.append(el('h4', '', T.e + ' ' + natName(t) + ' · ' + T.n), libBar(t));
-    const info = el('div', 'dim', provsOf(t.id).length + ' províncias · tributo ' + money(Math.max(0, -(t.inc && t.inc.tribute) || 0)) + '/mês' + (s.integ ? ' · integrando (−' + integRate(t).toFixed(1) + '/mês, 💰' + integCost() + '/mês)' : '')); c.append(info);
+  const triT = list.reduce((a, t) => a + Math.max(0, -((t.inc && t.inc.tribute) || 0)), 0);
+  b.append(kv([['Súditos', list.length], ['Tributo', money(triT) + '/mês'], ['Vendas aos súditos', money((n.inc && n.inc.subjSales) || 0) + '/mês', 'Súditos compram o seu excedente antes do mercado mundial']]));
+  list.forEach(t => { const s = t.subj, T = SUBJECTS[s.tier], c = el('div', 'card'), rel = Math.round(t.rel[n.id] || 0); c.style.marginTop = '10px';
+    c.append(el('h4', '', T.e + ' ' + natName(t) + ' · ' + T.n), libBar(t), subjPath(t));
+    const ln = el('div', 'dim', provsOf(t.id).length + ' províncias · tributo ' + money(Math.max(0, -(t.inc && t.inc.tribute) || 0)) + '/mês · '); c.append(ln); ln.append(tip(el('span', rel >= SUBJ_PROG.rel ? 'good' : 'bad', 'relação com você ' + rel + ' (integração exige ' + SUBJ_PROG.rel + ')'), 'Melhore com presentes e melhorar relações. Leis duras baixam a relação.'));
     for (const k in SUBJ_LAWS) { const L = SUBJ_LAWS[k], r = el('div', 'row'); r.append(el('small', 'dim', L.n + ':'));
-      for (const v in L.o) { const d = L.o[v]; r.append(btn(d.n, () => { const e = act('setSubjLaw', t.id, k, v); if (e) say(e, 'bad'); drawWin(); }, 'sm' + (s.laws[k] === v ? ' on' : ''), s.lawCd > S.t && s.laws[k] !== v ? 'Mudança recente' : '', 'Liberdade ' + (d.lib > 0 ? '+' : '') + (d.lib || 0) + (d.tri != null ? ' · tributo ×' + d.tri : '') + (d.mp ? ' · cede ' + pct(d.mp) + ' do contingente' : '') + (d.demil ? ' · exército limitado' : '') + (d.int ? ' · integração ×' + d.int : '') + '\nTrocar custa −5 de relação com eles; uma vez por ano')); }
+      for (const v in L.o) { const d = L.o[v]; r.append(btn(d.n, () => { const e = act('setSubjLaw', t.id, k, v); if (e) say(e, 'bad'); drawWin(); }, 'sm' + (s.laws[k] === v ? ' on' : ''), s.lawCd > S.t && s.laws[k] !== v ? 'Mudança recente' : '', 'Liberdade ' + (d.lib > 0 ? '+' : '') + (d.lib || 0) + (d.tri != null ? ' · tributo ×' + d.tri : '') + (d.mp ? ' · cede ' + pct(d.mp) + ' do contingente' : '') + (d.demil ? ' · exército limitado' : '') + (d.int ? ' · progresso ×' + d.int : '') + '\nTrocar custa −5 de relação com eles; uma vez por ano')); }
       c.append(r); }
-    if (s.tier !== 'union') { const r = el('div', 'row'); r.append(el('small', 'dim', 'Nível:')); ['puppet', 'vassal', 'protect', 'dominion'].forEach(k => r.append(btn(SUBJECTS[k].e + ' ' + SUBJECTS[k].n, () => { const e = act('setSubjTier', t.id, k); if (e) say(e, 'bad'); drawWin(); }, 'sm' + (s.tier === k ? ' on' : ''), s.tierCd > S.t && s.tier !== k ? 'Mudança recente' : '', SUBJECTS[k].d + '\nMais controle: +15 de liberdade na hora; menos controle: −5'))); c.append(r); }
-    const r2 = el('div', 'row'); r2.append(btn(s.integ ? '⏸️ Parar integração' : '🔗 Integrar', () => { s.integ = !s.integ; drawWin(); }, 'sm grn' + (s.integ ? ' on' : ''), !s.integ && !integOk(t) ? 'Só com liberdade até 50%' : '', 'Empurra a barra para 0% (' + integRate(t).toFixed(1) + ' por mês, 💰' + integCost() + '/mês); em 0% o país é anexado em paz.\nPara sozinha se a liberdade passar de 50%.'));
-    r2.append(btn('Libertar', () => { act('freeSubject', t.id); t.rel[n.id] = Math.min(100, (t.rel[n.id] || 0) + 40); drawWin(); refresh(); }, 'sm red', '', 'Vira independente (relação +40)')); c.append(r2);
+    const r2 = el('div', 'row'), go = k => () => { const e = act('dipAct', t.id, k); if (e) say(e, 'bad'); drawWin(); refresh(); };
+    r2.append(btn('🤝 Melhorar relações (💰' + dipCost('improve') + ')', go('improve'), 'sm grn', (n.cd || {})[t.id] > S.t ? 'Já tentado este ano' : '', '+15 de relação deles com você'), btn('🎁 Presente (💰' + dipCost('gift') + ')', go('gift'), 'sm grn', '', '+20 de relação'));
+    r2.append(btn('Libertar', () => { act('freeSubject', t.id); drawWin(); refresh(); }, 'sm red', '', 'Vira independente (relação +40)')); c.append(r2);
     b.append(c); });
 }
 /* recursos por estado (painel do mapa de recursos e sub-aba da Construção); a cor é a mesma do estado no mapa */
@@ -1019,6 +1077,7 @@ function winPop(b, forceTab) {
         else { const gd = g === 'staple' ? { e: '🌾', n: 'Grãos ou peixe' } : GOODS[g], st = g === 'staple' ? n.foodSat : (n.mk.sat[g] ?? 1); r.append(el('span', 'e', gd.e), el('span', 'nm', gd.n + ' ' + (q >= .1 ? q.toFixed(2) : q.toFixed(3))), el('span', 'lv ' + (st < .8 ? 'bad' : ''), pct(st))); tip(r, gd.n + ': ' + q.toFixed(3) + ' por mil pessoas por mês · atendido ' + pct(st) + (g !== 'staple' ? '\n' + goodUsers(g) : '')); }
         c.append(r); });
       if (k === 'slave') c.append(tip(el('small', 'dim', 'Lei: ' + LAWS.slavery.o[n.laws.slavery].n + ' · ' + pct(n.sf || 0) + ' dos empregos braçais'), LAWS.slavery.o[n.laws.slavery].d + '\nPovos escravizados (aba Culturas/Religiões) também viram escravos.\nEstabilidade: −' + (slaveShare(n) * 50 + Math.max(0, slaveShare(n) - .15) * 150).toFixed(1) + ' (pesa muito acima de 15%)'));
+      if (k === 'slave' && slavesOn(n)) { const rv = n.slvReb || 0, rr = slaveRebRate(n); c.append(tip(el('small', rv > 70 ? 'bad' : 'dim', '✊ Rebeldia ' + Math.round(rv) + '% (' + (rr >= 0 ? '+' : '') + rr.toFixed(2) + '/mês)'), 'Sobe todo mês, mesmo com os escravos alimentados. Em 100% estoura uma revolta de escravos.\n' + slaveRebParts(n).map(([l, v]) => l + ' ' + (v >= 0 ? '+' : '') + v.toFixed(2)).join('\n') + '\nGuardas (segurança) e eventos baixam; proibir a escravidão acaba com ela.'), bar(rv / 100, rv > 70 ? '#e5636b' : '#e5a35b')); }
       grid.append(c);
     });
     b.append(grid); return;
@@ -1031,7 +1090,7 @@ function winPop(b, forceTab) {
       [popStr(v), pct(v / Math.max(1, tot)), ...['low', 'mid', 'high'].map(k => pct(JOBS[g][k]))].forEach(x => { const c = r.insertCell(); c.className = 'n'; c.textContent = x; }); });
     b.append(t);
     const sv = el('div', 'card'); sv.style.marginTop = '10px'; sv.append(el('h4', '', 'Serviços públicos'));
-    for (const k in SVC) { const v = (n.cov || {})[k] || 0, r = el('div', 'brow'); r.append(el('span', 'e', SVC[k].e), el('span', 'nm', SVC[k].n + ' · ' + svcName(k, curYear())), el('span', 'lv', pct(v))); tip(r, SVC[k].d + '\nEmpregam sobretudo a classe média. A classe média e a alta exigem saúde e educação.'); sv.append(r, bar(v, '#7fc8e0')); }
+    for (const k in SVC) { const v = (n.cov || {})[k] || 0, r = el('div', 'brow'); r.append(el('span', 'e', SVC[k].e), el('span', 'nm', SVC[k].n + ' · ' + svcSrc(me(), k)), el('span', 'lv', pct(v))); tip(r, SVC[k].d + '\nEmpregam sobretudo a classe média. A classe média e a alta exigem saúde e educação.'); sv.append(r, bar(v, '#7fc8e0')); }
     b.append(sv); return;
   }
   // culturas e religiões: régua de autonomia de cada povo que não é o principal

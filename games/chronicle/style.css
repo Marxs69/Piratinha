@@ -320,3 +320,9 @@ table.t select { margin: 0; max-width: 150px; } .docrow { display: flex; flex-di
 #room .rchat { flex: 1; min-height: 120px; max-height: 280px; overflow: auto; border: 1px solid var(--line); border-radius: 4px; padding: 4px 6px; background: rgba(0,0,0,.3); font-size: 12px; }
 #room .rl { padding: 1px 0; } #room .rl.sys { color: var(--gold); font-style: italic; } #room input { flex: 1; min-width: 0; }
 .netb { cursor: pointer; } .netb.new { border-color: var(--gold); color: var(--gold-2); }
+/* transição de era: aparece e some sozinha, sem bloquear cliques */
+.erafx { position: fixed; left: 0; right: 0; top: 18%; z-index: 60; pointer-events: none; text-align: center; padding: 22px 0;
+  background: linear-gradient(90deg, transparent, rgba(12, 10, 6, .72) 25%, rgba(12, 10, 6, .72) 75%, transparent); animation: erafx 3.6s ease-in-out forwards; }
+.erafx small { display: block; font: 600 13px "Alegreya Sans", sans-serif; letter-spacing: .35em; text-transform: uppercase; color: #d9b45a; opacity: .85; }
+.erafx b { display: block; font: 700 44px "Cinzel", serif; color: #f3e6c4; text-shadow: 0 2px 14px rgba(0, 0, 0, .8); margin-top: 4px; }
+@keyframes erafx { 0% { opacity: 0; transform: translateY(8px); } 18% { opacity: 1; transform: none; } 75% { opacity: 1; } 100% { opacity: 0; transform: translateY(-6px); } }

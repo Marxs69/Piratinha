@@ -1,8 +1,8 @@
 /* Grand Chronicle — dados derivados: índices e tabelas montadas a partir do conteúdo (content/*.js).
    As tabelas em si ficam em content/ (só dados, editáveis); a lógica fica em sim/. Para equilibrar, mexa nos números de content/. */
 'use strict';
-const { START_YEAR, END_YEAR, VERT_DECLINE, BUILD_SLOW, RANK_KING, RANK_EMP, WIDTH_BASE, LOGI_BASE, SHIP_CAP, COUNCIL_TRAIT_W, HOARD_MONTHS, HOARD_MIN, HOARD_LEAK, APPOINT_CD, APPOINT_CD_DEATH, PRICE_BASE, PRICE_EXP, PRICE_LAG } = CONTENT.DEFINES;
-const { NAV_DOCS, VERT_DOC, EXPLORE_ERA, FAITH_RULES, GOODS, SUBSIST, CLASSES, JOBS, JOB_N, BFX_CAP, REQS, BUILDINGS, BGROUPS, SVC, CATS, VERTS, VUNITS, NEEDS, VERT_SUF, VERT_UPFX, GOVS, RANK_N, RANK_CAP, RANK_REQ, RANK_SLOTS, RANKSET, IDEOS, MODS, LAWS, LAW_DEF, CPOL, RPOL_N, CUL_SLOTS, REL_SLOTS, DIPLO, DIP_ACC, DIP_DRIFT, INTERACT, PLOT, SPY, PEACE, COUP_GOVS, ELECT_FORMS, COUNCIL_MODE, ENACT, GOV_TR, SUBJECTS, SUBJ_LAWS, SUBJ_LAW_DEF, UNITS, UNIT_BASE, UNIT_ERA, UNIT_NEEDS, VERT_UNIT_NEED, VET, SUPPORT, STANCES, PURSUIT, SHIPS, TERRAIN, ERAS, DISEASES, PANDEMICS, INVASIONS, WORLD_EVENTS, ROCKETS, MOON_TYPES, ALIEN_ERAS, TRAITS, STATS, ROLE_NAMES, SECRETS, SCHEMES, TUTOR_TR, TRAIT_OPP, COUNCIL, LANGS, COLD_FAMS, CUL_LIST, RELIGIONS, FAITH_GRP, DOC_POOL, HEAD_POOL, HOLY_POOL, GRP_D, DOCTRINES, TENETS, REFORMS, FERV } = CONTENT;
+const { START_YEAR, END_YEAR, VERT_DECLINE, BUILD_SLOW, WIDTH_BASE, LOGI_BASE, SHIP_CAP, COUNCIL_TRAIT_W, HOARD_MONTHS, HOARD_MIN, HOARD_LEAK, APPOINT_CD, APPOINT_CD_DEATH, PRICE_BASE, PRICE_EXP, PRICE_LAG } = CONTENT.DEFINES;
+const { NAV_DOCS, VERT_DOC, EXPLORE_ERA, FAITH_RULES, GOODS, SUBSIST, CLASSES, JOBS, JOB_N, BFX_CAP, REQS, BUILDINGS, BGROUPS, SVC, CATS, VERTS, VUNITS, NEEDS, VERT_SUF, VERT_UPFX, GOVS, RANK_N, RANK_CAP, RANK_REQ, DOMAIN, RANK_SLOTS, RANKSET, IDEOS, MODS, LAWS, LAW_DEF, CPOL, RPOL_N, CUL_SLOTS, REL_SLOTS, DIPLO, DIP_ACC, DIP_DRIFT, INTERACT, PLOT, SPY, PEACE, COUP_GOVS, ELECT_FORMS, COUNCIL_MODE, ENACT, GOV_TR, SLAVE_REB, SUBJECTS, SUBJ_PROG, SUBJ_ACTS, SUBJ_BACK, SUBJ_LAWS, SUBJ_LAW_DEF, UNITS, UNIT_BASE, UNIT_ERA, UNIT_NEEDS, VERT_UNIT_NEED, VET, SUPPORT, STANCES, PURSUIT, SHIPS, TERRAIN, ERAS, ERA_LIM, DISEASES, PANDEMICS, INVASIONS, WORLD_EVENTS, ROCKETS, MOON_TYPES, ALIEN_ERAS, TRAITS, STATS, ROLE_NAMES, SECRETS, SCHEMES, TUTOR_TR, TRAIT_OPP, COUNCIL, LANGS, COLD_FAMS, CUL_LIST, RELIGIONS, FAITH_GRP, DOC_POOL, HEAD_POOL, HOLY_POOL, GRP_D, DOCTRINES, TENETS, REFORMS, FERV } = CONTENT;
 const EVENTS = CONTENT.EVENTS, EVENT = Object.fromEntries(EVENTS.map(e => [e.id, e]));
 
 const GOOD_IDS = Object.keys(GOODS);
@@ -10,11 +10,11 @@ const GOOD_IDS = Object.keys(GOODS);
 const CLASS_IDS = Object.keys(CLASSES);
 function classNeeds(year, k) {
   const t = Math.max(0, Math.min(1, (year - 860) / 900)), ti = Math.max(0, Math.min(1, (year - 1760) / 200)), t2 = Math.max(0, Math.min(1, (year - 1950) / 250));
-  const pw = year < 1890 ? 0 : .01 + .05 * Math.min(1, (year - 1890) / 110) + .12 * t2, el = year < 1950 ? 0 : .01 + .12 * t2;
+  const pw = year < 1890 ? 0 : .01 + .05 * Math.min(1, (year - 1890) / 110) + .12 * t2, el = year < 1950 ? 0 : .01 + .12 * t2, rt = year < 1830 ? 0 : Math.min(1, (year - 1830) / 120);   // rt: viagens de trem
   if (k === 'slave') return { staple: .85 };
-  if (k === 'low') return { staple: 1, clothes: .025 + .015 * t + .04 * ti, goods: .01 + .012 * t + .06 * ti + .08 * t2, pfood: .03 * ti + .1 * t2, power: pw * .7, elec: el * .6 };
-  if (k === 'mid') return { staple: .8, pfood: .12 + .1 * t + .2 * ti, clothes: .07 + .04 * t + .08 * ti, goods: .06 + .05 * t + .15 * ti + .15 * t2, lux: .002 + .004 * t + .01 * ti, tools: .01, power: pw * 1.4, elec: el * 1.6, svc: 1 };
-  return { staple: .6, pfood: .35 + .2 * ti, clothes: .18 + .1 * ti, goods: .2 + .2 * ti + .2 * t2, lux: .04 + .07 * t + .12 * ti, power: pw * 2.5, elec: el * 3, svc: 1 };
+  if (k === 'low') return { staple: 1, clothes: .025 + .015 * t + .04 * ti, goods: .01 + .012 * t + .06 * ti + .08 * t2, pfood: .03 * ti + .1 * t2, power: pw * .7, elec: el * .6, transit: .008 * rt };
+  if (k === 'mid') return { staple: .8, pfood: .12 + .1 * t + .2 * ti, clothes: .07 + .04 * t + .08 * ti, goods: .06 + .05 * t + .15 * ti + .15 * t2, lux: .002 + .004 * t + .01 * ti, tools: .01, power: pw * 1.4, elec: el * 1.6, transit: .03 * rt, svc: 1 };
+  return { staple: .6, pfood: .35 + .2 * ti, clothes: .18 + .1 * ti, goods: .2 + .2 * ti + .2 * t2, lux: .04 + .07 * t + .12 * ti, power: pw * 2.5, elec: el * 3, transit: .05 * rt, svc: 1 };
 }
 
 const TECHS = [];
@@ -37,7 +37,17 @@ VERTS.forEach(v => {
 const techFx = t => t.vr ? TECH[t.vr].fx : t.fx;
 
 const eraOf = y => { let e = ERAS[0][1]; for (const [a, n] of ERAS) if (y >= a) e = n; return e; };
+/* era do país (índice em ERAS): avança quando todas as técnicas comuns da era em que ele está foram feitas (as da vertente contam pela versão dela) */
+let ERA_CORE = null;
+function natEra(n) {
+  if (!ERA_CORE) ERA_CORE = ERAS.map((e, k) => k ? TECHS.filter(t => !t.v && t.y < e[0] && (k === 1 || t.y >= ERAS[k - 1][0])).map(t => t.id) : []);
+  let k = 0; while (k + 1 < ERAS.length && ERA_CORE[k + 1].every(id => hasT(n, id))) k++; return k;
+}
+const eraLim = (n, k) => ERA_LIM[k][Math.min(ERA_LIM[k].length - 1, n.era || 0)];
+const isSvcB = d => !!(d.fx && (d.fx.svc || d.fx.svcP)) && !d.max;
 const SVC_CAP = y => 30 * (1 + (y - 860) / 250);
+/* quem presta o serviço no país: o prédio próprio (nome da época) ou, antes dele, os substitutos parciais (templo, paço) */
+const svcSrc = (n, k) => n.fx.b.has(SVC[k].b) ? svcName(k, curYear()) : Object.keys(BUILDINGS).filter(b => ((BUILDINGS[b].fx || {}).svcP || {})[k]).map(b => BUILDINGS[b].n + ' (' + Math.round(BUILDINGS[b].fx.svcP[k] * 100) + '%)').join(' / ') + ' · ' + BUILDINGS[SVC[k].b].n + ' mais tarde';
 const svcName = (k, y) => { let n = SVC[k].names[0][1]; for (const [a, x] of SVC[k].names) if (y >= a) n = x; return n; };
 
 /* sorteia as peculiaridades das fés de uma partida (determinístico pela seed) */

@@ -114,15 +114,18 @@ function rebuildMap() {
 /* obras ligando estados vizinhos do mesmo dono: estradas, ferrovias, rodovias… e oleodutos (desenhados por cima do mapa) */
 function computeLinks() {
   if (!WD.stAdj) { WD.stAdj = WD.states.map(() => new Set()); WD.provs.forEach(p => p.adj.forEach(o => { const a = p.state, b = WD.provs[o].state; if (a < b) WD.stAdj[a].add(b); })); }
-  const me = S.player >= 0 ? nat(S.player) : null, tier = WD.states.map(st => { let t = 0; const B = S.bld[st.id]; for (const k in B) { const f = BUILDINGS[k].fx; if (B[k] && f && f.infra) t = Math.max(t, f.infra); } return t; });
-  R.links = []; R.pipes = [];
+  const me = S.player >= 0 ? nat(S.player) : null, tierOf = key => WD.states.map(st => { let t = 0; const B = S.bld[st.id]; for (const k in B) { const f = BUILDINGS[k].fx; if (B[k] && f && f[key]) t = Math.max(t, f[key]); } return t; }), tier = tierOf('infra'), rail = tierOf('rail');
+  R.links = []; R.pipes = []; R.rails = [];
   WD.states.forEach(a => WD.stAdj[a.id].forEach(bi => {
     const b = WD.states[bi], o = stateOwnerOf(a.id); if (o < 0 || o !== stateOwnerOf(bi)) return; if (me && (!me.exP[a.cap] || !me.exP[b.cap])) return;
     const t = Math.min(tier[a.id], tier[bi]); if (t) R.links.push([a.cap, b.cap, t]);
+    const rt = Math.min(rail[a.id], rail[bi]); if (rt) R.rails.push([a.cap, b.cap, rt]);
     if (S.bld[a.id].pipeline && S.bld[bi].pipeline) R.pipes.push([a.cap, b.cap]);
   }));
 }
-const LINK_STYLE = { 1: ['#8b6b3a', 1.2, [4, 3]], 2: ['#2a2a2a', 2, []], 3: ['#d9d9d9', 2.6, []], 4: ['#ffffff', 2.2, [10, 3]], 5: ['#5ff2ff', 2.4, []], 6: ['#d38cff', 2.6, [2, 2]], 7: ['#fff6b0', 3, [1, 4]] };
+/* estradas (infra: estrada, rodovia, portal) e trilhos (rail: ferrovia, alta velocidade, maglev, tubos) são redes separadas, desenhadas lado a lado */
+const LINK_STYLE = { 1: ['#8b6b3a', 1.2, [4, 3]], 2: ['#d9d9d9', 2.6, []], 3: ['#fff6b0', 3, [1, 4]] };
+const RAIL_STYLE = { 1: ['#2a2a2a', 2.2], 2: ['#ffffff', 2.2], 3: ['#5ff2ff', 2.4], 4: ['#d38cff', 2.6] };
 /* rótulos das nações: um por bloco contínuo de território (o maior sempre; os outros se forem grandes), num ponto bem dentro dele
    (a província mais longe da fronteira, perto do centro) e com a largura disponível naquela altura para caber o nome */
 function computeLabels() {
@@ -203,9 +206,12 @@ function drawFrame() {
   }
   // obras e oleodutos
   if (R.links && z >= .9) {
-    const line = (a, b) => { const pa = WD.provs[a], pb = WD.provs[b]; const [x0, y0] = toScreen(pa.cx * K + K / 2, pa.cy * K + K / 2), [x1, y1] = toScreen(pb.cx * K + K / 2, pb.cy * K + K / 2); c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1); c.stroke(); };
+    const line = (a, b, off = 0) => { const pa = WD.provs[a], pb = WD.provs[b]; let [x0, y0] = toScreen(pa.cx * K + K / 2, pa.cy * K + K / 2), [x1, y1] = toScreen(pb.cx * K + K / 2, pb.cy * K + K / 2);
+      if (off) { const L = Math.hypot(x1 - x0, y1 - y0) || 1, ox = -(y1 - y0) / L * off, oy = (x1 - x0) / L * off; x0 += ox; x1 += ox; y0 += oy; y1 += oy; } c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1); c.stroke(); };
     c.lineCap = 'round';
-    for (const [a, b, t] of R.links) { const [col, w, dash] = LINK_STYLE[t]; c.strokeStyle = col; c.lineWidth = w * Math.min(1.6, z / 1.5); c.setLineDash(dash); line(a, b); if (t === 2) { c.strokeStyle = 'rgba(255,255,255,.55)'; c.lineWidth = 1; c.setLineDash([2, 5]); line(a, b); } }
+    for (const [a, b, t] of R.links) { const [col, w, dash] = LINK_STYLE[t] || LINK_STYLE[1]; c.strokeStyle = col; c.lineWidth = w * Math.min(1.6, z / 1.5); c.setLineDash(dash); line(a, b); }
+    const ro = 3 * Math.min(1.6, z / 1.5);   // trilhos: linha cheia com dormentes claros, ao lado da estrada
+    for (const [a, b, t] of R.rails || []) { const [col, w] = RAIL_STYLE[t] || RAIL_STYLE[1]; c.strokeStyle = col; c.lineWidth = w * Math.min(1.6, z / 1.5); c.setLineDash([]); line(a, b, ro); c.strokeStyle = t === 1 ? 'rgba(255,255,255,.6)' : 'rgba(0,0,0,.45)'; c.lineWidth = 1; c.setLineDash([2, 5]); line(a, b, ro); }
     c.strokeStyle = 'rgba(255,140,0,.85)'; c.lineWidth = 1.6; c.setLineDash([7, 4]); for (const [a, b] of R.pipes) line(a, b);
     c.setLineDash([]);
   }

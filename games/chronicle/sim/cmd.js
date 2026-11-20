@@ -53,8 +53,9 @@ const CMDS = {
   declareWar: (n, tid, st, kind) => { const t = nat(tid); return t ? declareWar(n, t, st ?? null, kind || null) : 'País inválido'; },
   faithAct: (n, k, tid) => faithAct(n, k, tid != null ? nat(tid) : undefined),
   startScheme: (n, k, tgt) => startScheme(n, k, tgt), cancelScheme: n => cancelScheme(n), exposeForeign: (n, tid) => exposeForeign(n, tid),
-  setSubjLaw: (n, tid, k, v) => setSubjLaw(n, nat(tid), k, v), setSubjTier: (n, tid, k) => setSubjTier(n, nat(tid), k),
-  freeSubject: (n, tid) => { const t = nat(tid); if (!t || t.senior !== n.id) return 'Não é seu súdito'; freeSubject(t, 'foi libertado por'); return ''; },
+  fabricate: (n, s) => fabricate(n, s), setSubjLaw: (n, tid, k, v) => setSubjLaw(n, nat(tid), k, v),
+  subjAct: (n, k) => subjAct(n, k), setImpPref: (n, k) => { if (!['senior', 'world'].includes(k)) return 'Inválido'; n.impPref = k; return ''; }, independence: n => { if (!isSubj(n)) return 'Você não é súdito'; independence(n); return ''; },
+  freeSubject: (n, tid) => { const t = nat(tid); if (!t || t.senior !== n.id) return 'Não é seu súdito'; freeSubject(t, 'foi libertado por'); t.rel[n.id] = Math.min(100, (t.rel[n.id] || 0) + 40); return ''; },
   // militar
   recruit: (n, type, k, at, g) => recruit(n, type, k, at, g), buildShips: (n, k, p) => buildShips(n, k, p),
   setGeneral: (n, aid, cid) => { const a = myArmy(n, aid), c = charById(n, cid); return a && c ? setGeneral(n, a, c) : 'Inválido'; },

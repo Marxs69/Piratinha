@@ -14,7 +14,7 @@ function buildInfo() {
   for (const b in BUILDINGS) {
     const d = BUILDINGS[b], f = d.fx || null, gr = jobGroup(b), ent = o => o ? Object.keys(o).map(g => [g, o[g], GI[g]]) : null;
     BI[b] = { d, w: d.w, gr, J: JOBS[gr], slave: !!d.slave, tl: d.tl || 0, food: !!d.food, fert: !!d.fert, inA: ent(d.in), outA: ent(d.out), boost: BOOST_BY[b] || null,
-              f, fxN: f ? Object.keys(f).filter(k => typeof f[k] === 'number').map(k => [k, f[k]]) : [], prod: f && f.prod || 0, speed: f && f.speed || 0 };
+              f, fxN: f ? Object.keys(f).filter(k => typeof f[k] === 'number').map(k => [k, f[k]]) : [], prod: f && f.prod || 0, speed: f && f.speed || 0, frt: f && f.frt || 0 };
   }
 }
 const laborShare = n => LAWS.women.o[(n.laws || LAW_DEF).women].lab;
@@ -60,16 +60,16 @@ function econNation(n, acc) {
       const own = stateOwnerOf(st.id) === n.id, ctl = own && S.ctrl[st.cap] === n.id;
       if (ctl) {
         const B = S.bld[st.id]; let need0 = 0, stBonus = 0, spd = 0;
-        for (const b in B) { const I = BI[b], L = B[b]; need0 += L * I.w; if (I.prod) stBonus += L * I.prod; if (I.speed) spd += L * I.speed; } S.stSpd[st.id] = spd;
+        let frt = 0; for (const b in B) { const I = BI[b], L = B[b]; need0 += L * I.w; if (I.prod) stBonus += L * I.prod; if (I.speed) spd += L * I.speed; if (I.frt) frt += L * I.frt; } S.stSpd[st.id] = spd;
         const e = need0 ? Math.min(1, labor / need0) : 1; used = Math.min(labor, need0);
-        const infK = clamp(spd / 1.2, 0, 1), tEff = .75 + .2 * infK, tK = .12 * (1 - .6 * infK);   // insumos de outros estados: chegam com perdas e frete (estradas e ferrovias ajudam)
+        const infK = clamp((spd + frt) / 1.2, 0, 1), tEff = .75 + .2 * infK, tK = .12 * (1 - .6 * infK);   // insumos de outros estados: chegam com perdas e frete (estradas e ferrovias ajudam)
         const fert = st.fert, sc = S.scov[st.id] = { health: 0, edu: 0, adm: 0, sec: 0 };
         for (const b in B) {
           const L = B[b]; if (!L) continue; const I = BI[b];
           for (const [k, v] of I.fxN) bs[k] = (bs[k] || 0) + L * v;
           const work = L * I.w * e, gr = I.gr, J = I.J; jobs[gr] = (jobs[gr] || 0) + work; jc.low += work * J.low; jc.mid += work * J.mid; jc.high += work * J.high;
           const slv = I.slave; if (slv) slaveJobs += work * J.low;
-          if (I.f) { const f = I.f; if (f.svc) { sc[f.svc] = Math.min(1, L * capSvc * svcMul / sp); svcLv += L; } if (f.army) bfx.army += L * f.army; if (f.mp) bfx.mp += L * f.mp; if (f.launch) bfx.launch += L; }
+          if (I.f) { const f = I.f; if (f.svc) { sc[f.svc] += L * capSvc * svcMul / sp; svcLv += L; } if (f.svcP) for (const k in f.svcP) sc[k] += L * f.svcP[k] * capSvc * svcMul / sp; if (f.army) bfx.army += L * f.army; if (f.mp) bfx.mp += L * f.mp; if (f.launch) bfx.launch += L; }
           if (I.tl) dem.tools += L * I.tl * e;                  // ferramentas: insumo leve (sem elas, até 20% a menos)
           let inSat = 1; if (I.inA) for (const [g, qi, gi] of I.inA) {
             const G = GOODS[g]; if (G.y0 > year) continue; const q = L * qi * e; dem[g] += q; LD[gi] += q;
@@ -84,6 +84,7 @@ function econNation(n, acc) {
           }
         }
       }
+      if (ctl) { const sc = S.scov[st.id]; for (const k in sc) sc[k] = Math.min(1, sc[k]); }
       employedT += used;
       if (ctl && S.scov[st.id]) for (const k in cov) cov[k] += S.scov[st.id][k] * sp;
       // subsistência dos não empregados (grãos, roupas feitas em casa e um pouco de bens e ferramentas)
@@ -118,11 +119,17 @@ function econNation(n, acc) {
     let budget = Math.max(0, gdp * ECON.taxBase * .35 + tradeInc * .8 + Math.max(0, n.money) * .03);
     const prio = g => GOODS[g].c === 'food' ? 0 : n.vert && VERT[n.vert].good === g ? 1 : GOODS[g].ip ?? 3;
     const ok = n.vert || '', order = IMP_ORDER[ok] || (IMP_ORDER[ok] = GOOD_IDS.slice().sort((a, b) => prio(a) - prio(b)));   // só depende da vertente
-    n.coastal = coastal; n.mk.src = {};
+    n.coastal = coastal; n.mk.src = {}; n.mk.impS = {}; n.mk.subT = {};   // impS = comprado do suserano · subT = o que os súditos levaram deste país no mês
+    // súdito: depois da própria produção, compra o excedente do suserano (preço mundial, sem frete) antes de ir ao mercado mundial (n.impPref = 'world' inverte)
+    const sen = isSubj(n) && n.impPref !== 'world' ? nat(n.senior) : null, sm = sen && sen.alive && sen.mk && sen.mk.exp ? sen.mk : null;
     for (const g of order) {
       const need = dem[g] - sup[g]; if (need <= 0 || budget <= 0 || (GOODS[g].c === 'lux' && S.wp[g] > GOODS[g].p * 3)) continue;
-      const src = importSrc(n, g), price = S.wp[g] * 1.05 * src.m, imp = Math.min(need * Math.min(1, eff * 1.2), budget / price);
-      n.mk.imp[g] = imp; n.mk.src[g] = src; tradeCost += imp * price; budget -= imp * price;
+      const cap = need * Math.min(1, eff * 1.2); let q1 = 0;
+      if (sm) { const p0 = S.wp[g], left = (sm.exp[g] || 0) - ((sm.subT || {})[g] || 0); q1 = Math.max(0, Math.min(cap, left, budget / p0));
+        if (q1 > .001) { sm.subT = sm.subT || {}; sm.subT[g] = (sm.subT[g] || 0) + q1; const v = q1 * p0; tradeCost += v; budget -= v; n.mk.impS[g] = q1;
+          const gain = v * .45; sen.money += gain; if (sen.inc) { sen.inc.subjSales = (sen.inc.subjSales || 0) + gain; sen.income += gain; } } else q1 = 0; }
+      let q2 = 0, src = null; if (cap - q1 > .001 && budget > 0) { src = importSrc(n, g); const price = S.wp[g] * 1.05 * src.m; q2 = Math.min(cap - q1, budget / price); tradeCost += q2 * price; budget -= q2 * price; }
+      n.mk.imp[g] = q1 + q2; n.mk.src[g] = src || { m: 1, o: n.senior, sea: false, sen: 1 };
     }
     GOOD_IDS.forEach(g => { if (n.mk.exp[g] > .05) (acc.exp[g] = acc.exp[g] || []).push(n.id); });
     const s2 = {}; GOOD_IDS.forEach(g => { s2[g] = dem[g] > 0 ? Math.min(1, (sup[g] + n.mk.imp[g]) / dem[g]) : 1; });
@@ -211,12 +218,14 @@ function canBuild(n, s, b) {
   if (stateOwnerOf(s) !== n.id || S.ctrl[st.cap] !== n.id) return 'Só quem controla a capital do estado constrói nele';
   if (d.vert && n.vert !== d.vert) return 'Exige a vertente ' + (VERT[d.vert] ? VERT[d.vert].n : '');
   if (!d.vert && !n.fx.b.has(b)) return 'Exige tecnologia';
+  if (d.obs && n.fx.b.has(d.obs) && !L) return 'Substituído por ' + BUILDINGS[d.obs].n;
   const R = d.req && REQS[d.req];
   if (R && R.coast === 1 && !st.coast) return 'Exige ' + R.n;
   if (d.req && d.req.startsWith('res:')) { const rr = d.req.slice(4), cap = resCount(st, rr); if (L >= cap) return cap ? 'Recurso esgotado' : (HIDDEN.includes(rr) ? 'Sem jazida conhecida (prospecte)' : 'Sem o recurso'); }
   else if (R && R.terr) { if (!(R.coast === 'or' && st.coast) && !st.provs.some(p => TERRAIN[WD.provs[p].terr][R.terr])) return 'Exige ' + R.n; }
-  else if (d.req) { const k = d.cap || R.cap; if (L >= (k ? st.caps[k] ?? 99 : 99)) return 'Sem espaço'; }
-  const max = d.maxFx ? 1 + n.fx[d.maxFx] : d.max; if (max && L >= max) return 'Nível máximo';
+  else if (d.req) { const k = d.cap || R.cap, c = k ? st.caps[k] ?? 99 : 99; if (!c) return 'Impossível neste estado: exige ' + R.n; if (L >= c) return 'Sem espaço'; }
+  const own = d.maxFx ? 1 + n.fx[d.maxFx] : d.max; if (own && L >= own) return 'Nível máximo';
+  if (!own) { const lim = eraLim(n, isSvcB(d) ? 'svc' : 'bld'); if (L >= lim) return 'Limite da era: ' + lim + ' por estado (' + ERAS[n.era || 0][1] + ')'; }
   if (d.w >= .5 && freeLabor(n, s) < d.w) return 'Sem trabalhadores livres no estado';
   if (n.cons.length >= consSlots(n)) return 'Sem canteiros livres';
   if (n.money < bCost(n, b)) return 'Sem dinheiro';
@@ -227,14 +236,15 @@ const homeCont = n => WD.provs[n.capital >= 0 ? n.capital : 0].cont;
 const contStates = c => { if (!WD.cS) { WD.cS = WD.conts.map(() => 0); WD.states.forEach(st => WD.cS[st.cont]++); } return WD.cS[c]; };
 const contProvs = c => { if (!WD.cP) { WD.cP = WD.conts.map(() => 0); WD.provs.forEach(p => WD.cP[p.cont]++); } return WD.cP[c]; };
 const contShare = n => { const c = homeCont(n); let k = 0; for (const p of provsOf(n.id)) if (WD.provs[p].cont === c) k++; return k / Math.max(1, contProvs(c)); };
-const rankCap = (n, r) => r < 3 ? RANK_CAP[r] : r === 3 ? Math.max(25, Math.round(contStates(homeCont(n)) * RANK_KING)) : Math.round(contStates(homeCont(n)) * 1.6) + 25;
-const rankReqTxt = (n, r) => r < 4 ? RANK_REQ[r] + ' estados' : 'controlar 2/3 das províncias de ' + WD.conts[homeCont(n)].n;
+/* limite de domínio: base do título (RANK_CAP) × era × administração (DOMAIN) — o mesmo degrau para todos, sem depender do tamanho do continente */
+const domainMul = n => 1 + DOMAIN.era * clamp((curYear() - DOMAIN.y0) / DOMAIN.span, 0, 1) + DOMAIN.adm * ((n.cov || {}).adm || 0);
+const rankCap = (n, r) => Math.round(RANK_CAP[r] * domainMul(n));
+const rankReqTxt = (n, r) => RANK_REQ[r] + ' estados';
 const domCap = n => rankCap(n, n.rank || 0);
 const overCap = n => Math.max(0, statesOf(n) - domCap(n));
 function rankUp(n) {                                          // proclama o próximo nível de título
   const r = (n.rank || 0) + 1; if (r > 4) return 'Já está no nível máximo';
-  if (r < 4 && statesOf(n) < RANK_REQ[r]) return 'Exige ' + RANK_REQ[r] + ' estados';
-  if (r === 4 && contShare(n) < RANK_EMP) return 'Exige controlar 2/3 de ' + WD.conts[homeCont(n)].n + ' (tem ' + Math.round(contShare(n) * 100) + '%)';
+  if (statesOf(n) < RANK_REQ[r]) return 'Exige ' + RANK_REQ[r] + ' estados';
   const c = rankCost(n); if (n.money < c) return 'Sem dinheiro';
   n.money -= c; n.rank = r; n.stab = Math.max(0, n.stab - 5);
   log(n.name + ' agora é ' + natName(n) + ' (' + RANK_N[r] + ').', isHuman(n.id) ? 'good' : 'world', [n.id]); S.mapDirty = true; return '';
@@ -254,7 +264,7 @@ function setCapital(n, p) {
   log('A capital de ' + natName(n) + ' agora é ' + WD.provs[p].n + '.', isHuman(n.id) ? 'good' : 'none', [n.id]); return '';
 }
 const slotsRaw = n => n.fx.slots + Math.floor((n.popT || 0) / 1000) + Math.floor(Math.max(0, n.money) / (2500 * eraScale())) + (n.xslots || 0);
-const slotCap = n => RANK_SLOTS[n.rank || 0] + (n.xslots || 0);   // o título limita os canteiros (comprados somam ao teto)
+const slotCap = n => Math.min(RANK_SLOTS[n.rank || 0], eraLim(n, 'slots')) + (n.xslots || 0);   // o título e a era limitam os canteiros (comprados somam ao teto)
 const consSlots = n => Math.min(slotsRaw(n), slotCap(n));
 const slotCost = n => Math.round(150 * eraScale() * (1 + (n.xslots || 0) * .5));
 function buySlot(n) { const c = slotCost(n); if (n.money < c) return 'Sem dinheiro'; n.money -= c; n.xslots = (n.xslots || 0) + 1; return ''; }
@@ -363,9 +373,10 @@ function adoptVert(n, v) {
 }
 function researchRate(n) { return (2 + (n.popT || 0) * .004 + ((n.bsum || {}).research || 0)) * Math.max(.2, 1 + n.m.research) * (.6 + n.stab / 250) * (1 + techCount(n) * .012); }
 function finishTech(n, t) {
-  n.techs[t.id] = 1;
+  n.techs[t.id] = 1; const e0 = n.era || 0;
   if (t.entry) vertOffer(n, t.v);
   calcMods(n);
+  if ((n.era || 0) > e0) log(natName(n) + ' entrou na ' + ERAS[n.era][1] + '.', isHuman(n.id) ? 'good' : 'none', [n.id]);
   if (isHuman(n.id)) log('Pesquisa concluída: ' + t.n + '.', 'good', [n.id]);
 }
 
@@ -374,7 +385,7 @@ function canColonize(n, p) {
   if (S.own[p] !== -1) return 'Já tem dono'; if (!n.exP[p]) return 'Inexplorada';
   if (S.cols.some(c => c.p === p)) return 'Já em colonização';
   const adj = WD.provs[p].adj.some(o => S.own[o] === n.id), near = !adj && nearSea(n, p);
-  if (!adj && !near) { if (n.fx.col < 1) return 'Exige Colonização (ou uma costa sua no mesmo mar)'; if (!WD.provs[p].coast || n.fx.sea < 1) return 'Fora de alcance'; }
+  if (!adj && !near) { if (n.fx.col < 1) return 'Exige Colonização (ou uma costa sua no mesmo mar ou no vizinho)'; if (!WD.provs[p].coast || n.fx.sea < 1) return 'Fora de alcance'; }
   if (near && n.fx.sea < 1) return 'Exige navios (Barcos longos)';
   if (n.fx.col < 1 && S.pop[p] > (adj || near ? 9 : 4)) return 'Nativos numerosos: exige Colonização';
   if (statesOf(n, [p]) > domCap(n)) return 'Limite de domínio (' + domCap(n) + ' estados)';
@@ -382,6 +393,7 @@ function canColonize(n, p) {
   if (n.money < colCost(n, p)) return 'Sem dinheiro';
   return '';
 }
-const nearSea = (n, p) => WD.provs[p].coast && WD.provs[p].seas.some(z => WD.seas[z].provs.some(q => S.own[q] === n.id));   // ilha ou costa no mesmo mar de uma província sua
+const seaMine = (n, z) => WD.seas[z].provs.some(q => S.own[q] === n.id);
+const nearSea = (n, p) => WD.provs[p].coast && WD.provs[p].seas.some(z => seaMine(n, z) || WD.seas[z].adj.some(w => seaMine(n, w)));   // ilha ou costa no mesmo mar de uma província sua ou no mar vizinho
 const colCost = (n, p) => Math.round(35 * ECON.costMul * eraScale() * (WD.provs[p].adj.some(o => S.own[o] === n.id) ? .6 : nearSea(n, p) ? .7 : 1));
 function colonize(n, p) { const e = canColonize(n, p); if (e) return e; n.money -= colCost(n, p); const easy = WD.provs[p].adj.some(o => S.own[o] === n.id) || nearSea(n, p); const m = Math.round((n.fx.col ? 18 : easy ? 24 : 48) / (1 + Math.max(-.5, n.m.colon || 0))); S.cols.push({ o: n.id, p, m, tot: m }); return ''; }

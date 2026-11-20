@@ -27,17 +27,21 @@ function accept(t, n, kind) {                                 // quanto t topa a
 }
 const dipCost = k => Math.round((DIPLO[k].cost || 0) * eraScale());
 const relAdd = (a, b, x) => { if (x) a.rel[b.id] = clamp((a.rel[b.id] || 0) + x, -100, 100); };
+/* aliança rompida: nenhum dos dois declara guerra ao outro por alguns anos (n.noWar[id] = até quando) */
+const noWarPact = (a, b, y) => { const t = S.t + 360 * y; (a.noWar = a.noWar || {})[b.id] = t; (b.noWar = b.noWar || {})[a.id] = t; };
+const noWarUntil = (a, b) => ((a.noWar || {})[b.id] || 0) > S.t ? a.noWar[b.id] : 0;
 const unlink = (a, b, k) => { a[k] = (a[k] || []).filter(x => x !== b.id); b[k] = (b[k] || []).filter(x => x !== a.id); };
 function dipAct(n, t, kind) {                                 // '' = feito/aceito; texto = motivo da recusa
   if (!t.alive || t === n) return 'Inválido';
   const D = DIPLO[kind], c = dipCost(kind) || 0; if (n.money < c) return 'Sem dinheiro';
+  if (['unally', 'untrade', 'embargo'].includes(kind) && subjFixed(n, t)) return 'Laço de súdito: só a independência desfaz';
   if (D.block) return D.block;
   if (!D.link) {                                              // ações de mão única: valem na hora
     if (D.cd && (n.cd || {})[t.id] > S.t) return 'Já tentado este ano';
     if (D.toggle && has(n, D.toggle, t.id)) { n[D.toggle] = n[D.toggle].filter(x => x !== t.id); return ''; }
     if (c) n.money -= c; if (D.cd) { n.cd = n.cd || {}; n.cd[t.id] = S.t + D.cd; } if (D.pay) t.money += c;
     if (D.toggle) (n[D.toggle] = n[D.toggle] || []).push(t.id);
-    if (D.ties) breakTies(n, t); if (D.unlink) unlink(n, t, D.unlink);
+    if (D.ties) breakTies(n, t); if (D.unlink) unlink(n, t, D.unlink); if (D.noWar) noWarPact(n, t, D.noWar);
     relAdd(t, n, D.rel[0]); relAdd(n, t, D.rel[1]); if (D.stab) n.stab = Math.max(0, n.stab + D.stab);
     return '';
   }

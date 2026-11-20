@@ -24,7 +24,7 @@ function priceTick(init) {
 const MONTHS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 const dateStr = (t = S.t) => (t % 30 + 1) + ' ' + MONTHS[Math.floor(t % 360 / 30)] + ' ' + yearOf(t);
 const nat = id => S.nations[id];
-const ownName = (n, r, set) => !set || (r === 3 && !(set.f3for || []).includes(n.gov));   // no nível 3 cada governo usa o próprio nome
+const ownName = (n, r, set) => !set || (r === 3 && !(set.f3for || []).includes(n.gov)) || (r === 4 && (GOVS[n.gov].imp || GOVS[n.gov].minRank === 4));   // no nível 3 cada governo usa o próprio nome; no 4, os imperiais próprios também
 const rankFmt = (n, r = n.rank || 0) => { const g = GOVS[n.gov], set = RANKSET[g.cat]; return (ownName(n, r, set) ? g.fmt : set.f[r]) || '{}'; };
 const rankTitle = (n, r = n.rank || 0) => { const g = GOVS[n.gov], set = RANKSET[g.cat]; return ownName(n, r, set) ? g.t : set.t[r]; };
 const natName = n => rankFmt(n).replace('{}', n.name);
@@ -129,7 +129,7 @@ function modBreak(n, k) {
 function calcMods(n) {
   const fx = calcFx(n), m = {}; Object.keys(MODS).forEach(k => m[k] = 0); m.coup = 0;
   for (const [, o] of modList(n)) for (const k in o) m[k] = (m[k] || 0) + o[k];
-  n.m = m; n.fx = fx;
+  n.m = m; n.fx = fx; n.era = natEra(n);
   const up = fx.up, um = n.vert && VUNITS[n.vert] ? VUNITS[n.vert].um : { inf: 1, cav: 1, art: 1 };
   n.up = { inf: up.inf * um.inf, cav: up.cav * um.cav, art: up.art * um.art, siege: up.siege, vrt: n.vert ? (up.inf * (1.5 + 1.75 * n.vlv / VERT[n.vert].len)) * (.5 + .5 * (n.vsat == null ? 1 : n.vsat)) : 0 };
 }

@@ -43,7 +43,7 @@ function newGame(seed, y0 = START_YEAR) {
     owner.forEach((nid, s) => WD.states[s].provs.forEach(p => { S.own[p] = nid; S.ctrl[p] = nid; })); ownChanged();
     ns.forEach(n => {
       n.capital = WD.states[n._st[0]].cap; delete n._st; delete n.vig;
-      { const ns = statesOf(n); n.rank = [0, 1, 2, 3].find(r => rankCap(n, r) >= ns); if (n.rank == null) n.rank = 3; }
+      { const ns = statesOf(n); n.rank = [0, 1, 2, 3, 4].find(r => rankCap(n, r) >= ns); if (n.rank == null) n.rank = 4; }
       if (n.kind === 'main') { grantTechs(n, adv ? y0 - (r() * 12 | 0) : 880 + (r() * 40 | 0)); n.gov = pickR(['feudal', 'feudal', 'feudal', 'feudal', 'elective', 'elective', 'tribal', 'theocracy']); n.ideo = chance(.25) ? 'warrior' : 'trad'; n.money = 160; }
       else if (n.kind === 'cold') { grantTechs(n, adv ? y0 - 10 - (r() * 25 | 0) : 860, ['nav_longship']); n.gov = pickR(['tribal', 'tribal', 'tribal_conf']); n.ideo = 'warrior'; n.money = 90; }
       else { grantTechs(n, adv ? y0 - 15 - (r() * 35 | 0) : 860); if (!adv && chance(.4)) delete n.techs.nav_longship; n.gov = pickR(['tribal', 'tribal', 'tribal', 'tribal_conf', 'horde', 'feudal']); n.ideo = chance(.3) ? 'warrior' : 'trad'; n.money = 60; }

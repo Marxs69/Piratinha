@@ -28,6 +28,7 @@ CONTENT.GOODS = {
   elec:    { n: 'Eletrônicos', p: 25, c: 'ind', e: '📟' },
   lux:     { n: 'Luxo', p: 20, c: 'lux', e: '💎' },
   power:   { n: 'Energia', p: 6, c: 'ind', e: '⚡', y0: 1885, grid: 1 },
+  transit: { n: 'Transporte ferroviário', p: 4, c: 'ind', e: '🚆', y0: 1830, grid: 1 },
   gears:   { n: 'Engrenagens', p: 14, c: 'punk', e: '⚙️' },
   boilers: { n: 'Caldeiras', p: 16, c: 'punk', e: '♨️' },
   coils:   { n: 'Bobinas Tesla', p: 18, c: 'punk', e: '⚡' },
@@ -64,6 +65,8 @@ CONTENT.JOB_N = { prod: 'Agricultura e extração', ind: 'Indústria e artesanat
    w = mil trabalhadores por nível · in/out = bens por mês por nível · req = condição do estado (REQS ou res:<bem>) · tech = tecnologia que libera
    job = grupo de empregos (senão o do BGROUPS) · slave = aceita escravos · food = soma o modificador de comida · fert = rende pela fertilidade do estado
    cap = vaga própria em st.caps (senão a do req) · maxFx = nível máximo = 1 + esse efeito da nação (senão max)
+   obs = some da lista quando o prédio indicado é liberado · fx.svcP = { serviço: eficiência } cobertura parcial de um serviço (templo, paço)
+   fx.frt = frete entre estados mais barato (trens) · fx.rail = ferrovia desenhada no mapa (nível) · fx.speed = tropas mais rápidas (estradas)
    fx (por nível): tax impostos · trade comércio · port porto · research pesquisa/mês · stab estabilidade · ferv fervor · yard desconto de navios no estado · rec meses a menos de recrutamento no estado
    fx.boost = { prédio: bônus por nível à produção dele no mesmo estado } · fx.sub = bônus por nível à subsistência do estado */
 /* teto da soma de cada efeito de prédio no país */
@@ -97,7 +100,7 @@ CONTENT.BUILDINGS = {
   castle:      { n: 'Castelo', e: '🏰', cost: 150, w: .3, fx: { fort: 1 }, max: 3, maxFx: 'fort' },
   port:        { n: 'Porto', e: '⚓', cost: 120, w: .6, fx: { port: 1, trade: .08 }, req: 'coast', max: 3, job: 'trade' },
   university:  { n: 'Universidade', e: '🎓', cost: 160, w: .4, fx: { research: 2.5 }, tech: 'soc_universities', max: 3 },
-  temple:      { n: 'Templo', e: '⛪', cost: 100, w: .3, fx: { stab: 1, ferv: 1.5 }, max: 2 },
+  temple:      { n: 'Templo', e: '⛪', cost: 100, w: .3, fx: { stab: 1, ferv: 1.5, svcP: { health: .4, edu: .4 } }, max: 2 },
   mill:        { n: 'Moinho e celeiro', e: '🥖', cost: 90, w: .5, fx: { boost: { farm: .15 }, sub: .05 }, tech: 'eco_watermill', max: 2 },
   foundry:     { n: 'Fundição', e: '🔥', cost: 160, w: 1.5, in: { iron: 2, coal: 1, wood: .5 }, out: { tools: 1.2, arms: 1.1 }, tech: 'eco_foundry' },
   blast_furnace:{ n: 'Alto-forno', e: '🏗️', cost: 220, w: 2, in: { iron: 2.5, coal: 1.5 }, out: { steel: 1.4 }, tech: 'eco_blastfurnace' },
@@ -110,7 +113,7 @@ CONTENT.BUILDINGS = {
   tool_factory:{ n: 'Fábrica de ferramentas', e: '🔧', cost: 360, w: 3, in: { steel: 1.5, coal: .5, power: .4 }, out: { tools: 5 }, tech: 'eco_mechanization' },
   arms_factory:{ n: 'Fábrica de armamentos', e: '💣', cost: 400, w: 3, in: { steel: 1.5, coal: .5, power: .4 }, out: { arms: 4.8 }, tech: 'eco_interchangeable' },
   steel_mill:  { n: 'Siderúrgica', e: '🔩', cost: 420, w: 3, in: { iron: 3, coal: 2, power: .8 }, out: { steel: 5 }, tech: 'eco_bessemer' },
-  railway:     { n: 'Ferrovia', e: '🚂', cost: 300, w: 1, in: { steel: .3, coal: .5 }, fx: { prod: .08, speed: .5, infra: 2 }, tech: 'eco_railways', max: 3 },
+  railway:     { n: 'Ferrovia', e: '🚂', cost: 300, w: 1, in: { steel: .3, coal: .5 }, out: { transit: 3 }, fx: { frt: .6, trade: .03, prod: .05, speed: .08, rail: 1 }, tech: 'eco_railways', max: 3 },
   copper_mine: { n: 'Mina de cobre', e: '🟠', cost: 80, w: 1.5, out: { copper: 2.4 }, req: 'res:copper', tl: .06, slave: 1 },
   uranium_mine:{ n: 'Mina de urânio', e: '☢️', cost: 300, w: 1, out: { uranium: 1.4 }, req: 'res:uranium', tech: 'eco_electricity' },
   rare_mine:   { n: 'Mina de terras raras', e: '💠', cost: 350, w: 1.5, out: { rare: 1.2 }, req: 'res:rare', tech: 'eco_assembly' },
@@ -133,17 +136,18 @@ CONTENT.BUILDINGS = {
   pw_space:    { n: 'Coletor solar orbital', e: '🛰️', cost: 1500, w: .3, out: { power: 25 }, vert: 'space' },
   // obras de transporte (desenhadas no mapa) e oleodutos
   road:        { n: 'Estradas', e: '🛤️', cost: 60, w: .3, fx: { speed: .15, trade: .01, infra: 1 }, max: 3 },
-  highway:     { n: 'Rodovias', e: '🛣️', cost: 400, w: .5, in: { oil: .3, steel: .2 }, fx: { speed: .4, prod: .05, infra: 3 }, tech: 'eco_highways', max: 3 },
-  hsr:         { n: 'Trem de alta velocidade', e: '🚄', cost: 700, w: .6, in: { power: .5, steel: .2 }, fx: { speed: .7, prod: .06, infra: 4 }, tech: 'eco_hsr', max: 2 },
-  maglev:      { n: 'Maglev', e: '🚝', cost: 1100, w: .5, in: { power: 1 }, fx: { speed: 1, prod: .08, infra: 5 }, tech: 'eco_maglev', max: 2 },
-  tubes:       { n: 'Tubos a vácuo', e: '🌀', cost: 1600, w: .5, in: { power: 1.5 }, fx: { speed: 1.5, prod: .1, infra: 6 }, tech: 'eco_tubes', max: 2 },
-  portal:      { n: 'Portais', e: '🌌', cost: 3000, w: .4, in: { power: 3 }, fx: { speed: 3, prod: .12, trade: .05, infra: 7 }, tech: 'eco_portals', max: 1 },
+  highway:     { n: 'Rodovias', e: '🛣️', cost: 400, w: .5, in: { oil: .3, steel: .2 }, fx: { speed: .4, prod: .03, frt: .2, infra: 2 }, tech: 'eco_highways', max: 3 },
+  hsr:         { n: 'Trem de alta velocidade', e: '🚄', cost: 700, w: .6, in: { power: .5, steel: .2 }, out: { transit: 6 }, fx: { frt: 1, trade: .04, prod: .06, speed: .15, rail: 2 }, tech: 'eco_hsr', max: 2 },
+  maglev:      { n: 'Maglev', e: '🚝', cost: 1100, w: .5, in: { power: 1 }, out: { transit: 9 }, fx: { frt: 1.3, trade: .05, prod: .08, speed: .2, rail: 3 }, tech: 'eco_maglev', max: 2 },
+  tubes:       { n: 'Tubos a vácuo', e: '🌀', cost: 1600, w: .5, in: { power: 1.5 }, out: { transit: 12 }, fx: { frt: 1.6, trade: .05, prod: .1, speed: .3, rail: 4 }, tech: 'eco_tubes', max: 2 },
+  portal:      { n: 'Portais', e: '🌌', cost: 3000, w: .4, in: { power: 3 }, fx: { speed: 3, prod: .12, trade: .05, frt: 2, infra: 3 }, tech: 'eco_portals', max: 1 },
   pipeline:    { n: 'Oleoduto e gasoduto', e: '🧪', cost: 350, w: .3, in: { steel: .2 }, fx: { pipe: 1, boost: { oil_well: .3 } }, tech: 'eco_pipelines', max: 1 },
-  // serviços públicos (cobertura por estado)
-  hospital:    { n: 'Hospital', e: '🏥', cost: 120, w: .4, fx: { svc: 'health' }, max: 5 },
-  school:      { n: 'Escola', e: '📚', cost: 110, w: .4, fx: { svc: 'edu' }, max: 5 },
-  office:      { n: 'Repartição pública', e: '🏛️', cost: 130, w: .4, fx: { svc: 'adm' }, max: 5 },
-  guard:       { n: 'Guarda', e: '🛡️', cost: 110, w: .4, fx: { svc: 'sec' }, max: 5 },
+  // serviços públicos (cobertura por estado; o teto de níveis vem da era, ERA_LIM.svc). Antes deles: templo (saúde e educação) e paço (administração), menos eficientes
+  hospital:    { n: 'Hospital', e: '🏥', cost: 120, w: .4, fx: { svc: 'health' }, tech: 'soc_scientific' },
+  school:      { n: 'Escola', e: '📚', cost: 110, w: .4, fx: { svc: 'edu' }, tech: 'soc_humanism' },
+  office:      { n: 'Repartição pública', e: '🏛️', cost: 130, w: .4, fx: { svc: 'adm' }, tech: 'soc_absolutism' },
+  guard:       { n: 'Guarda', e: '🛡️', cost: 110, w: .4, fx: { svc: 'sec' } },
+  manor:       { n: 'Paço senhorial', e: '🏯', cost: 90, w: .3, fx: { svcP: { adm: .5 } }, obs: 'office' },
   // militares
   shipyard:    { n: 'Estaleiro', e: '🛠️', cost: 160, w: .6, req: 'coast', fx: { yard: .15 }, max: 2 },
   barracks:    { n: 'Quartel', e: '⛺', cost: 100, w: .4, fx: { mp: .05, rec: 1 }, max: 3 },
@@ -167,15 +171,15 @@ CONTENT.BUILDINGS = {
 CONTENT.BGROUPS = [['prod', '🌾 Produção e extração', ['farm', 'stud', 'mill', 'fishery', 'lumber', 'quarry', 'plantation', 'iron_mine', 'coal_mine', 'gold_mine', 'copper_mine', 'uranium_mine', 'rare_mine', 'oil_well']],
   ['ind', '🏭 Indústria', ['apothecary', 'pharma', 'weaver', 'textile_manuf', 'tailor', 'bakery', 'garment_factory', 'food_factory', 'workshop', 'smithy', 'foundry', 'blast_furnace', 'jeweler', 'manufactory', 'textile_mill', 'goods_factory', 'tool_factory', 'arms_factory', 'steel_mill', 'electronics']],
   ['energy', '⚡ Energia', ['power_plant', 'oil_plant', 'hydro', 'nuclear', 'wind', 'solar_plant', 'fusion']],
-  ['infra', '🛤️ Transporte e comércio', ['road', 'railway', 'highway', 'hsr', 'maglev', 'tubes', 'portal', 'pipeline', 'port', 'market']],
-  ['svc', '🏛️ Serviços públicos', ['hospital', 'school', 'office', 'guard', 'university', 'temple']],
+  ['infra', '🛤️ Transporte e comércio', ['road', 'highway', 'portal', 'railway', 'hsr', 'maglev', 'tubes', 'pipeline', 'port', 'market']],
+  ['svc', '🏛️ Serviços públicos', ['hospital', 'school', 'office', 'manor', 'guard', 'university', 'temple']],
   ['mil', '⚔️ Militar', ['castle', 'shipyard', 'barracks', 'academy', 'airbase', 'launch_site']],
   ['vert', '✨ Vertente', []]];
 
 /* ---------- serviços públicos: nome do prédio muda com a era; cada nível atende SVC_CAP(ano) mil pessoas ---------- */
 CONTENT.SVC = {
-  health: { n: 'Saúde', e: '🏥', b: 'hospital', names: [[860, 'Casa de caridade'], [1650, 'Hospital'], [1900, 'Hospital moderno'], [2000, 'Centro médico'], [2080, 'Clínica de regeneração']], d: 'Crescimento da população, teto populacional e resistência a pragas' },
-  edu:    { n: 'Educação', e: '📚', b: 'school', names: [[860, 'Escola monástica'], [1500, 'Escola'], [1850, 'Escola pública'], [2000, 'Campus digital'], [2080, 'Rede neural de ensino']], d: 'Pesquisa' },
-  adm:    { n: 'Administração', e: '🏛️', b: 'office', names: [[860, 'Chancelaria local'], [1500, 'Intendência'], [1850, 'Repartição pública'], [2000, 'Governo digital'], [2080, 'Administração algorítmica']], d: 'Impostos, menos corrupção e obras mais baratas' },
+  health: { n: 'Saúde', e: '🏥', b: 'hospital', names: [[1620, 'Hospital'], [1900, 'Hospital moderno'], [2000, 'Centro médico'], [2080, 'Clínica de regeneração']], d: 'Crescimento da população, teto populacional e resistência a pragas' },
+  edu:    { n: 'Educação', e: '📚', b: 'school', names: [[1470, 'Escola'], [1850, 'Escola pública'], [2000, 'Campus digital'], [2080, 'Rede neural de ensino']], d: 'Pesquisa' },
+  adm:    { n: 'Administração', e: '🏛️', b: 'office', names: [[1600, 'Intendência'], [1850, 'Repartição pública'], [2000, 'Governo digital'], [2080, 'Administração algorítmica']], d: 'Impostos, menos corrupção e obras mais baratas' },
   sec:    { n: 'Segurança', e: '🛡️', b: 'guard', names: [[860, 'Guarda'], [1600, 'Milícia urbana'], [1830, 'Polícia'], [2000, 'Segurança inteligente'], [2080, 'Vigilância preditiva']], d: 'Estabilidade e menos golpes' },
 };

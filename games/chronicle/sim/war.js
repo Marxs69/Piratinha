@@ -153,19 +153,20 @@ function callAllies(w, side) {                                // aliados e parce
     if (isHuman(id)) { S.calls = S.calls || []; S.calls.push({ w: w.id, side, from: lead.id, to: id }); return; }
     const p = (al.ruler.tr.includes('honest') ? 1 : side === 'D' ? .75 : .45) + (al.rel[lead.id] || 0) / 400 - (al.ruler.tr.includes('craven') ? .3 : 0);
     if (chance(p)) joinWar(w, id, side);
-    else { breakTies(al, lead); al.rel[lead.id] -= 40; lead.rel[id] = (lead.rel[id] || 0) - 60; log(natName(al) + ' recusou o chamado de ' + natName(lead) + ' e a aliança acabou.', 'world', [id, lead.id]); }
+    else { breakTies(al, lead); noWarPact(al, lead, DIPLO.unally.noWar); al.rel[lead.id] -= 40; lead.rel[id] = (lead.rel[id] || 0) - 60; log(natName(al) + ' recusou o chamado de ' + natName(lead) + ' e a aliança acabou.', 'world', [id, lead.id]); }
   });
 }
 function answerCall(c, yes) {
   const pid = c.to ?? S.player, w = S.wars.find(x => x.id === c.w), me = nat(pid), lead = nat(c.from); if (!w) return;
   if (yes) joinWar(w, pid, c.side);
-  else { breakTies(me, lead); lead.rel[me.id] = (lead.rel[me.id] || 0) - 60; me.stab = Math.max(0, me.stab - 5); log('Você recusou o chamado de ' + natName(lead) + '. A aliança acabou.', 'bad', [S.player]); }
+  else { breakTies(me, lead); noWarPact(me, lead, DIPLO.unally.noWar); lead.rel[me.id] = (lead.rel[me.id] || 0) - 60; me.stab = Math.max(0, me.stab - 5); log('Você recusou o chamado de ' + natName(lead) + '. A aliança acabou.', 'bad', [S.player]); }
 }
 function declareWar(n, t, s, cb) {                           // cb 'holy' = guerra santa (pouca perda de estabilidade)
   if (atWar(n.id, t.id)) return 'Já em guerra'; if (n.truce[t.id] > S.t) return 'Trégua em vigor';
   if (n.senior != null && !(n.subj && SUBJECTS[n.subj.tier].dip)) return 'Súdito sem diplomacia própria não declara guerras';
   if (t.id === n.senior || t.senior === n.id) return 'É seu suserano ou súdito';
   if ((n.allies || []).includes(t.id)) return 'Rompa a aliança antes';
+  if (noWarUntil(n, t)) return 'Aliança rompida há pouco: guerra só a partir de ' + yearOf(noWarUntil(n, t));
   if (coldBlocked(n.id, t.id)) return 'Guerra Fria: as superpotências não se enfrentam diretamente';
   if (cb === 'holy') { const e = holyWhy(n, t); if (e) return e; }
   const claim = (s != null && n.claims[s]) || cb === 'holy';

@@ -50,7 +50,7 @@ CONTENT.GOVS = {
   surveillance:  { n: 'Estado de vigilância', cat: 'Ditadura', succ: 'party', t: 'Guardião', fmt: 'Estado de {}', m: { stab: .2, research: -.05, coup: 0 }, coup: .1, to: ['totalitarian', 'one_party', 'synthocracy'] },
   hive:          { n: 'Coletivo-colmeia', cat: 'Tecnocracia', succ: 'ai', t: 'Mente coletiva', fmt: 'Colmeia de {}', m: { prod: .3, research: .2, stab: .1, growth: -.1 }, coup: 0 , to: ['synthocracy'] },
   star_empire:   { n: 'Império estelar', minRank: 4, cat: 'Monarquia', succ: 'hered', t: 'Imperador estelar', fmt: 'Império Estelar de {}', m: { tax: .15, army: .15, research: .1 }, coup: .4 , to: ['empire', 'hegemony'] },
-  hegemony:      { n: 'Hegemonia orbital', cat: 'Tecnocracia', succ: 'council', term: 10, t: 'Hegemon', fmt: 'Hegemonia de {}', m: { tax: .1, prod: .1, research: .1, army: .1, stab: .1 }, coup: .2 , to: ['star_empire', 'technate'] },
+  hegemony:      { n: 'Hegemonia orbital', imp: 1, cat: 'Tecnocracia', succ: 'council', term: 10, t: 'Hegemon', fmt: 'Hegemonia de {}', m: { tax: .1, prod: .1, research: .1, army: .1, stab: .1 }, coup: .2 , to: ['star_empire', 'technate'] },
 };
 
 /* como se escolhe o governante em cada tipo de sucessão (aba Governo). pick = o jogador escolhe entre 4 candidatos */
@@ -108,11 +108,14 @@ CONTENT.GOV_TR = [
 ];
 
 /* ---------- níveis de título (como no CK3): limitam quantos estados o país sustenta (Limite de domínio) ----------
-   cap: províncias sem perder estabilidade · req: mínimo para proclamar o nível · no nível 3 cada governo usa o próprio nome (fmt/t) */
+   imp (no governo) ou minRank 4 = governo imperial próprio: no nível 4 usa o próprio nome em vez do genérico
+   RANK_CAP = estados sustentados sem perder estabilidade (base) · RANK_REQ = estados para proclamar o nível · no nível 3 cada governo usa o próprio nome (fmt/t)
+   DOMAIN: o limite cresce com as eras (até +era, de y0 a y0+span) e com a cobertura administrativa (até +adm) */
 CONTENT.RANK_N = ['Baronia', 'Condado', 'Ducado', 'Reino', 'Império'];
 
-CONTENT.RANK_CAP = [2, 5, 12];
-CONTENT.RANK_REQ = [0, 2, 4, 8];
+CONTENT.RANK_CAP = [2, 5, 12, 30, 60];
+CONTENT.RANK_REQ = [0, 2, 4, 8, 24];
+CONTENT.DOMAIN = { era: .6, y0: 860, span: 1000, adm: .3 };
 
 CONTENT.RANK_SLOTS = [3, 5, 8, 12, 18];// teto de canteiros de obra pelo título
 
@@ -122,7 +125,7 @@ CONTENT.RANKSET = {
   República:   { f: ['Comuna de {}', 'Cidade Livre de {}', 'Liga de {}', null, 'República Imperial de {}'], t: ['Prefeito', 'Burgomestre', 'Cônsul', null, 'Primeiro Cidadão'] },
   Socialista:  { f: ['Coletivo de {}', 'Soviete de {}', 'União Regional de {}', null, 'União das Repúblicas de {}'], t: ['Delegado', 'Comissário', 'Secretário regional', null, 'Presidente da União'] },
   Teocracia:   { f: ['Priorado de {}', 'Bispado de {}', 'Arcebispado de {}', null, 'Santo Império de {}'], t: ['Prior', 'Bispo', 'Arcebispo', null, 'Pontífice'] },
-  Ditadura:    { f: ['Distrito Militar de {}', 'Protetorado de {}', 'Estado de {}', null, 'Império Nacional de {}'], t: ['Comandante', 'Governador militar', 'Protetor', null, 'Autocrata'] },
+  Ditadura:    { f: ['Distrito Militar de {}', 'Comando de {}', 'Região Autônoma de {}', null, 'Império Nacional de {}'], t: ['Comandante', 'Governador militar', 'Protetor', null, 'Autocrata'] },
   Tecnocracia: { f: ['Distrito Técnico de {}', 'Comitê de {}', 'Diretório de {}', null, 'Hegemonia de {}'], t: ['Engenheiro-chefe', 'Supervisor', 'Diretor', null, 'Arquiteto supremo'] },
 };
 
@@ -190,6 +193,9 @@ CONTENT.LAWS = {
 
 CONTENT.LAW_DEF = { tax: 'normal', draft: 'limited', trade: 'normal', spend: 'normal', press: 'regulated', currency: 'metal', bank: 'none', labor: 'free', land: 'feudal', edu: 'clergy', health: 'charity', police: 'militia', vote: 'nobles', subsidy: 'none', company: 'guilds', hours: 'free', slavery: 'colonial', relig: 'state', culture: 'primary', women: 'patriarchy', succ: 'partition' };
 
+/* rebeldia dos escravos por mês: base + parte da população × share + fome × unsat (+ lowStab com estabilidade < 40) − cobertura de segurança × sec; reset = onde a barra recomeça depois de uma revolta */
+CONTENT.SLAVE_REB = { base: .1, share: 10, unsat: 1.5, lowStab: .3, sec: .6, reset: 35 };
+
 /* ---------- autonomia de culturas e religiões que não são a principal/oficial (−2 a +2; 0 = livre) ----------
    w: peso como minoria (estabilidade e satisfação) · as: assimilação/conversão por ano · ag: agitação (revoltas) */
 CONTENT.CPOL = { '-2': { n: 'Escravizada', e: '⛓️', w: 2.5, as: 0, ag: 3, d: 'Parte desse povo vira escravo a cada mês (exige escravidão permitida). Pesa muito na estabilidade e gera revoltas.' },
@@ -216,7 +222,7 @@ CONTENT.DIPLO = {
   gift:     { cost: 40, pay: 1, rel: [20, 0] },
   insult:   { rel: [-40, -20] },
   break:    { ties: 1, rel: [-40, 0], stab: -5 },
-  unally:   { unlink: 'allies', rel: [-40, 0], stab: -5 },
+  unally:   { unlink: 'allies', rel: [-40, 0], stab: -5, noWar: 5 },   // noWar: anos sem poder declarar guerra um ao outro depois do rompimento
   untrade:  { unlink: 'trade', rel: [-10, 0] },
   embargo:  { toggle: 'emb', unlink: 'trade', rel: [-25, 0] },
   integrate:{ cost: 200, block: 'Use a aba Súditos na diplomacia' },
@@ -235,18 +241,37 @@ CONTENT.DIP_ACC = [['rel', .5, 'relação'], ['sameIdeo', 12, 'mesma ideologia']
 CONTENT.DIP_DRIFT = [['linked', 50, 'allies'], ['linked', 30, 'marr'], ['linked', 15, 'trade'], ['sameIdeo', 10], ['neighbor', -10], ['embargo', -40], ['war', -100], ['overlord', 40]];
 
 CONTENT.SUBJECTS = {
-  puppet:   { n: 'Fantoche', e: '🎭', base: 15, tri: .3, war: 1, dip: 0, int: 1.5, cost: .9, d: 'Governo imposto: paga muito, segue o suserano em tudo e integra rápido.' },
-  vassal:   { n: 'Vassalo', e: '🛡️', base: 30, tri: .15, war: 1, dip: 0, int: 1, cost: .7, d: 'Paga tributo e luta nas guerras do suserano.' },
-  protect:  { n: 'Protetorado', e: '☂️', base: 45, tri: .05, war: 0, dip: 1, int: .6, cost: .5, d: 'Tem diplomacia própria e é defendido pelo suserano; paga pouco.' },
-  dominion: { n: 'Domínio', e: '🏛️', base: 55, tri: .05, war: 0, dip: 1, int: .4, cost: .35, d: 'Quase independente: governo e diplomacia próprios, laço leve com a coroa.' },
-  union:    { n: 'União pessoal', e: '👑', base: 30, tri: 0, war: 1, dip: 0, int: .8, cost: null, d: 'O mesmo monarca nas duas coroas; nasce de casamentos reais.' },
+  protect:  { n: 'Protetorado', e: '☂️', base: 28, tri: .05, war: 0, dip: 1, int: .8, next: 'puppet', cost: .5, d: 'Diplomacia própria, defendido pelo suserano; paga pouco.' },
+  dominion: { n: 'Domínio', e: '🏛️', base: 32, tri: .05, war: 0, dip: 1, int: .7, next: 'vassal', cost: .35, d: 'Quase independente: governo e diplomacia próprios.' },
+  puppet:   { n: 'Fantoche', e: '🎭', base: 20, tri: .3, war: 1, dip: 0, int: 1.2, next: 'vassal', cost: .9, d: 'Governo imposto: paga muito e segue o suserano.' },
+  vassal:   { n: 'Vassalo', e: '🛡️', base: 12, tri: .15, war: 1, dip: 0, int: 1, next: 'int', cost: .7, d: 'Paga tributo e luta nas guerras do suserano.' },
+  union:    { n: 'União pessoal', e: '👑', base: 15, tri: 0, war: 1, dip: 0, int: .8, next: 'int', cost: null, d: 'O mesmo monarca nas duas coroas; nasce de casamentos reais.' },
 };
+/* progresso dos súditos: os níveis não se escolhem, sobem sozinhos (next) enquanto o súdito está satisfeito (liberdade abaixo de 50%)
+   k = pontos por mês com liberdade 0% (× int do nível) · back = quanto volta por mês com liberdade 100% · rel = relação mínima do súdito com o suserano para a integração final */
+CONTENT.SUBJ_PROG = { k: .35, back: .5, rel: 50, cost: 25 };   // cost = 💰 por província do súdito (× era), pago pelo suserano na integração, que também exige paz
+
+/* ações do país súdito (aba Súditos da diplomacia): g = loyal (lealdade) ou rebel (rebelião) · cost = 💰 (× era) · cd = anos até repetir
+   when = condições (COND) · fx = efeitos (EFF): lib = barra agora · libPush = empurra o alvo por um tempo · relSenior = relação com o suserano
+   petition = pede ao suserano uma lei mais leve (tribute, army ou rule) · backer = procura uma potência que apoie a independência */
+CONTENT.SUBJ_ACTS = {
+  gifts:    { g: 'loyal', e: '🎁', n: 'Presentes ao suserano', cost: 40, cd: 2, d: 'Aproxima as cortes.', fx: { relSenior: 20 } },
+  oath:     { g: 'loyal', e: '🙇', n: 'Jurar lealdade', cd: 5, d: 'Promessa pública de fidelidade.', fx: { lib: -10, pres: -5, stab: 3 } },
+  pet_tri:  { g: 'loyal', e: '📜', n: 'Pedir alívio do tributo', cd: 3, d: 'O suserano pode recusar.', when: { subjLaw: { tribute: ['heavy', 'normal'] } }, fx: { petition: 'tribute' } },
+  pet_army: { g: 'loyal', e: '⚔️', n: 'Pedir o exército de volta', cd: 3, d: 'O suserano pode recusar.', when: { subjLaw: { army: ['levies', 'demil'] } }, fx: { petition: 'army' } },
+  pet_rule: { g: 'loyal', e: '🏛️', n: 'Pedir mais autogoverno', cd: 3, d: 'O suserano pode recusar.', when: { subjLaw: { rule: ['governor', 'advisors'] } }, fx: { petition: 'rule' } },
+  culture:  { g: 'rebel', e: '📚', n: 'Renascimento cultural', cost: 35, cd: 5, d: 'Escolas, poetas e a língua da terra.', fx: { libPush: { l: 'Renascimento cultural', v: 8, mo: 60 }, pres: 5 } },
+  agitate:  { g: 'rebel', e: '🔥', n: 'Agitar nacionalistas', cost: 30, cd: 3, d: 'Panfletos e comícios.', fx: { libPush: { l: 'Agitação nacionalista', v: 12, mo: 36 }, relSenior: -10, stab: -2 } },
+  arms:     { g: 'rebel', e: '🗡️', n: 'Armas escondidas', cost: 50, cd: 4, d: 'Arsenais longe dos olhos do suserano.', fx: { manpower: 3, libPush: { l: 'Armas escondidas', v: 5, mo: 48 } } },
+  backer:   { g: 'rebel', e: '🤝', n: 'Buscar apoio estrangeiro', cost: 60, cd: 5, d: 'Uma potência rival do suserano entra na guerra de independência.', when: { backer: false }, fx: { backer: true } },
+};
+CONTENT.SUBJ_BACK = { lib: 10, rel: 0, minStr: .5 };   // apoio estrangeiro: + liberdade enquanto durar; quem apoia tem relação ≤ rel com o suserano e força ≥ minStr dele
 
 /* leis para cada súdito: lib = efeito na liberdade; tri = multiplicador do tributo; mp = parte do contingente cedida; int = velocidade de integração */
 CONTENT.SUBJ_LAWS = {
   tribute: { n: 'Tributo', o: { none: { n: 'Isento', lib: -10, tri: 0 }, normal: { n: 'Normal', lib: 0, tri: 1 }, heavy: { n: 'Pesado', lib: 15, tri: 2 } } },
   army:    { n: 'Exército', o: { own: { n: 'Próprio', lib: 0 }, levies: { n: 'Contingentes ao suserano', lib: 8, mp: .2 }, demil: { n: 'Desmilitarizado', lib: 12, demil: 1 } } },
-  rule:    { n: 'Governo', o: { self: { n: 'Autogoverno', lib: -10, int: .5 }, advisors: { n: 'Conselheiros do suserano', lib: 0, int: 1 }, governor: { n: 'Governador nomeado', lib: 12, int: 2 } } },
+  rule:    { n: 'Governo', o: { self: { n: 'Autogoverno', lib: -10, int: .6 }, advisors: { n: 'Conselheiros do suserano', lib: 0, int: 1 }, governor: { n: 'Governador nomeado', lib: 12, int: 1.4 } } },
 };
 
 CONTENT.SUBJ_LAW_DEF = { tribute: 'normal', army: 'own', rule: 'advisors' };

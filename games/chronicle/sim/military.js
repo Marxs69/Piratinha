@@ -21,8 +21,8 @@ const navDoc = n => NAV_DOCS[n.navDoc] || NAV_DOCS.line;
 function setNavDoc(n, k) { if (!NAV_DOCS[k]) return 'Inválido'; if (n.navDoc === k) return 'Já é a doutrina'; if (n.navDocCd > S.t) return 'Troca recente: de novo em ' + dateStr(n.navDocCd); n.navDoc = k; n.navDocCd = S.t + 360; return ''; }
 const supOk = (n, k) => !SUPPORT[k].tech || hasT(n, SUPPORT[k].tech);
 /* bens que o exército inteiro do país consome por mês */
-let abC = null;                                              // exércitos por dono (refeito a cada dia)
-const armiesOf = id => { if (!abC || abC.t !== S.t || abC.k !== S.armies.length) { abC = { t: S.t, k: S.armies.length, m: new Map() }; for (const a of S.armies) { const l = abC.m.get(a.o); if (l) l.push(a); else abC.m.set(a.o, [a]); } } return abC.m.get(id) || []; };
+let abC = null;                                              // exércitos por dono: refeito quando muda o dia, a lista (filtros criam outra) ou o tamanho dela
+const armiesOf = id => { if (!abC || abC.t !== S.t || abC.ref !== S.armies || abC.k !== S.armies.length) { abC = { t: S.t, ref: S.armies, k: S.armies.length, m: new Map() }; for (const a of S.armies) { const l = abC.m.get(a.o); if (l) l.push(a); else abC.m.set(a.o, [a]); } } return abC.m.get(id) || []; };
 function armyDemand(n) {
   const R = { inf: 0, cav: 0, art: 0, vrt: 0 }, sc = { recon: 0, eng: 0, med: 0 }, d = {};
   for (const a of armiesOf(n.id)) { UT.forEach(t => R[t] += a[t]); for (const k in a.sup || {}) sc[k]++; }

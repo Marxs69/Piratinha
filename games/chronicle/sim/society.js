@@ -73,9 +73,23 @@ function slaveTick(n) {                                        // o estoque de e
 }
 const REVOLT = { slave: ['Revolta de escravos', '⛓️'], low: ['Revolta popular', '✊'], cul: ['Levante separatista', '🏴'], rev: ['Revolução liberal', '🗽'], react: ['Levante reacionário', '⚜️'] };
 const slaveShare = n => (n.cls ? n.cls.slave : 0) / Math.max(1, n.popT || 0);
+/* rebeldia dos escravos (n.slvReb, 0–100): sobe todo mês mesmo com eles alimentados; em 100 estoura uma revolta e a barra volta a SLAVE_REB.reset.
+   Some quando a escravidão é proibida ou não há escravos. */
+const slavesOn = n => (n.slv || 0) > 0 && n.laws.slavery !== 'banned';
+function slaveRebParts(n) {
+  const R = SLAVE_REB, sl = slaveShare(n), sat = (n.csat || {}).slave ?? 1, sec = (n.cov || {}).sec || 0;
+  return [['Cativeiro', R.base], ['Escravos na população (' + Math.round(sl * 100) + '%)', sl * R.share], ['Fome', (1 - sat) * R.unsat], ['Estabilidade baixa', n.stab < 40 ? R.lowStab : 0], ['Segurança', -sec * R.sec]].filter(x => Math.abs(x[1]) >= .01);
+}
+const slaveRebRate = n => slaveRebParts(n).reduce((a, x) => a + x[1], 0);
+function slaveRebTick(n) {
+  if (!slavesOn(n)) { n.slvReb = 0; return false; }
+  n.slvReb = clamp((n.slvReb || 0) + slaveRebRate(n), 0, 100);
+  if (n.slvReb < 100) return false;
+  n.slvReb = SLAVE_REB.reset; revolt(n, 'slave'); return true;
+}
 function unrestTick(n) {
-  const sl = slaveShare(n), cs = n.csat || {}, sec = (n.cov || {}).sec || 0, low = cs.low == null ? 1 : cs.low;
-  if (sl > .02 && chance(sl * .05 * (1 - sec * .7) * (n.stab < 40 ? 2 : 1))) revolt(n, 'slave');
+  const cs = n.csat || {}, sec = (n.cov || {}).sec || 0, low = cs.low == null ? 1 : cs.low;
+  if (slaveRebTick(n)) return;
   else if (low < .55 && n.stab < 45 && chance((.55 - low) * .08 * (1 - sec * .5))) revolt(n, 'low');
   else if ((n.minC || 0) > .2 && n.stab < 35 && chance(.004 * Math.max(1, ...Object.values(n.cpol || {}).map(v => CPOL[v].ag)))) revolt(n, 'cul');
 }

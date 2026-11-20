@@ -10,7 +10,7 @@ function researchTick(n) {
   n.rp = Math.min(n.rp, techBase(y) * 3);
 }
 function worksTick(n) {                                         // obras concluídas e recrutas prontos
-  n.cons.forEach(c => c.m--); n.cons.filter(c => c.m <= 0).forEach(c => { if (stateOwnerOf(c.s) === n.id) { S.bld[c.s][c.b] = (S.bld[c.s][c.b] || 0) + 1; const f = BUILDINGS[c.b].fx; if (f && (f.infra || f.pipe)) S.mapDirty = true; if (isHuman(n.id)) log(BUILDINGS[c.b].n + ' concluída em ' + WD.states[c.s].n + '.', 'good', [n.id]); } }); n.cons = n.cons.filter(c => c.m > 0);
+  n.cons.forEach(c => c.m--); n.cons.filter(c => c.m <= 0).forEach(c => { if (stateOwnerOf(c.s) === n.id) { S.bld[c.s][c.b] = (S.bld[c.s][c.b] || 0) + 1; const f = BUILDINGS[c.b].fx; if (f && (f.infra || f.rail || f.pipe)) S.mapDirty = true; if (isHuman(n.id)) log(BUILDINGS[c.b].n + ' concluída em ' + WD.states[c.s].n + '.', 'good', [n.id]); } }); n.cons = n.cons.filter(c => c.m > 0);
   n.rec.forEach(r => r.m--);
   n.rec.filter(r => r.m <= 0).forEach(r => {
     if (r.type === 'ship') { const pr = WD.provs[r.at]; if (S.own[r.at] === n.id) { const z = pr.seas[0], f = S.fleets.find(f => f.o === n.id && f.z === z && !f.path.length); if (f) f.ships += r.k; else addFleet(n.id, z, r.k); } return; }
