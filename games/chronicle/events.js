@@ -131,6 +131,9 @@ const EVENTS = [
   { id: 'peasant_revolt', e: '🔥', t: 'Revolta camponesa', p: 0, when: { stab: [null, 50] },
     m: 'Os camponeses pegaram em foices e tomaram as aldeias.',
     opts: [{ n: 'Mandar o exército', fx: { revolt: 'low', manpower: -1 }, ai: 1 }, { n: 'Ceder terras', fx: { money: -60, stab: 3, law: { land: 'private' } }, when: { tech: 'soc_common_law' }, ai: 1 }, { n: 'Prometer reformas', fx: { pres: -4, chain: { id: 'peasant_unrest', mo: 24 } }, ai: 1 }] },
+  { id: 'cav_drill', e: '🐎', t: 'Manobras de cavalaria', p: .02, cd: 3, when: { drilling: true },
+    m: 'Nos campos de treino, a cavalaria de {pais} ensaia cargas de perseguição.',
+    opts: [{ n: 'Treino intensivo (2 anos)', fx: { money: -30, pursuit: 24 }, when: { money: [30, null] }, ai: 2 }, { n: 'Treino curto (1 ano)', fx: { pursuit: 12 }, ai: 1 }] },
   // ---------- marcos de era ----------
   { id: 'printing', e: '📜', t: 'A imprensa', p: .02, once: true, when: { tech: 'soc_printing' },
     m: 'Gráficas imprimem livros às centenas em {pais}.',

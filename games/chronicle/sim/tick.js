@@ -15,7 +15,11 @@ function worksTick(n) {                                         // obras conclu�
   n.rec.filter(r => r.m <= 0).forEach(r => {
     if (r.type === 'ship') { const pr = WD.provs[r.at]; if (S.own[r.at] === n.id) { const z = pr.seas[0], f = S.fleets.find(f => f.o === n.id && f.z === z && !f.path.length); if (f) f.ships += r.k; else addFleet(n.id, z, r.k); } return; }
     const at = S.own[r.at] === n.id && S.ctrl[r.at] === n.id ? r.at : n.capital; const ex = S.armies.find(a => a.o === n.id && a.p === at && !a.path.length);
-    const x = r.x ?? .1; if (ex) addMen(ex, r.type, r.k, x); else addArmy(n.id, at, { [r.type]: r.k }, x);
+    const x = r.x ?? .1;
+    if (r.g != null && S.armies.some(a => a.o === n.id && gid(a) === r.g)) {   // comprada para um exército: entra nele (no destacamento que está lá ou num novo, que vai até ele)
+      const G = S.armies.filter(a => a.o === n.id && gid(a) === r.g), here = G.find(a => a.p === at && !a.path.length);
+      if (here) addMen(here, r.type, r.k, x); else { const b = addArmy(n.id, at, { [r.type]: r.k }, x); b.g = r.g; b.front = G[0].front; b.st = G[0].st; b.gen = G[0].gen; }
+    } else if (ex) addMen(ex, r.type, r.k, x); else addArmy(n.id, at, { [r.type]: r.k }, x);
   });
   n.rec = n.rec.filter(r => r.m > 0);
 }

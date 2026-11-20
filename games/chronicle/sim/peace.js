@@ -80,7 +80,7 @@ function separatePeace(w, L, winner, t) {
     S.wars = S.wars.filter(x => x !== w);
   } else { w.A = w.A.filter(x => x !== L); w.D = w.D.filter(x => x !== L); if (!w.A.length || !w.D.length) S.wars = S.wars.filter(x => x !== w); }
   warsChanged(); ownChanged(); checkDead(); S.fronts = (S.fronts || []).filter(f => S.wars.some(x => x.id === f.w)); S.armies.forEach(a => { if (a.front != null && !S.fronts.some(f => f.id === a.front)) a.front = null; });
-  S.armies.forEach(a => { if (leaving.includes(a.o) && a.p < WD.provs.length && S.own[a.p] !== a.o && !friendsOf(a.o).has(S.ctrl[a.p]) && nat(a.o).alive) { a.p = nat(a.o).capital; a.path = []; a.front = null; } });
+  S.armies.forEach(a => { if (leaving.includes(a.o) && a.p < WD.provs.length && S.own[a.p] !== a.o && nat(a.o).alive && !a.inv) goHome(a); });   // tropas em terra estrangeira marcham de volta ao estado próprio mais perto
   const wn = winner != null ? natName(nat(winner)) : null;
   const txt = winner == null ? (lead ? 'Paz branca entre ' + natName(nat(w.a)) + ' e ' + natName(nat(w.d)) + '.' : ln + ' saiu da guerra (paz branca).')
     : wn + ' impôs a paz a ' + ln + (parts.length ? ': ' + parts.join(', ') : '') + '.';

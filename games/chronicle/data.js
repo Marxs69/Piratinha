@@ -527,12 +527,14 @@ const SUPPORT = {
            d: 'Baixas −25% (um quarto dos feridos volta ao contingente) · atrito −30% · doenças −50%' },
 };
 /* posturas de combate: def vence agg, agg vence pur, pur vence def (+15% de dano para quem vence) */
+/* posturas de combate e de automação: agressiva vai ao front mais próximo e ataca; defensiva segura a linha e abate quem avançou;
+   equilibrada segue a ordem do front. Ciclo: defensiva vence agressiva, agressiva vence equilibrada, equilibrada vence defensiva (+15% de dano) */
 const STANCES = {
-  bal: { n: 'Equilibrada', e: '⚖️', dmg: 1, take: 1, mor: 1, fat: 1, pur: 1, d: 'Sem bônus nem penalidade' },
-  agg: { n: 'Ataque agressivo', e: '⚔️', dmg: 1.2, take: 1.15, mor: 1.1, fat: 1.3, pur: 1, beats: 'pur', d: 'Dano +20%, moral do inimigo cai 10% mais rápido; baixas próprias +15% e cansa mais' },
-  def: { n: 'Defensiva', e: '🛡️', dmg: .85, take: .8, mor: 1, fat: .8, pur: .5, beats: 'agg', d: 'Baixas −20%, cansa menos; dano −15% e persegue mal' },
-  pur: { n: 'Perseguição', e: '🐎', dmg: .95, take: 1.05, mor: 1, fat: 1.1, pur: 2, beats: 'def', d: 'Depois de vencer, mata o dobro dos que fogem (melhor com cavalaria)' },
+  bal: { n: 'Equilibrada', e: '⚖️', dmg: 1, take: 1, mor: 1, fat: 1, beats: 'def', d: 'Segue a ordem do front (defender ou avançar). Sem bônus nem penalidade' },
+  agg: { n: 'Ataque agressivo', e: '⚔️', dmg: 1.2, take: 1.15, mor: 1.1, fat: 1.3, beats: 'bal', act: 'adv', d: 'Vai ao front mais próximo e ataca. Dano +20%, moral do inimigo cai 10% mais rápido; baixas próprias +15% e cansa mais' },
+  def: { n: 'Defensiva', e: '🛡️', dmg: .85, take: .8, mor: 1, fat: .8, beats: 'agg', act: 'hold', d: 'Segura a linha e vai abater tropas inimigas que avançaram. Baixas −20%, cansa menos; dano −15%' },
 };
+const PURSUIT = { mul: 2, cav: .1 };                            // bônus de perseguição (evento de treino): perseguição ×2 e choque da cavalaria +10%, por 1–2 anos
 const WIDTH_BASE = 12, LOGI_BASE = 2, SHIP_CAP = 1;          // largura de combate, alcance da linha de suprimento (províncias), regimentos por navio
 
 /* ---------- terrenos ---------- */

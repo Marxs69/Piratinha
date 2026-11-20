@@ -40,6 +40,7 @@ const COND = {
   noFlag:  { ok: (n, v) => !(n.flags || {})[v], txt: v => 'Sem a marca: ' + v },
   succ:    { ok: (n, v) => arr(v).includes(GOVS[n.gov].succ), txt: v => arr(v).includes('hered') ? 'Monarquia hereditária' : 'Sucessão: ' + arr(v).join(', ') },
   heirAge: { ok: (n, v) => { const k = (n.kids || []).slice().sort((a, b) => a.born - b.born)[0]; return !!k && inR(ageOf(k), v); }, txt: v => rTxt('Idade do herdeiro', v) },
+  drilling:{ ok: (n, v) => S.armies.some(a => a.o === n.id && a.drill && a.cav > 1) === v, txt: v => v ? 'Exército com cavalaria em treino' : 'Sem treino' },
   govOld:  { ok: (n, v) => (govAge(n) > 0) === v, txt: v => v ? 'Governo ultrapassado' : 'Governo atual' },
   press:   { ok: (n, v) => inR(n.press || 0, v), txt: v => rTxt('Pressão do conselho', v) },
   any:     { ok: (n, v) => v.some(c => condOk(n, c)), txt: v => 'Uma destas: ' + v.map(c => condTxt(c).join(', ')).join(' | '), sub: v => v },
@@ -80,6 +81,8 @@ const EFF = {
   /* cadeia: agenda outro evento para este país daqui a 'mo' meses */
   chain:    { do: (n, v) => { (n.evNext = n.evNext || []).push({ id: v.id, t: S.t + (v.mo || 1) * 30 }); }, txt: () => '', ids: v => [['EVENT', v.id]] },
   revolt:   { do: (n, v) => revolt(n, v), txt: v => '✊ ' + REVOLT[v][0] },
+  /* perseguição: o maior exército em treino ganha o bônus de perseguição por v meses */
+  pursuit:  { do: (n, v) => { const a = S.armies.filter(x => x.o === n.id && x.drill && x.cav > 1).sort((x, y) => y.cav - x.cav)[0]; if (a) (a.g != null ? groupOf(a) : [a]).forEach(x => x.pur = S.t + v * 30); }, txt: v => '🐎 Perseguição na cavalaria por ' + durTxt(v) + ' (perseguição ×' + PURSUIT.mul + ', choque +' + Math.round(PURSUIT.cav * 100) + '%)' },
   govNext:  { do: n => { const g = govNextOf(n); if (g && g !== n.gov) { applyGov(n, g); if (GOVS[g].succ !== 'hered') succeed(n, false); } }, txt: () => 'Reforma o governo para a forma seguinte' },
   /* conselho: concede = atende a exigência mais pesada; purge = troca o conselheiro mais exigente */
   council:  { do: (n, v) => { const d = demandsOf(n).filter(x => x.slot !== 'ruler').sort((a, b) => b.w - a.w);

@@ -11,15 +11,14 @@ function frontsTick() {
   for (const w of S.wars) for (const side of ['A', 'D']) {
     const mine = new Set(w[side]), foe = new Set(side === 'A' ? w.D : w.A), F = [];
     for (let p = 0; p < P; p++) if (mine.has(S.ctrl[p]) && WD.provs[p].adj.some(q => foe.has(S.ctrl[q]))) F.push(p);
-    const inF = new Set(F), seen = new Set();
-    for (const p0 of F) {                                      // componentes: vizinhas na linha, ou de frente para a mesma província inimiga
-      if (seen.has(p0)) continue; const comp = [], fo = new Set(), q = [p0]; seen.add(p0);
-      for (let h = 0; h < q.length; h++) { const u = q[h]; comp.push(u);
-        for (const v of WD.provs[u].adj) { if (foe.has(S.ctrl[v])) { fo.add(v); for (const x of WD.provs[v].adj) if (inF.has(x) && !seen.has(x)) { seen.add(x); q.push(x); } } else if (inF.has(v) && !seen.has(v)) { seen.add(v); q.push(v); } } }
-      // mantém o id do front antigo que mais se parece com este
-      let best = null, bo = 0; for (const f of old) { if (f.w !== w.id || f.side !== side || used.has(f.id)) continue; let o = 0; for (const p of f.provs) if (inF.has(p) && comp.includes(p)) o++; if (o > bo) { bo = o; best = f; } }
+    // um front por estado: as províncias da linha são agrupadas pelo estado a que pertencem
+    const byState = new Map(); for (const p of F) { const st = WD.provs[p].state; if (!byState.has(st)) byState.set(st, []); byState.get(st).push(p); }
+    for (const comp of byState.values()) {
+      const fo = new Set(); for (const u of comp) for (const v of WD.provs[u].adj) if (foe.has(S.ctrl[v])) fo.add(v);
+      const cs = new Set(comp); let best = null, bo = 0;              // mantém o id do front antigo que mais se parece com este
+      for (const f of old) { if (f.w !== w.id || f.side !== side || used.has(f.id)) continue; let o = 0; for (const p of f.provs) if (cs.has(p)) o++; if (o > bo) { bo = o; best = f; } }
       const id = best ? best.id : S.id++; used.add(id);
-      out.push({ id, w: w.id, side, provs: comp, foe: [...fo] });
+      out.push({ id, w: w.id, side, st: WD.provs[comp[0]].state, provs: comp, foe: [...fo] });
     }
   }
   S.fronts = out;
@@ -33,7 +32,8 @@ const frontsOf = id => (S.fronts || []).filter(f => { const w = S.wars.find(x =>
 const frontById = id => (S.fronts || []).find(f => f.id === id);
 const fordOf = (o, fid) => ((S.ford || {})[o] || {})[fid] || 'hold';
 function setFord(o, fid, v) { S.ford = S.ford || {}; (S.ford[o] = S.ford[o] || {})[fid] = v; }
-function frontName(f) {                                       // pelo estado que mais aparece na linha
+function frontName(f) {                                       // o estado da linha
+  if (f.st != null) return 'Front de ' + WD.states[f.st].n;
   const c = {}; f.provs.forEach(p => { const s = WD.provs[p].state; c[s] = (c[s] || 0) + 1; }); const s = Object.keys(c).sort((a, b) => c[b] - c[a])[0];
   return 'Front de ' + WD.states[s].n;
 }
@@ -61,10 +61,13 @@ function frontOrders(n) {
   for (const f of frontsOf(n.id)) {
     const list = S.armies.filter(a => a.o === n.id && a.front === f.id && !armyBusy(a));
     if (!list.length) continue;
-    const ord = fordOf(n.id, f.id);
-    const rest = ord === 'adv' ? frontAdvance(n, f, list) : null; if (rest && !rest.length) continue;
+    const ford = fordOf(n.id, f.id), act = a => STANCES[stanceOf(a)].act || ford;   // a postura manda: agressiva ataca, defensiva segura; equilibrada segue o front
+    const advL = list.filter(a => act(a) === 'adv'), holdL = list.filter(a => act(a) !== 'adv');
+    const rest0 = advL.length ? frontAdvance(n, f, advL) : []; const rest = advL.length ? [...(rest0 || advL), ...holdL] : null; if (rest && !rest.length) continue;
     // defender: maiores exércitos nos pontos mais ameaçados, um por ponto; ponto já ocupado pelo inimigo só com 1,3× de vantagem
     const ep = enemyPower(n.id), pts = f.provs.map(p => [p, WD.provs[p].adj.reduce((s, q) => s + (ep.get(q) || 0) * .3, 0) + (S.own[p] >= 0 && nat(S.own[p]).capital === p ? 5 : 0) + fortOf(p) + (ep.get(p) ? 20 : 0)]).sort((x, y) => y[1] - x[1]);
+    for (const p of f.provs) for (const q of WD.provs[p].adj) if (ep.get(q) && friendsOf(n.id).has(S.ctrl[q]) && !pts.some(x => x[0] === q)) pts.push([q, 30 + ep.get(q)]);   // inimigo que avançou para dentro: a defesa vai abatê-lo
+    pts.sort((x, y) => y[1] - x[1]);
     disperse(n, f, pts); const listD = S.armies.filter(a => a.o === n.id && a.front === f.id && !armyBusy(a));   // exércitos do jogador se espalham pela linha
     const free = (rest || listD).filter(a => !sieging(a) && (!rest || rest.includes(a) || !list.includes(a))).sort((x, y) => regs(y) - regs(x)), taken = new Set();
     for (const a of free) {

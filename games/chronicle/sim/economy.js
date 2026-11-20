@@ -238,7 +238,7 @@ function canRecruit(n, type, k = 1) {
   if (n.money < recCost(n, type, k)) return 'Sem dinheiro';
   return '';
 }
-function recruit(n, type, k, at) { const e = canRecruit(n, type, k); if (e) return e; n.money -= recCost(n, type, k); n.manpower -= k; const at2 = at != null ? at : n.capital; n.rec.push({ type, k, m: Math.round((type === 'vrt' ? 5 : 3) * BUILD_SLOW) - (S.bld[WD.provs[at2].state].barracks ? 2 : 0), at: at2, x: recruitXp(n, at2) }); return ''; }
+function recruit(n, type, k, at, g) { const e = canRecruit(n, type, k); if (e) return e; n.money -= recCost(n, type, k); n.manpower -= k; const at2 = at != null ? at : n.capital; n.rec.push({ type, k, m: Math.round((type === 'vrt' ? 5 : 3) * BUILD_SLOW) - (S.bld[WD.provs[at2].state].barracks ? 2 : 0), at: at2, x: recruitXp(n, at2), g }); return ''; }
 const shipCost = n => Math.round(30 * ECON.costMul * eraScale());
 function buildShips(n, k, p) {
   const pr = WD.provs[p]; if (!pr || !pr.coast || S.own[p] !== n.id) return 'Exige litoral próprio';

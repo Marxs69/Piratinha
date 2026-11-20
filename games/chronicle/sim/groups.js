@@ -41,7 +41,9 @@ function playerArmies() {
   for (const a of armiesOf(n.id)) if (a.g == null) a.g = a.id;
   const fs = frontsOf(n.id), groups = groupsOf(n.id).filter(G => !G.some(a => a.exp || a.inv));
   if (fs.length) { const need = f => f.foe.reduce((s, q) => s + foeNear(n.id, q), 0);
-    for (const G of groups) if (G[0].front == null || !fs.some(f => f.id === G[0].front)) { const f = fs.slice().sort((x, y) => need(y) - need(x))[0]; G.forEach(a => { a.front = f.id; a.path = []; }); } }
+    for (const G of groups) if (G[0].front == null || !fs.some(f => f.id === G[0].front)) {   // agressivos vão ao front mais próximo; os demais ao mais ameaçado
+      const h = G[0], o = WD.provs[h.p < WD.provs.length ? h.p : n.capital], d = f => Math.min(...f.provs.map(p => Math.hypot(WD.provs[p].cx - o.cx, WD.provs[p].cy - o.cy)));
+      const f = stanceOf(h) === 'agg' ? fs.slice().sort((x, y) => d(x) - d(y))[0] : fs.slice().sort((x, y) => need(y) - need(x))[0]; G.forEach(a => { a.front = f.id; a.path = []; }); } }
   else {
     const reb = Object.keys(S.rebels || {}).map(Number).filter(p => S.own[p] === n.id);
     for (const G of groups) { G.forEach(a => a.front = null); const lead = G.slice().sort((x, y) => regs(y) - regs(x))[0]; if (armyBusy(lead)) continue;
@@ -51,3 +53,17 @@ function playerArmies() {
   }
   mergeGroupParts(n.id);
 }
+
+/* volta para casa: marcha (por qualquer terra conhecida, sem combater) até o estado próprio mais perto ou até a capital */
+function goHome(a, toCapital) {
+  const n = nat(a.o), P = WD.provs.length; if (a.p >= P) return 'Embarcado';
+  const ok = p => S.own[p] === a.o && S.ctrl[p] === a.o && (!toCapital || p === n.capital);
+  const seen = new Map([[a.p, -1]]), q = [a.p]; let end = ok(a.p) ? a.p : null;
+  for (let h = 0; h < q.length && end == null; h++) { const u = q[h]; for (const v of WD.provs[u].adj) { if (seen.has(v) || !n.exP[v]) continue; seen.set(v, u); if (ok(v)) { end = v; break; } q.push(v); } }
+  if (end == null) { a.p = n.capital; a.path = []; return ''; }      // sem caminho por terra: volta pelo mar
+  const path = []; for (let v = end; v !== a.p && v !== -1; v = seen.get(v)) path.unshift(v);
+  a.path = path; a.need = 0; a.prog = 0; a.retreat = true; a.sh = S.t + path.length * 15; a.front = null; return '';
+}
+const goHomeGroup = (a, toCapital) => groupOf(a).forEach(x => goHome(x, toCapital));
+/* nome do exército: o do general; sem general, "Tropa N" pela ordem de criação */
+function armyName(a) { const G = groupOf(a), g = G.map(x => x.gen).find(Boolean); if (g) return charName(g); const ids = groupsOf(a.o).map(G => gid(G[0])).sort((x, y) => x - y); return 'Tropa ' + (ids.indexOf(gid(a)) + 1); }

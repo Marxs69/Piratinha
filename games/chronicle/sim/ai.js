@@ -140,7 +140,7 @@ function aiRecruit(n, myArmies, myR, atWarN, P) {
   for (const [t, d] of def) { const k = Math.min(left, Math.max(1, Math.round(d))); if (k < 1) continue; if (!recruit(n, t, k, at)) left -= k; if (left <= 0) break; }
   if (left === batch) recruit(n, 'inf', batch, at);
 }
-function aiStance(n, a, adv) { const cav = a.cav / Math.max(1, regs(a)); a.st = !adv ? 'def' : cav > .25 ? 'pur' : vetLv(a) >= 2 || personality(n).war > 1.2 ? 'agg' : 'bal'; }
+function aiStance(n, a, adv) { a.st = !adv ? 'def' : vetLv(a) >= 2 || personality(n).war > 1.2 ? 'agg' : 'bal'; }
 function aiSupport(n, a, T) {
   if (regs(a) < T * .5 || a.exp) return;
   for (const k of ['med', 'recon', 'eng']) if (!(a.sup && a.sup[k]) && supOk(n, k) && n.money > supCost(n, k) * 5 && !addSupport(n, a, k)) return;
@@ -160,11 +160,15 @@ function aiArmyFront(n, P, rebP) {
   const field = groupsOf(n.id).filter(G => !G.some(a => a.exp || a.inv));
   if (war) {
     if (!fs.length) { aiOverseas(n, field.map(lead)); return; }
+    // concentração: primeiro os fronts com inimigo dentro do território (defesa), depois os estados inimigos mais fracos, até ter vantagem em cada um
     const need = new Map(fs.map(f => [f.id, f.foe.reduce((s, q) => s + foeNear(n.id, q), 0) / Math.max(1, Math.sqrt(f.foe.length)) + 2])), got = new Map(fs.map(f => [f.id, 0]));
-    field.forEach(G => { const f = G[0].front; if (got.has(f)) got.set(f, got.get(f) + powG(G)); else G.forEach(a => a.front = null); });
-    for (const G of field) if (G[0].front == null) { const f = fs.slice().sort((x, y) => got.get(x.id) / need.get(x.id) - got.get(y.id) / need.get(y.id))[0]; G.forEach(a => { a.front = f.id; a.path = []; }); got.set(f.id, got.get(f.id) + powG(G)); }
-    // se um front ficou sem ninguém e outro tem sobra, o maior grupo se divide (nova unidade) para cobrir
-    for (const f of fs) if (!got.get(f.id) && need.get(f.id) > 2) { const G = field.filter(G => G[0].front != null && got.get(G[0].front) > need.get(G[0].front) * 1.5).sort((x, y) => size(y) - size(x))[0]; if (G && size(G) >= T) { const g = splitGroup(lead(G), f.id); if (g != null) got.set(f.id, 1); } }
+    const ep = enemyPower(n.id), intr = f => f.provs.some(p => WD.provs[p].adj.some(q => ep.get(q) && friendsOf(n.id).has(S.ctrl[q])) || ep.get(p));
+    const claim = f => f.foe.some(q => n.claims[WD.provs[q].state]) ? .6 : 1, order = fs.slice().sort((x, y) => (intr(y) - intr(x)) || need.get(x.id) * claim(x) - need.get(y.id) * claim(y));
+    field.forEach(G => { if (!got.has(G[0].front)) G.forEach(a => a.front = null); });
+    const pool = [];                                            // quem já está num front fica enquanto ele precisar (sem vai e vem que interrompe avanços)
+    for (const G of field.slice().sort((x, y) => powG(y) - powG(x))) { const f = G[0].front; if (f != null && got.has(f) && got.get(f) < need.get(f) * 1.6) got.set(f, got.get(f) + powG(G)); else pool.push(G); }
+    for (const f of order) { while (pool.length && got.get(f.id) < need.get(f.id) * 1.6) { const G = pool.shift(); G.forEach(a => { if (a.front !== f.id) a.path = []; a.front = f.id; }); got.set(f.id, got.get(f.id) + powG(G)); } }
+    for (const G of pool) { const f = order[0]; G.forEach(a => a.front = f.id); got.set(f.id, got.get(f.id) + powG(G)); }   // sobra reforça o front principal
     const bold = 1.3 / Math.max(.7, P.war);
     for (const f of fs) { const adv = got.get(f.id) > need.get(f.id) * bold; setFord(n.id, f.id, adv ? 'adv' : 'hold'); field.filter(G => G[0].front === f.id).forEach(G => { const h = lead(G); aiStance(n, h, adv); G.forEach(x => x.st = h.st); }); }
     return;

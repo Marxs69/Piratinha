@@ -40,6 +40,7 @@ function addSupport(n, a, k) {
   n.money -= c; (a.sup = a.sup || {})[k] = 1; return '';
 }
 const setStance = (a, s) => { if (STANCES[s]) a.st = s; return ''; };
+const stanceOf = a => STANCES[a.st] ? a.st : 'bal';
 /* treinamento em tempo de paz: sobe até Veterano, custa 50% a mais de manutenção */
 const DRILL_CAP = .45;
 const drillOk = a => !!a.drill && a.p < WD.provs.length && S.own[a.p] === a.o && !warsOf(a.o).length && !a.path.length;
@@ -128,11 +129,11 @@ function sideInfo(list, p, isDef) {
   const fp = tot.inf + tot.cav + tot.vrt, k = fp > W ? W / fp : 1, eng = { inf: tot.inf * k, cav: tot.cav * k, vrt: tot.vrt * k, art: 0, artBack: 0 };
   const room = Math.max(0, W - fp * k); eng.art = Math.min(tot.art, room); eng.artBack = Math.min(tot.art - eng.art, W);
   const vx = xp / R, vet = VET.reduce((v, x) => vx >= x.x ? x : v, VET[0]);
-  return { list, n, tot, regs: regsT, eng, W, vet, fat: fat / R, sat: sat / R, gen, has, st: STANCES[big.st || 'bal'] ? (big.st || 'bal') : 'bal', def: defW / R, mor: morW / R * vet.mo, isDef, amph: list.some(a => a.amph > S.t) };
+  return { pur: list.some(a => a.pur > S.t), list, n, tot, regs: regsT, eng, W, vet, fat: fat / R, sat: sat / R, gen, has, st: STANCES[big.st || 'bal'] ? (big.st || 'bal') : 'bal', def: defW / R, mor: morW / R * vet.mo, isDef, amph: list.some(a => a.amph > S.t) };
 }
 function sideDmg(s, o, ph, pip, p) {
   const n = s.n, T = TERRAIN[WD.provs[p].terr]; let d = 0;
-  for (const t of UT) { const e = s.eng[t] + (t === 'art' ? s.eng.artBack * .5 : 0); if (e <= 0) continue; d += e * unitStat(n, t, ph) * unitStat(n, t, 'kill') * (n.up ? n.up[t] || 1 : 1) * (t === 'cav' ? T.cav : 1); }
+  for (const t of UT) { const e = s.eng[t] + (t === 'art' ? s.eng.artBack * .5 : 0); if (e <= 0) continue; d += e * unitStat(n, t, ph) * unitStat(n, t, 'kill') * (n.up ? n.up[t] || 1 : 1) * (t === 'cav' ? T.cav * (s.pur && ph === 'shock' ? 1 + PURSUIT.cav : 1) : 1); }
   const st = STANCES[s.st], beat = st.beats === o.st ? 1.15 : 1;
   return d * s.vet.m * (.6 + .4 * s.sat) * (1 + (n.m ? n.m.army : 0)) * genMul(s.gen) * st.dmg * beat * (1 - .35 * s.fat) * Math.max(.05, (5 + pip) / 10);
 }
@@ -180,7 +181,7 @@ function battleDay(p, A, B) {
   if (!brokeA && !brokeB) return;
   const [L, Wn, sl, sw] = brokeA ? [A, B, sa, sb] : [B, A, sb, sa];
   // perseguição: cavalaria, postura e reconhecimento de quem venceu matam parte de quem foge
-  const cavSh = sw.tot.cav / Math.max(1, sw.regs), pur = Math.min(.35, .03 + .12 * cavSh * STANCES[sw.st].pur * (sw.has.recon ? 1.3 : 1) * T.cav);
+  const cavSh = sw.tot.cav / Math.max(1, sw.regs), pur = Math.min(.35, .03 + .12 * cavSh * (sw.pur ? PURSUIT.mul : 1) * (sw.has.recon ? 1.3 : 1) * T.cav);
   const lr = L.reduce((t, a) => t + regs(a), 0), wr = Wn.reduce((t, a) => t + regs(a), 0);
   applyLoss(sl, lr * pur, w);
   if (w) { w.bp = w.bp || {}; w.bp[Wn[0].o] = (w.bp[Wn[0].o] || 0) + clamp(Math.round(lr * .5), 1, 10); }
