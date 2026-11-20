@@ -84,7 +84,7 @@ function dayTick() {
   const zs = new Map(); for (const f of S.fleets) { if (!zs.has(f.z)) zs.set(f.z, []); zs.get(f.z).push(f); }
   zs.forEach(list => { if (list.length < 2) return; for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) if (atWar(list[i].o, list[j].o) && list[i].ships > 0 && list[j].ships > 0) navalBattle(list[i], list[j]); });
   S.fleets = S.fleets.filter(f => f.ships > .2);
-  for (const k in S.battles) if (S.battles[k].seen !== S.t) delete S.battles[k];   // batalha acabou sem vencedor (alguém saiu)
+  for (const k in S.battles) if (S.battles[k].seen !== S.t && !(S.battles[k].fb && S.battles[k].seen >= S.t - 1)) delete S.battles[k];   // batalhas de front continuam no dia seguinte   // batalha acabou sem vencedor (alguém saiu)
   // moral se recupera fora de combate (devagar se cansado; sem suprimento, quase nada e com teto); descanso tira o cansaço
   for (const a of S.armies) {
     if (a.inBattle) { a.inBattle = false; continue; }

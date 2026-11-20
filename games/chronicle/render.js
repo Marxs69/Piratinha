@@ -233,7 +233,8 @@ function drawFrame() {
     c.stroke();
   }
   const bt = new Set(Object.keys(S.battles || {}).map(Number));
-  bt.forEach(p => { const q = WD.provs[p]; const [sx, sy] = toScreen(q.cx * K + K / 2, q.cy * K + K / 2); c.font = '18px serif'; c.fillText('⚔️', sx + 30, sy - 4); });
+  bt.forEach(p => { if (S.battles[p].fb) return; const q = WD.provs[p]; const [sx, sy] = toScreen(q.cx * K + K / 2, q.cy * K + K / 2); c.font = '18px serif'; c.fillText('⚔️', sx + 30, sy - 4); });
+  if (typeof drawFbIcons === 'function') drawFbIcons();
   if (R.box) { const b = R.box; c.fillStyle = 'rgba(255,210,87,.12)'; c.strokeStyle = '#ffd257'; c.lineWidth = 1; c.fillRect(b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0); c.strokeRect(b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0); }
 }
 /* minimapa: o mundo inteiro, o retângulo da câmera e as tropas como pontos */

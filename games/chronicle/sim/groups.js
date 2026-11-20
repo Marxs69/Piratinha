@@ -21,14 +21,6 @@ function splitGroup(a, fid) {
 }
 function joinGroups(a, b) { const k = gid(a); groupOf(b).forEach(x => { x.g = k; x.front = a.front; x.st = a.st; x.gen = x.gen || a.gen; }); }
 const setGroupFront = (a, fid) => groupOf(a).forEach(x => { x.front = fid; x.path = []; });
-/* dispersão: cada grupo no front se divide até ter um destacamento por ponto ameaçado (respeitando o mínimo de regimentos) */
-function disperse(n, f, pts) {
-  const groups = new Map(); for (const a of S.armies) if (a.o === n.id && a.front === f.id && a.g != null && !armyBusy(a)) { const k = a.g; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(a); }
-  for (const G of groups.values()) {
-    const tot = G.reduce((s, a) => s + regs(a), 0), want = Math.max(1, Math.min(pts.length, 6, Math.floor(tot / DET_MIN)));
-    for (let i = G.length; i < want; i++) { const big = G.slice().sort((x, y) => regs(y) - regs(x))[0]; if (regs(big) < DET_MIN * 2) break; G.push(detach(big, .5)); }
-  }
-}
 /* destacamentos do mesmo grupo parados na mesma província voltam a ser um só */
 function mergeGroupParts(id) {
   const by = new Map(); for (const a of armiesOf(id)) { if (a.g == null || a.path.length || a.inBattle || a.inv || a.exp || a.p >= WD.provs.length) continue; const k = a.g + ':' + a.p; if (!by.has(k)) by.set(k, []); by.get(k).push(a); }

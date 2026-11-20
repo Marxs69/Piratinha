@@ -23,10 +23,12 @@ function frontsTick() {
   }
   S.fronts = out;
   const live = new Set(out.map(f => f.id));
-  for (const a of S.armies) if (a.front != null && !live.has(a.front)) a.front = null;
+  // front que sumiu (estado tomado ou perdido): seus exércitos passam ao front mais perto da mesma guerra e lado
+  const near = new Map(); for (const f of old) if (!live.has(f.id)) { const c = WD.provs[f.provs[0]], alt = out.filter(g => g.w === f.w && g.side === f.side).sort((x, y) => Math.hypot(WD.provs[x.provs[0]].cx - c.cx, WD.provs[x.provs[0]].cy - c.cy) - Math.hypot(WD.provs[y.provs[0]].cx - c.cx, WD.provs[y.provs[0]].cy - c.cy))[0]; near.set(f.id, alt ? alt.id : null); }
+  for (const a of S.armies) if (a.front != null && !live.has(a.front)) a.front = near.get(a.front) ?? null;
   for (const n of S.nations) if (S.ford && S.ford[n.id]) for (const k in S.ford[n.id]) if (!live.has(+k)) delete S.ford[n.id][k];
   aiCaution();
-  if (S.t % (FRONT_EVERY * 2) === 0) { S._threat = null; playerArmies(); S.nations.forEach(n => { if (n.alive) frontOrders(n); }); }
+  if (S.t % (FRONT_EVERY * 2) === 0) { S._threat = null; playerArmies(); }
 }
 const frontsOf = id => (S.fronts || []).filter(f => { const w = S.wars.find(x => x.id === f.w); return w && w[f.side].includes(id); });
 const frontById = id => (S.fronts || []).find(f => f.id === id);
@@ -56,53 +58,6 @@ function enemyPower(o) {
 const dangerFor = a => { const m = enemyPower(a.o), mine = armyPower(a) * .8, s = new Set(); m.forEach((v, p) => { if (v > mine) s.add(p); }); return s; };
 const armyBusy = a => a.inBattle || a.retreat || a.exp || a.p >= WD.provs.length || a.inv || (S.battles && S.battles[a.p]);
 const sieging = a => !a.path.length && S.sieges[a.p] && S.sieges[a.p].o === a.o;
-/* executa as ordens dos fronts de um país */
-function frontOrders(n) {
-  for (const f of frontsOf(n.id)) {
-    const list = S.armies.filter(a => a.o === n.id && a.front === f.id && !armyBusy(a));
-    if (!list.length) continue;
-    const ford = fordOf(n.id, f.id), act = a => STANCES[stanceOf(a)].act || ford;   // a postura manda: agressiva ataca, defensiva segura; equilibrada segue o front
-    const advL = list.filter(a => act(a) === 'adv'), holdL = list.filter(a => act(a) !== 'adv');
-    const rest0 = advL.length ? frontAdvance(n, f, advL) : []; const rest = advL.length ? [...(rest0 || advL), ...holdL] : null; if (rest && !rest.length) continue;
-    // defender: maiores exércitos nos pontos mais ameaçados, um por ponto; ponto já ocupado pelo inimigo só com 1,3× de vantagem
-    const ep = enemyPower(n.id), pts = f.provs.map(p => [p, WD.provs[p].adj.reduce((s, q) => s + (ep.get(q) || 0) * .3, 0) + (S.own[p] >= 0 && nat(S.own[p]).capital === p ? 5 : 0) + fortOf(p) + (ep.get(p) ? 20 : 0)]).sort((x, y) => y[1] - x[1]);
-    for (const p of f.provs) for (const q of WD.provs[p].adj) if (ep.get(q) && friendsOf(n.id).has(S.ctrl[q]) && !pts.some(x => x[0] === q)) pts.push([q, 30 + ep.get(q)]);   // inimigo que avançou para dentro: a defesa vai abatê-lo
-    pts.sort((x, y) => y[1] - x[1]);
-    disperse(n, f, pts); const listD = S.armies.filter(a => a.o === n.id && a.front === f.id && !armyBusy(a));   // exércitos do jogador se espalham pela linha
-    const free = (rest || listD).filter(a => !sieging(a) && (!rest || rest.includes(a) || !list.includes(a))).sort((x, y) => regs(y) - regs(x)), taken = new Set();
-    for (const a of free) {
-      const dst = a.path.length ? a.path[a.path.length - 1] : a.p, mine = armyPower(a);
-      if ((ep.get(dst) || 0) > mine * .9 && dst !== a.p) a.path = [];                   // o destino virou armadilha: para
-      else if (pts.some(([p]) => p === dst) && !taken.has(dst)) { taken.add(dst); continue; }
-      const t = pts.find(([p]) => !taken.has(p) && (ep.get(p) || 0) * 1.3 < mine); if (!t) continue;
-      taken.add(t[0]); if (a.p !== t[0]) orderArmy(a, t[0], true);
-    }
-  }
-}
-/* avançar: escolhe um alvo e mantém por um tempo; junta só as tropas necessárias (1,6× a defesa) numa província de apoio ao lado dele
-   e ataca reunido. Devolve os exércitos que sobraram (ficam defendendo a linha) ou null se a força não basta. */
-function frontAdvance(n, f, list) {
-  const free = list.filter(a => !sieging(a)), pow = free.reduce((s, a) => s + armyPower(a), 0); if (!free.length) return [];
-  n._ft = n._ft || {}; let T = n._ft[f.id];
-  if (!T || !f.foe.includes(T.q) || S.t - T.t > 90 || !f.provs.includes(T.st)) {
-    const cx = free.reduce((s, a) => s + WD.provs[a.p].cx, 0) / free.length, cy = free.reduce((s, a) => s + WD.provs[a.p].cy, 0) / free.length;
-    let best = null, bs = -1e9;
-    for (const q of f.foe) { const pr = WD.provs[q], st = WD.states[pr.state], def = foeNear(n.id, q); if (pow < def * 1.3) continue;
-      const sc = (n.claims[pr.state] ? 6 : 0) + (S.own[q] >= 0 && nat(S.own[q]).capital === q ? 8 : 0) + (st.cap === q ? 3 : 0) - fortOf(q) * 2 - def * .3 - Math.hypot(pr.cx - cx, pr.cy - cy) * .15;
-      if (sc > bs) { bs = sc; best = q; } }
-    if (best == null) { delete n._ft[f.id]; return null; }
-    const ep = enemyPower(n.id), stg = WD.provs[best].adj.filter(p => f.provs.includes(p)).sort((x, y) => (ep.get(x) || 0) - (ep.get(y) || 0) || WD.provs[x].adj.length - WD.provs[y].adj.length)[0];
-    T = n._ft[f.id] = { q: best, st: stg, t: S.t };
-  }
-  const def = foeNear(n.id, T.q); if (pow < def * 1.2) { delete n._ft[f.id]; return null; }
-  const at = free.filter(a => a.p === T.st && !a.path.length).sort((x, y) => armyPower(y) - armyPower(x)), pAt = at.reduce((s, a) => s + armyPower(a), 0);
-  if (pAt >= def * 1.2) { let sent = 0; for (const a of at) { if (sent >= def * 1.5 + 1) break; orderArmy(a, T.q); sent += armyPower(a); } }   // ataque reunido
-  // o grupo de ataque: quem já está no apoio ou indo para lá, completado pelos mais próximos até 1,6× a defesa
-  const sp = WD.provs[T.st], dist = a => Math.hypot(WD.provs[a.p].cx - sp.cx, WD.provs[a.p].cy - sp.cy), going = a => a.p === T.st || a.p === T.q || (a.path.length && [T.st, T.q].includes(a.path[a.path.length - 1]));
-  let got = free.filter(going).reduce((s, a) => s + armyPower(a), 0); const rest = [];
-  for (const a of free.filter(a => !going(a)).sort((x, y) => dist(x) - dist(y))) { if (got >= def * 1.6 + 1) { rest.push(a); continue; } if (orderArmy(a, T.st, true)) got += armyPower(a); else rest.push(a); }
-  return rest;
-}
 /* cautela da IA: quem marcha para uma província (ou passa por uma) onde o inimigo ficou mais forte que o grupo que está chegando, para */
 function aiCaution() {
   const head = new Map();                                     // força a caminho de cada destino, por país

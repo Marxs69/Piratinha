@@ -35,7 +35,6 @@ const supCost = (n, k) => Math.round(SUPPORT[k].c * eraScale());
 function addSupport(n, a, k) {
   if (!a || a.o !== n.id || a.sup && a.sup[k]) return 'Já tem';
   if (!supOk(n, k)) return 'Exige ' + TECH[SUPPORT[k].tech].n;
-  if (a.p >= WD.provs.length || S.own[a.p] !== n.id || S.ctrl[a.p] !== n.id) return 'Só em território próprio';
   const c = supCost(n, k); if (n.money < c) return 'Sem dinheiro';
   n.money -= c; (a.sup = a.sup || {})[k] = 1; return '';
 }
@@ -96,8 +95,9 @@ function provSupply(p, o) {
 function attritionOf(a) {
   const P = WD.provs.length; if (a.p >= P) return [0, []];
   const n = nat(a.o), fr = friendsOf(a.o), pr = WD.provs[a.p], why = [];
-  let tot = 0; for (const b of S.armies) if (b.p === a.p && fr.has(b.o)) tot += regs(b);
-  const cap = provSupply(a.p, a.o); a.cap = cap;
+  const f = a.front != null && !(a.fready > S.t) && typeof frontById === 'function' ? frontById(a.front) : null;
+  let tot = 0, cap; if (f) { for (const b of S.armies) if (b.front === a.front && b.o === a.o) tot += regs(b); cap = WD.states[f.st].provs.filter(p => fr.has(S.ctrl[p])).reduce((s, p) => s + provSupply(p, a.o), 0); }   // no front o estado inteiro abastece
+  else { for (const b of S.armies) if (b.p === a.p && fr.has(b.o)) tot += regs(b); cap = provSupply(a.p, a.o); } a.cap = cap;
   const home = fr.has(S.ctrl[a.p]) && fr.has(S.own[a.p]);
   let x = home ? 0 : TERRAIN[pr.terr].attr; if (x) why.push(TERRAIN[pr.terr].n);   // o terreno só castiga fora de casa
   if (tot > cap) { x += Math.min(.05, .01 + (tot / cap - 1) * .02); why.push('Acima do suprimento (' + Math.round(tot) + 'k de ' + Math.round(cap) + 'k)'); }

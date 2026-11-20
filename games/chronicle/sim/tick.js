@@ -118,7 +118,7 @@ function repairGame(full) {
 /* ---------- avanço do tempo ---------- */
 function advanceDay() {
   if (S.over) return;
-  S.t++; dayTick(); invasionTick(); frontsTick();
+  S.t++; dayTick(); invasionTick(); frontsTick(); frontPlace(); frontBattleTick();
   if (S.t % 30 === 0) monthTick();
 }
 function score(n) { return Math.round((n.popT || 0) / 100 + (n.gdp || 0) / 50 + techCount(n) * 5 + provsOf(n.id).length * 2); }

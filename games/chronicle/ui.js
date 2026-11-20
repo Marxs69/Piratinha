@@ -325,6 +325,9 @@ function sideArmy(sd, id) {
     barRow('📦 Abastecimento ' + pct(sup), sup, sup < .7 ? '#e5636b' : '#e8c25a', 'Bens que as tropas consomem (armas, comida, cavalos...) e a linha de suprimento (fora dela, só metade chega).\nAbaixo de 100%: menos dano em batalha.\nAtrito médio ' + (x0 * 100).toFixed(1) + '%/mês' + (why.length ? ' (' + why.join(', ') + ')' : '') + '\nLinha de suprimento: até ' + logiRange(n) + ' províncias de território amigo.'),
     barRow('🎖️ ' + VET[v].n + ' ' + pct(a.xp || 0), Math.min(1, (a.xp || 0) / .9), VET_COL[v], vetTip(a)),
     barRow('Cansaço ' + pct(a.fat || 0), a.fat || 0, '#e5a35b', 'Marchar e lutar cansam (terreno difícil cansa mais).\nCansaço tira até 35% do dano e deixa a moral voltar mais devagar. Passa descansando com suprimento.')));
+  const B0 = H.front != null && S.fbat ? S.fbat[H.front] || Object.values(S.fbat).find(B => G.some(x => x.p === B.q)) : null;
+  if (H.fready > S.t) sd.append(tip(el('div', 'card dim', '🚶 A caminho do front · chega em ' + (H.fready - S.t) + ' dias'), 'Exércitos viajam até a linha pelo passo da tropa mais lenta; só lutam ao chegar'));
+  if (B0) { const c = el('div', 'card'), hd = el('div', 'row'); hd.append(fbIcon(B0, n.id), el('h4', '', 'Batalha de front · ' + WD.provs[B0.q].n)); c.append(hd, el('small', 'dim', B0.ev.slice(-4).join('\n'))); sd.append(c); }
   G.forEach(x => { if (x.p < P && S.battles[x.p]) battleBox(sd, x.p); });
   if (H.inv) sd.append(el('p', 'gold', '⚓ Invasão de ' + WD.provs[H.inv.to].n + ': ' + { go: 'indo ao porto de ' + WD.provs[H.inv.port].n, sail: 'navegando', land: 'desembarcando', back: 'voltando ao porto' }[H.inv.st]));
   const gc = el('div', 'gencard'), gen = G.map(x => x.gen).find(Boolean);
@@ -339,7 +342,7 @@ function sideArmy(sd, id) {
   sd.append(sec('Postura', rs));
   const ap = el('div'), sp = Object.keys(H.sup || {}); if (sp.length) { const ch = el('div', 'chips'); sp.forEach(k => ch.append(tip(el('span', 'chip p', SUPPORT[k].e + ' ' + supName(n, k)), SUPPORT[k].d))); ap.append(ch); }
   const home = G.find(x => x.p < P && S.own[x.p] === n.id && S.ctrl[x.p] === n.id) || H;
-  const rsu = el('div', 'row'); Object.keys(SUPPORT).forEach(k => { if (H.sup && H.sup[k]) return; rsu.append(btn(SUPPORT[k].e + ' ' + supName(n, k) + ' (💰' + supCost(n, k) + ')', () => { const e = addSupport(n, home, k); if (e) say(e, 'bad'); else forG(x => (x.sup = x.sup || {})[k] = 1); drawSide(); }, 'sm', !supOk(n, k) ? 'Exige ' + TECH[SUPPORT[k].tech].n : n.money < supCost(n, k) ? 'Sem dinheiro' : '', SUPPORT[k].d + '\nManutenção 💰' + (SUPPORT[k].up * eraScale()).toFixed(1) + '/mês · consome ' + Object.keys(SUPPORT[k].need).map(g => GOODS[g].n.toLowerCase()).join(', ') + '\nCompra com algum destacamento em território próprio')); });
+  const rsu = el('div', 'row'); Object.keys(SUPPORT).forEach(k => { if (G.every(x => x.sup && x.sup[k])) return; rsu.append(btn(SUPPORT[k].e + ' ' + supName(n, k) + ' (💰' + supCost(n, k) + ')', () => { const e = G.some(x => x.sup && x.sup[k]) ? '' : addSupport(n, H, k); if (e) say(e, 'bad'); else forG(x => (x.sup = x.sup || {})[k] = 1); refresh(); }, 'sm', !supOk(n, k) ? 'Exige ' + TECH[SUPPORT[k].tech].n : n.money < supCost(n, k) ? 'Sem dinheiro' : '', SUPPORT[k].d + '\nManutenção 💰' + (SUPPORT[k].up * eraScale()).toFixed(1) + '/mês · consome ' + Object.keys(SUPPORT[k].need).map(g => GOODS[g].n.toLowerCase()).join(', '))); });
   if (rsu.children.length) ap.append(rsu); sd.append(sec('Apoio', ap));
   const tr = el('div', 'row');
   tr.append(btn(H.drill ? '🎯 Treinando' : '🎯 Treinar', () => { const d = !H.drill; forG(x => x.drill = d); drawSide(); }, 'sm' + (H.drill ? ' on' : ''), '', 'Em paz, parado em território próprio: +1,5% de experiência por mês até ' + VET[2].n + '.\nManutenção +50% enquanto treina.'));
@@ -375,8 +378,8 @@ function sideArmies(sd, ids) {                                // vários exérci
       tip(bar(ours / Math.max(1, ours + theirs), ours >= theirs ? '#8fd17f' : '#e5636b'), 'Força: ' + Math.round(ours) + ' × ' + Math.round(theirs)));
     const r = el('div', 'row');
     r.append(btn('➕ Mandar para cá', () => { gs.forEach(G => setGroupFront(G[0], f.id)); refresh(); }, 'sm', on === gs.length ? 'Já estão aqui' : '', 'Os exércitos selecionados vão para este front e se espalham pela linha'),
-      btn('🛡️ Defender', () => { setFord(n.id, f.id, 'hold'); frontOrders(n); refresh(); }, 'sm' + (ord === 'hold' ? ' on' : ''), '', 'Espalha as tropas pelos pontos mais ameaçados da linha'),
-      btn('⚔️ Avançar', () => { setFord(n.id, f.id, 'adv'); frontOrders(n); refresh(); }, 'sm' + (ord === 'adv' ? ' on' : ''), '', 'Reúne as tropas num ponto e ataca quando a força passa de 1,2× a defesa do alvo'));
+      btn('🛡️ Defender', () => { setFord(n.id, f.id, 'hold'); refresh(); }, 'sm' + (ord === 'hold' ? ' on' : ''), '', 'Espalha as tropas pelos pontos mais ameaçados da linha'),
+      btn('⚔️ Avançar', () => { setFord(n.id, f.id, 'adv'); refresh(); }, 'sm' + (ord === 'adv' ? ' on' : ''), '', 'Reúne as tropas num ponto e ataca quando a força passa de 1,2× a defesa do alvo'));
     c.append(r); rf.append(c); });
   if (fs.length) sd.append(sec('Fronts', rf)); else sd.append(el('p', 'dim', warsOf(n.id).length ? 'Guerra sem fronts: o inimigo está além-mar (invasão pelo botão direito numa costa).' : 'Em paz: os exércitos combatem rebeldes e se reagrupam sozinhos.'));
   const r = el('div', 'row'); r.append(btn('Juntar num só exército', () => { gs.slice(1).forEach(G => joinGroups(gs[0][0], G[0])); select('army', gs[0][0].id); refresh(); }, 'sm', gs.length > 1 ? '' : 'Só um exército', 'Passam a ser um único exército (os destacamentos se reúnem sozinhos fora do front)'));
@@ -405,6 +408,21 @@ function drawOutl() {
   const work = n.cons.length + n.rec.length + S.cols.filter(c => c.o === n.id).length;
   if (work) { o.append(el('h4', '', 'EM ANDAMENTO')); n.cons.forEach(c => o.append(el('div', 'orow', BUILDINGS[c.b].e + ' ' + BUILDINGS[c.b].n + ' · ' + c.m + 'm'))); n.rec.forEach(r => o.append(el('div', 'orow', (r.type === 'ship' ? '⛵ ' + shipName(n) : unitName(n, r.type)) + ' ×' + r.k + ' · ' + r.m + 'm'))); S.cols.filter(c => c.o === n.id).forEach(c => o.append(el('div', 'orow', '🏕️ ' + WD.provs[c.p].n + ' · ' + c.m + 'm'))); }
 }
+/* batalhas de front: ícone redondo (vermelho = atacando, azul = defendendo), no mapa e na janela Militar */
+const fbSide = (B, id) => { const w = S.wars.find(x => x.id === B.w); if (!w) return null; const s = sideOf(w, id); return !s ? null : s === B.side ? 'a' : 'd'; };
+const fbMine = (B, id) => !!fbSide(B, id);
+function fbIcon(B, id) { const sd = fbSide(B, id), bt = S.battles[B.q], d = el('span', 'fbi ' + (sd === 'a' ? 'att' : sd === 'd' ? 'def' : 'oth'), bt ? '⚔' : '⚑');
+  if (bt) { const r = bt.pa + bt.pb > 0 ? bt.pa / (bt.pa + bt.pb) : .5; d.style.setProperty('--r', Math.round((sd === 'd' ? 1 - r : r) * 100) + '%'); } return tip(d, fbTip(B)); }
+function armyTip(G) { const h = G[0], n = nat(h.o), r = G.reduce((s, a) => s + regs(a), 0), m = G.reduce((s, a) => s + a.mor * regs(a), 0) / Math.max(.01, r);
+  return armyName(h) + ' · ' + fmtK(r) + '\n' + UT.filter(t => G.some(a => a[t] > .05)).map(t => unitName(n, t) + ' ' + fmtK(G.reduce((s, a) => s + a[t], 0))).join(' · ') + '\nMoral ' + pct(m) + ' · postura ' + STANCES[stanceOf(h)].n + (h.fready > S.t ? '\nChega ao front em ' + (h.fready - S.t) + ' dias' : '') + '\nClique para abrir'; }
+function drawFbIcons() {
+  let L = $('#fbicons'); if (!L) return; if (!S || UI.scr !== 'game' || S.player < 0) { L.innerHTML = ''; return; }
+  const me0 = nat(S.player), list = Object.values(S.fbat || {}).filter(B => me0.exP[B.q] || fbMine(B, S.player)), keep = new Set();
+  for (const B of list) { const k = 'fb' + B.f; keep.add(k); let d = L.querySelector('#' + k); if (!d) { d = fbIcon(B, S.player); d.id = k; d.onclick = () => { const a = S.armies.find(a => a.o === S.player && a.front === B.f) || S.armies.find(a => a.o === S.player && fbMine(B, S.player) && a.p === B.q); if (a) select('army', a.id); }; L.append(d); }
+    const q = WD.provs[B.q], [x, y] = toScreen(q.cx * K + K / 2, q.cy * K + K / 2), bt = S.battles[B.q]; d.style.transform = 'translate(' + Math.round(x - 14) + 'px,' + Math.round(y - 34) + 'px)'; d.textContent = bt ? '⚔' : '⚑'; d.dataset.tip = fbTip(B);
+    if (bt) { const r = bt.pa + bt.pb > 0 ? bt.pa / (bt.pa + bt.pb) : .5; d.style.setProperty('--r', Math.round((fbSide(B, S.player) === 'd' ? 1 - r : r) * 100) + '%'); } }
+  [...L.children].forEach(d => { if (!keep.has(d.id)) d.remove(); });
+}
 /* grade de treino: primeira linha 1k de cada tipo, segunda linha 5k; g = exército que recebe (null = cada clique cria um exército novo) */
 function trainGrid(n, at, g, done) {
   const ts = UT.filter(t => t !== 'vrt' || n.vert), wrap = el('div', 'rgrid2'); wrap.style.gridTemplateColumns = 'repeat(' + ts.length + ', 1fr)';
@@ -418,7 +436,7 @@ function drawArmyBar() {
   const gs = groupsOf(S.player); b.hidden = !gs.length;
   gs.forEach(G => { const h = G.slice().sort((x, y) => regs(y) - regs(x))[0], c = el('div', 'acard' + (G.some(a => R.selArmies.includes(a)) ? ' sel' : '')), st = STANCES[stanceOf(h)], mor = G.reduce((s, a) => s + a.mor * regs(a), 0) / Math.max(.01, G.reduce((s, a) => s + regs(a), 0));
     c.append(el('b', '', (h.gen ? '★ ' : '') + armyName(h)), el('small', '', fmtK(G.reduce((s, a) => s + regs(a), 0)) + ' · ' + st.e + (h.inv ? ' ⚓' : h.exp ? ' 🧭' : h.front != null ? ' 🚩' : '') + (G.some(a => a.inBattle || S.battles[a.p]) ? ' ⚔️' : '')), bar(mor, '#7fe08a'));
-    tip(c, armyName(h) + '\n' + (h.front != null && frontById(h.front) ? frontName(frontById(h.front)) : 'Sem front') + ' · ' + st.n + (G.length > 1 ? '\n' + G.length + ' destacamentos' : ''));
+    tip(c, (h.front != null && frontById(h.front) ? '🚩 ' + frontName(frontById(h.front)) : 'Sem front') + '\n' + armyTip(G));
     c.onclick = () => { select('army', h.id); centerOn(...armyXY(h)); }; b.append(c); });
 }
 function flagImgEl(f) { const im = new Image(); im.className = 'mini'; im.src = flagImg(f).src; return im; }
@@ -883,10 +901,10 @@ function milFronts(b, n) {
     c.append(el('h4', '', '🚩 ' + frontName(f) + ' · contra ' + natName(foe)), el('div', 'dim', f.provs.length + ' províncias na linha · ' + list.length + ' exército' + (list.length === 1 ? '' : 's') + ' (' + fmtK(list.reduce((s, a) => s + regs(a), 0)) + ')'));
     c.append(tip(el('div', '', 'Força: ' + Math.round(ours) + ' × ' + Math.round(theirs)), 'Força estimada dos exércitos atribuídos contra os inimigos vistos junto à linha (tipos, tecnologia, veterania, suprimento, cansaço e moral).'), bar(ours / Math.max(1, ours + theirs), ours >= theirs ? '#8fd17f' : '#e5636b'));
     const r = el('div', 'row');
-    r.append(btn('🛡️ Defender', () => { setFord(n.id, f.id, 'hold'); frontOrders(n); drawWin(); }, 'sm' + (ord === 'hold' ? ' on' : '')), btn('⚔️ Avançar', () => { setFord(n.id, f.id, 'adv'); frontOrders(n); drawWin(); }, 'sm' + (ord === 'adv' ? ' on' : ''), '', 'Ataca quando a força concentrada passa de 1,2× a defesa do alvo'));
+    r.append(btn('🛡️ Defender', () => { setFord(n.id, f.id, 'hold'); drawWin(); }, 'sm' + (ord === 'hold' ? ' on' : '')), btn('⚔️ Avançar', () => { setFord(n.id, f.id, 'adv'); drawWin(); }, 'sm' + (ord === 'adv' ? ' on' : ''), '', 'Ataca quando a força concentrada passa de 1,2× a defesa do alvo'));
     const sel = R.selArmies.filter(a => a.o === n.id && S.armies.includes(a));
-    r.append(btn('➕ Atribuir selecionados (' + sel.length + ')', () => { sel.forEach(a => { if (!a.inv && !a.exp) { a.front = f.id; a.path = []; } }); frontOrders(n); drawWin(); }, 'sm', sel.length ? '' : 'Selecione exércitos no mapa'));
-    r.append(btn('➕ Todos os livres', () => { S.armies.filter(a => a.o === n.id && a.front == null && !a.inv && !a.exp && a.p < WD.provs.length).forEach(a => a.front = f.id); frontOrders(n); drawWin(); }, 'sm'));
+    r.append(btn('➕ Atribuir selecionados (' + sel.length + ')', () => { sel.forEach(a => { if (!a.inv && !a.exp) { a.front = f.id; a.path = []; } }); drawWin(); }, 'sm', sel.length ? '' : 'Selecione exércitos no mapa'));
+    r.append(btn('➕ Todos os livres', () => { S.armies.filter(a => a.o === n.id && a.front == null && !a.inv && !a.exp && a.p < WD.provs.length).forEach(a => a.front = f.id); drawWin(); }, 'sm'));
     r.append(btn('Liberar', () => { list.forEach(a => a.front = null); drawWin(); }, 'sm', list.length ? '' : 'Nenhum exército'));
     c.append(r); b.append(c);
   }
@@ -920,9 +938,17 @@ function winMil(b) {
   if (tab === 'units') { milUnits(b, n); return; }
   const c = el('div', 'cols');
   const pw = el('div', 'card'); pw.append(el('h4', '', 'Exército'));
-  const t = el('table', 't'); const h = t.insertRow(); ['Tipo', 'Unidade', 'Fogo / choque', 'Custo', ''].forEach(x => h.append(el('th', '', x)));
-  ['inf', 'cav', 'art', 'vrt'].filter(ty => ty !== 'vrt' || n.vert).forEach(ty => { const r = t.insertRow(); r.insertCell().textContent = { inf: 'Infantaria', cav: 'Cavalaria', art: 'Artilharia', vrt: 'Vertente' }[ty]; const u = r.insertCell(); u.textContent = unitName(n, ty); tip(u, unitTip(n, ty)); const f = r.insertCell(); f.className = 'n'; f.textContent = (n.up[ty] * unitStat(n, ty, 'fire')).toFixed(1) + ' / ' + (n.up[ty] * unitStat(n, ty, 'shock')).toFixed(1); const co = r.insertCell(); co.className = 'n'; co.textContent = '💰' + recCost(n, ty); r.insertCell().append(btn('+1 na capital', () => { msg.textContent = recruit(n, ty, 1); refresh(); }, 'sm', canRecruit(n, ty, 1))); });
-  pw.append(t, msg, btn('➕ Criar novo exército', () => newArmyModal(n), 'grn', '', 'Escolha onde e quais unidades treinar; tudo forma um único exército novo')); c.append(pw);
+  const t = el('table', 't'); const h = t.insertRow(); ['Tipo', 'Unidade', 'Fogo / choque', 'Custo', 'Total'].forEach(x => h.append(el('th', '', x)));
+  ['inf', 'cav', 'art', 'vrt'].filter(ty => ty !== 'vrt' || n.vert).forEach(ty => { const r = t.insertRow(); r.insertCell().textContent = { inf: 'Infantaria', cav: 'Cavalaria', art: 'Artilharia', vrt: 'Vertente' }[ty]; const u = r.insertCell(); u.textContent = unitName(n, ty); tip(u, unitTip(n, ty)); const f = r.insertCell(); f.className = 'n'; f.textContent = (n.up[ty] * unitStat(n, ty, 'fire')).toFixed(1) + ' / ' + (n.up[ty] * unitStat(n, ty, 'shock')).toFixed(1); const co = r.insertCell(); co.className = 'n'; co.textContent = '💰' + recCost(n, ty); tip(co, 'Custo de 1k; treine pelo painel de um exército ou de uma província'); const q = r.insertCell(); q.className = 'n'; q.textContent = fmtK(armiesOf(n.id).reduce((s, a) => s + a[ty], 0)); });
+  const al = el('div', 'alist'); groupsOf(n.id).forEach(G => { const h = G.slice().sort((x, y) => regs(y) - regs(x))[0], f = h.front != null ? frontById(h.front) : null, r0 = el('div', 'arow');
+    r0.append(el('b', '', (h.gen ? '★ ' : '') + armyName(h)), el('span', 'dim', f ? '🚩 ' + frontName(f) : h.inv ? '⚓ invasão' : h.exp ? '🧭 exploração' : 'Sem front'), el('span', 'n', fmtK(G.reduce((s, a) => s + regs(a), 0))));
+    tip(r0, armyTip(G)); r0.onclick = () => { closeWin(); select('army', h.id); centerOn(...armyXY(h)); }; al.append(r0); });
+  pw.append(t, el('h4', '', 'Exércitos'), al, msg, btn('➕ Criar novo exército', () => newArmyModal(n), 'grn', '', 'Escolha onde e quais unidades treinar; tudo forma um único exército novo')); c.append(pw);
+  const fbs = Object.values(S.fbat || {}).filter(B => fbMine(B, n.id)), hs = (S.fbHist || []).filter(B => B.a === n.id || B.d === n.id || fbSide(B, n.id)).slice(0, 6), bc = el('div', 'card'); bc.append(el('h4', '', 'Batalhas de front'));
+  if (!fbs.length && !hs.length) bc.append(el('p', 'dim', 'Nenhuma batalha de front.'));
+  fbs.forEach(B => { const r0 = el('div', 'arow'); r0.append(fbIcon(B, n.id), el('span', 'grow', WD.provs[B.q].n), el('small', 'dim', S.battles[B.q] ? 'dia ' + S.battles[B.q].d : Math.round(B.prog * 100) + '%')); tip(r0, fbTip(B)); r0.onclick = () => { closeWin(); centerOn(WD.provs[B.q].cx * K + K / 2, WD.provs[B.q].cy * K + K / 2); }; bc.append(r0); });
+  hs.forEach(B => { const r0 = el('div', 'arow dim'); const ok = (B.a === n.id || fbSide(B, n.id) === 'a') === !!B.won; r0.append(el('span', 'fbi ' + (ok ? 'win' : 'lose'), ok ? '✔' : '✖'), el('span', 'grow', WD.provs[B.q].n), el('small', '', dateStr(B.t1))); tip(r0, (ok ? 'Vitória' : 'Derrota') + ' · ' + WD.provs[B.q].n + '\n' + B.ev.join('\n')); bc.append(r0); });
+  c.append(bc);
   const st = el('div', 'card'); st.append(el('h4', '', 'Forças'), kv([['Regimentos', fmtK(S.armies.filter(a => a.o === n.id).reduce((s, a) => s + regs(a), 0))], ['Contingente', Math.floor(n.manpower) + 'k / ' + Math.floor(n.mpMax || 0) + 'k'], ['Navegação', n.fx.sea === 2 ? 'Oceânica' : n.fx.sea ? 'Costeira' : 'Nenhuma', 'Costeira: mares junto à terra. Oceânica (Caravela): mar aberto.'], ['Cerco', '×' + n.up.siege.toFixed(1)]]), modChips({ army: n.m.army, manpower: n.m.manpower, speed: n.m.speed })); c.append(st);
   const nv = el('div', 'card'); nv.append(el('h4', '', 'Marinha · ' + shipName(n)));
   const ports = provsOf(n.id).filter(p => WD.provs[p].coast && S.ctrl[p] === n.id).sort((a, b) => (S.bld[WD.provs[b].state].port || 0) - (S.bld[WD.provs[a].state].port || 0));

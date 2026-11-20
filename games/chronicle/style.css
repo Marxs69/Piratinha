@@ -265,8 +265,16 @@ h4.bgrp { font: 700 11px var(--title); color: var(--dim); letter-spacing: 1px; m
 .tprevw { display: flex; gap: 4px; align-items: stretch; } .tprevw .tech { flex: 1; } .tprevw .btn { align-self: center; }
 .vprev { margin-bottom: 12px; } .vprev .chips { margin-top: 4px; }
 #hint { z-index: 60; position: fixed; }
-#armybar { position: absolute; left: 50%; bottom: 28px; transform: translateX(-50%); display: flex; gap: 6px; max-width: min(60vw, 900px); overflow-x: auto; padding: 6px; background: rgba(20,16,11,.88); border: 1px solid var(--line); border-radius: 6px; z-index: 4; }
+#armybar { position: absolute; left: 50%; bottom: 28px; transform: translateX(-50%); display: flex; gap: 6px; max-width: min(60vw, 900px); overflow-x: auto; padding: 6px; background: rgba(20,16,11,.88); border: 1px solid var(--line); border-radius: 6px; }
 #armybar .acard { min-width: 120px; padding: 5px 8px; border-radius: 5px; background: rgba(0,0,0,.3); border: 1px solid rgba(232,194,90,.25); cursor: pointer; display: flex; flex-direction: column; gap: 2px; }
 #armybar .acard.sel { border-color: var(--gold); background: rgba(232,194,90,.12); }
 #armybar .acard b { font-size: 12px; white-space: nowrap; } #armybar .acard small { font-size: 11px; opacity: .85; }
 .rgrid2 { display: grid; gap: 6px; margin-bottom: 6px; }
+#fbicons { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+.fbi { --r: 50%; display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; font-size: 15px; color: #fff; flex: none; cursor: pointer; pointer-events: auto; border: 2px solid #111; box-shadow: 0 1px 4px rgba(0,0,0,.6); background: conic-gradient(#3fa34d var(--r), #b33a3a 0); }
+#fbicons .fbi { position: absolute; left: 0; top: 0; }
+.fbi.att { outline: 2px solid #e85a4f; } .fbi.def { outline: 2px solid #5aa0f0; } .fbi.oth { outline: 2px solid #999; opacity: .85; }
+.fbi.win { background: #3fa34d; width: 20px; height: 20px; font-size: 11px; } .fbi.lose { background: #b33a3a; width: 20px; height: 20px; font-size: 11px; }
+.alist { display: flex; flex-direction: column; gap: 3px; margin-bottom: 8px; }
+.arow { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 4px; background: rgba(0,0,0,.2); cursor: pointer; }
+.arow:hover { background: rgba(232,194,90,.12); } .arow .grow, .arow > b { flex: 1; }
