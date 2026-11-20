@@ -39,6 +39,11 @@ function provsOf(id) { if (!ownCache) { ownCache = S.nations.map(() => []); for 
 function resetCaches() { ownCache = null; warSet = null; strC = null; nbC.clear(); epC = null; abC = null; frC = null; supC = null; enterC = null; cnC = null; BI = null; }
 /* jogadores humanos: S.humans (multiplayer) ou o jogador local (S.player). A simulação só pergunta isHuman; a interface usa me() */
 const humans = () => S.humans ? S.humans.filter(id => nat(id) && nat(id).alive) : S.player >= 0 ? [S.player] : [];
+/* pendências de cada jogador humano (multiplayer: cada um tem as suas): offer = proposta de paz da IA · conf = impor a paz · lead = escolher o líder */
+const pendGet = (k, pid) => ((S.pend || {})[k] || {})[pid] || null;
+const pendSet = (k, pid, v) => { S.pend = S.pend || {}; (S.pend[k] = S.pend[k] || {})[pid] = v; };
+const pendDel = (k, pid) => { if (S.pend && S.pend[k]) delete S.pend[k][pid]; };
+const hasPending = pid => !!(pendGet('offer', pid) || pendGet('conf', pid) || pendGet('lead', pid) || (S.calls || []).some(c => (c.to ?? S.player) === pid) || (S.dipOffers || []).some(c => (c.to ?? S.player) === pid));
 const isHuman = id => id != null && id >= 0 && (S.humans ? S.humans.includes(id) : id === S.player);
 function ownChanged() { ownCache = null; S.mapDirty = true; enterC = null; }
 const hasTech = (n, id) => !!n.techs[id];

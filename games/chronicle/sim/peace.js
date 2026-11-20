@@ -112,20 +112,20 @@ function aiPeace(w) {
   for (const id of [...w.A, ...w.D]) {
     const sd = sideOf(w, id); if (!sd || leaderOf(w, sd) === id || surrenderOf(w, id) < 1) continue;
     const wl = leaderOf(w, sd === 'A' ? 'D' : 'A');
-    if (isHuman(wl)) { if (!S.conf) S.conf = { w: w.id, L: id, to: wl }; continue; }
+    if (isHuman(wl)) { if (!pendGet('conf', wl)) pendSet('conf', wl, { w: w.id, L: id, to: wl }); continue; }
     const t = aiTerms(w, wl, id, warPointsVs(w, id));
     if (isHuman(id)) notifyAll('🏳️ Capitulação', 'Seu país foi totalmente ocupado e teve de aceitar a paz de ' + natName(nat(wl)) + '.');
     separatePeace(w, id, wl, t); if (!S.wars.includes(w)) return;
   }
   const loseSide = sD >= sA ? 'D' : 'A', winSide = loseSide === 'A' ? 'D' : 'A', sl = Math.max(sA, sD), winLead = leaderOf(w, winSide), L = leaderOf(w, loseSide);
   if (sl >= 1 || (months >= 8 && sl >= .6 && chance(.12))) {           // capitulação ou derrota clara do líder
-    if (isHuman(winLead)) { if (!S.conf && sl >= 1) S.conf = { w: w.id, L, to: winLead }; return; }
+    if (isHuman(winLead)) { if (!pendGet('conf', winLead) && sl >= 1) pendSet('conf', winLead, { w: w.id, L, to: winLead }); return; }
     const t = aiTerms(w, winLead, L, warPointsVs(w, L));
-    if (isHuman(L) && sl < 1) { if (!S.offer) S.offer = { w: w.id, winner: winLead, L, t, to: L }; return; }
+    if (isHuman(L) && sl < 1) { if (!pendGet('offer', L)) pendSet('offer', L, { w: w.id, winner: winLead, L, t, to: L }); return; }
     if (isHuman(L)) notifyAll('🏳️ Capitulação', 'Seu lado capitulou e teve de aceitar os termos de ' + natName(nat(winLead)) + '.');
     separatePeace(w, L, winLead, t); return;
   }
-  if (months > 12 * 7 && sl < .3 && chance(.05)) { if (!human) separatePeace(w, w.d, null, null); else if (!S.offer && (isHuman(w.a) || isHuman(w.d))) S.offer = { w: w.id, winner: null, L: isHuman(w.a) ? w.d : w.a, t: null, to: isHuman(w.a) ? w.a : w.d }; }
+  if (months > 12 * 7 && sl < .3 && chance(.05)) { if (!human) separatePeace(w, w.d, null, null); else { const hp = isHuman(w.a) ? w.a : w.d; if (isHuman(hp) && !pendGet('offer', hp)) pendSet('offer', hp, { w: w.id, winner: null, L: hp === w.a ? w.d : w.a, t: null, to: hp }); } }
 }
 /* jogador: impõe a paz a L (separada, se L não for líder) ou pede paz branca */
 function proposePeace(w, L, t, pid = S.player) {

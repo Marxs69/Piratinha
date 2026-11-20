@@ -116,7 +116,7 @@ const fillTxt = (n, s) => s.replace(/\{lei\}/g, n.enact ? enactName(n.enact) : '
 
 /* ---------- avisos e eventos ---------- */
 /* aviso ao jogador (janela sem escolha); só chega se n for o jogador */
-function notify(id, t, m, extra) { if (!isHuman(id)) return; (S.evq = S.evq || []).push(Object.assign({ t, m, to: id }, extra)); }   // to = de qual jogador é o aviso
+function notify(id, t, m, extra) { if (!isHuman(id)) return; (S.evq = S.evq || []).push(Object.assign({ t, m, to: id, nid: S.id++ }, extra)); }   // nid: o jogador confirma pelo id (ackNote)   // to = de qual jogador é o aviso
 const notifyAll = (t, m, extra) => humans().forEach(id => notify(id, t, m, extra));
 
 /* eventos (EVENTS em events.js): uma vez por mês, cada país vivo sorteia no máximo um evento cujas condições valem.
@@ -143,7 +143,7 @@ function eventsTick(n) {
 /* resposta do jogador (índice na lista de escolhas disponíveis) */
 function chooseEvent(n, id, k) {
   const ev = EVENT[id]; if (!ev || n.evWait !== id) return 'Evento expirado';
-  const o = evOpts(n, ev)[k] || evOpts(n, ev)[0]; n.evWait = null; if (S.evq) S.evq = S.evq.filter(e => e.ev !== id); if (o) applyFx(n, o.fx); return '';
+  const o = evOpts(n, ev)[k] || evOpts(n, ev)[0]; n.evWait = null; if (S.evq) S.evq = S.evq.filter(e => !(e.ev === id && (e.to ?? n.id) === n.id)); if (o) applyFx(n, o.fx); return '';
 }
 const tmodTick = n => { if (n.tmods && n.tmods.some(x => x.u <= S.t)) { n.tmods = n.tmods.filter(x => x.u > S.t); calcMods(n); } };
 

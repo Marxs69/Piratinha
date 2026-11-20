@@ -88,7 +88,7 @@ function leaderCands(n, ideo, keepOld) {
 }
 function chooseLeader(n, why, ideo, keepOld) {
   const cands = leaderCands(n, ideo, keepOld);
-  if (isHuman(n.id)) { S.leadPick = { id: n.id, why, cands }; return; }
+  if (isHuman(n.id)) { pendSet('lead', n.id, { id: n.id, why, cands }); return; }
   setLeader(n, cands.slice().sort((a, b) => leaderScore(b) - leaderScore(a))[0]);
 }
 function setLeader(n, c) {

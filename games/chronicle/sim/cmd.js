@@ -10,7 +10,7 @@ const fleetById = id => S.fleets.find(f => f.id === id) || null;
 /* personagem do país pelo id: corte, conselho, candidatos (conselho, generais, eleição) e generais dos exércitos */
 function charById(n, id) {
   const pool = [n.ruler, n.spouse, n.regent, ...(n.kids || []), ...Object.values(n.council || {}), ...Object.values(n.cands || {}).flatMap(x => x.list || []),
-    ...((n.gcands || {}).list || []), ...(S.leadPick && S.leadPick.id === n.id ? S.leadPick.cands : []), ...S.armies.filter(a => a.o === n.id && a.gen).map(a => a.gen)];
+    ...((n.gcands || {}).list || []), ...((pendGet('lead', n.id) || {}).cands || []), ...S.armies.filter(a => a.o === n.id && a.gen).map(a => a.gen)];
   return pool.find(c => c && c.id === id) || null;
 }
 const myArmy = (n, id) => { const a = armyById(id); return a && a.o === n.id ? a : null; };
@@ -36,7 +36,10 @@ const CMDS = {
   setLaw: (n, k, o) => setLaw(n, k, o), setGov: (n, g) => setGov(n, g), setIdeo: (n, i) => setIdeo(n, i), cancelEnact: n => cancelEnact(n),
   campaign: n => campaign(n), rankUp: n => rankUp(n), setFlag: (n, f) => setFlag(n, f), rename: (n, nm) => rename(n, nm), setCapital: (n, p) => setCapital(n, p),
   swapCouncil: (n, k, cid) => { const c = charById(n, cid); return c ? swapCouncil(n, k, c) : 'Candidato inválido'; },
-  setLeader: (n, cid) => { if (!S.leadPick || S.leadPick.id !== n.id) return 'Nada a escolher'; const c = charById(n, cid); if (!c) return 'Candidato inválido'; S.leadPick = null; setLeader(n, c); return ''; },
+  setLeader: (n, cid) => { if (!pendGet('lead', n.id)) return 'Nada a escolher'; const c = charById(n, cid); if (!c) return 'Candidato inválido'; pendDel('lead', n.id); setLeader(n, c); return ''; },
+  dismiss: (n, k) => { if (!['offer', 'conf'].includes(k)) return 'Inválido'; pendDel(k, n.id); return ''; },   // fechou a janela sem decidir (proposta de paz recusada, paz adiada)
+  ackNote: (n, id) => { S.evq = (S.evq || []).filter(e => !(e.nid === id && e.to === n.id)); return ''; },
+  answerOffer: (n, fromId, kind, yes) => { const o = (S.dipOffers || []).find(x => x.from === fromId && x.kind === kind && (x.to ?? S.player) === n.id); if (!o) return 'Nada a responder'; S.dipOffers = S.dipOffers.filter(x => x !== o); if (!yes) { const f = nat(fromId); if (f) f.rel[n.id] = (f.rel[n.id] || 0) - 10; return ''; } return CMDS.acceptOffer(n, fromId, kind); },
   interact: (n, cid, k) => { const c = charById(n, cid); return c ? interact(n, c, k) : 'Pessoa inválida'; },
   useSecret: (n, cid, k) => { const c = charById(n, cid); return c ? useSecret(n, c, k) : 'Pessoa inválida'; },
   abandonPlot: n => abandonPlot(n), setTutor: (n, kid, seat) => setTutor(n, kid, seat),
@@ -65,6 +68,7 @@ const CMDS = {
   setNavDoc: (n, k) => setNavDoc(n, k), fleetAuto: (n, fid, on) => fleetAuto(n, fid, on), fleetGo: (n, fid, z) => fleetGo(n, fid, z),
   // eventos e paz
   chooseEvent: (n, ev, k) => chooseEvent(n, ev, k),
+  peaceOffer: (n, yes) => { const o = pendGet('offer', n.id); if (!o) return 'Nada a responder'; pendDel('offer', n.id); const w = S.wars.find(x => x.id === o.w); if (!w || !yes) return ''; separatePeace(w, o.L ?? n.id, o.winner, o.t); return ''; },
   proposePeace: (n, wid, L, t) => { const w = S.wars.find(x => x.id === wid); return w ? proposePeace(w, L, t, n.id) : 'Guerra inválida'; },
   answerCall: (n, wid, yes) => { const c = (S.calls || []).find(x => x.w === wid && (x.to ?? S.player) === n.id); if (!c) return 'Nada a responder'; S.calls = S.calls.filter(x => x !== c); answerCall(c, !!yes); return ''; },
   peace: (n, wid, L, winner, t) => { const w = S.wars.find(x => x.id === wid); if (!w) return 'Guerra inválida'; if (winner !== n.id && L !== n.id) return 'Não é sua paz'; separatePeace(w, L, winner, t); return ''; },

@@ -4,11 +4,12 @@
 /* ---------- salvar / carregar ---------- */
 const b64 = u8 => { let s = ''; for (let i = 0; i < u8.length; i += 8192) s += String.fromCharCode.apply(null, u8.subarray(i, i + 8192)); return btoa(s); };
 const unb64 = (s, T = Uint8Array) => { const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return new T(u.buffer); };
+const NET_MK0 = { sup: {}, dem: {}, sat: {}, imp: {}, exp: {} };
 /* empacota o estado para texto (save e rede). net = mantém as pendências de cada jogador (no save elas são descartadas) */
 function packState(net) {
   return Object.assign({}, S, { stSpd: undefined, stS: undefined, stD: undefined, stHas: undefined, stInfo: undefined, relg: S.relg ? b64(S.relg) : undefined, culg: S.culg ? b64(S.culg) : undefined, own: b64(new Uint8Array(S.own.buffer)), ctrl: b64(new Uint8Array(S.ctrl.buffer)), pop: b64(new Uint8Array(S.pop.buffer)), news: [], mapDirty: undefined, _mine: undefined, _threat: undefined,
-    nations: S.nations.map(n => Object.assign({}, n, { exP: b64(n.exP), exZ: b64(n.exZ), m: undefined, fx: undefined, up: undefined, eff: undefined })),
-    offer: net ? S.offer : null, calls: net ? S.calls : [], dipOffers: net ? S.dipOffers : [], evq: (S.evq || []).filter(e => net || e.ev), conf: net ? S.conf : null });
+    nations: S.nations.map(n => Object.assign({}, n, { exP: b64(n.exP), exZ: b64(n.exZ), m: undefined, fx: undefined, up: undefined, eff: undefined }, net && !isHuman(n.id) ? { mk: NET_MK0 } : {})),   // rede: mercado detalhado só dos jogadores (a interface só mostra o do próprio país)
+    pend: net ? S.pend : undefined, calls: net ? S.calls : [], dipOffers: net ? S.dipOffers : [], evq: (S.evq || []).filter(e => net || e.ev), offer: undefined, conf: undefined, leadPick: undefined });
 }
 /* desempacota um estado. net = retrato vindo do anfitrião: não refaz o mundo se a semente é a mesma e não roda a economia (quem simula é o anfitrião) */
 function unpackState(o, net) {
@@ -21,6 +22,7 @@ function unpackState(o, net) {
   S.armies.forEach(a => { if (a.xp == null) a.xp = .2; a.fat = a.fat || 0; a.st = a.st || 'bal'; a.sup = a.sup || {}; });
   if (!S.faith) S.faith = rollFaiths(S.seed); if (!S.culx) S.culx = rollCultures(S.seed);
   if (o.culg) S.culg = unb64(o.culg); else initCul(); if (o.relg) S.relg = unb64(o.relg); else initRelig();
+  if (!net) S.humans = null;   // save de partida multijogador abre sozinho; ao reabrir a sala, os outros escolhem de novo (o lobby mostra quem era dono: S.mpNames)
   if (net) { ownChanged(); warsChanged(); S.nations.forEach(n => { if (n.alive) calcMods(n); }); S.mapDirty = true; return true; }
   GOOD_IDS.forEach(g => { if (!(S.wp[g] > 0)) S.wp[g] = GOODS[g].p; });   // saves antigos: bens novos sem preço davam −NaN/mês
   for (const g in S.wp) if (!GOODS[g]) delete S.wp[g]; if (S.wacc) S.wacc = null;   // bem removido do conteúdo; somas do mês recomeçam

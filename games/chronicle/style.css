@@ -313,3 +313,10 @@ h4.bgrp { font: 700 11px var(--title); color: var(--dim); letter-spacing: 1px; m
 table.t select { margin: 0; max-width: 150px; } .docrow { display: flex; flex-direction: column; gap: 2px; padding: 6px 0; border-top: 1px solid rgba(90,74,50,.35); } .docrow:first-of-type { border-top: 0; }
 
 .netb { font-size: 12px; padding: 2px 8px; border: 1px solid var(--line); border-radius: 10px; margin-right: 6px; }
+
+#room { position: absolute; right: 10px; top: 56px; width: 340px; max-height: min(520px, calc(100% - 80px)); z-index: 12; display: flex; flex-direction: column; gap: 6px; padding: 8px; }
+#room header { display: flex; align-items: center; } #room header b { flex: 1; font: 700 14px var(--title); color: var(--gold-2); }
+#room .rplayers { display: flex; flex-direction: column; gap: 4px; } #room .rp { display: flex; align-items: center; gap: 6px; } #room .rp .fl { width: 26px; height: 17px; } #room .rp small { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#room .rchat { flex: 1; min-height: 120px; max-height: 280px; overflow: auto; border: 1px solid var(--line); border-radius: 4px; padding: 4px 6px; background: rgba(0,0,0,.3); font-size: 12px; }
+#room .rl { padding: 1px 0; } #room .rl.sys { color: var(--gold); font-style: italic; } #room input { flex: 1; min-width: 0; }
+.netb { cursor: pointer; } .netb.new { border-color: var(--gold); color: var(--gold-2); }

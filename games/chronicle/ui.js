@@ -120,25 +120,40 @@ function startPlay(fresh) {
 
 /* ---------- multijogador (net.js): abrir e entrar em salas ---------- */
 const roomCode = () => Math.random().toString(36).slice(2, 7).toUpperCase();
+/* painel da sala: jogadores (com o país de cada um) e chat; o anfitrião pode expulsar */
+function drawRoom() {
+  const r = $('#room'); r.hidden = !UI.room || !(NET.host || NET.client) || UI.scr !== 'game'; if (r.hidden) return; NET.unread = 0;
+  r.innerHTML = ''; const h = el('header'); h.append(el('b', '', '🌐 Sala ' + NET.code), btn('✕', () => { UI.room = false; drawRoom(); drawTop(); }, 'x sm')); r.append(h);
+  const pl = el('div', 'rplayers'); NET.players().forEach(p => { const n = nat(p.pid), row = el('div', 'rp');
+    if (n) row.append(flagImgEl(n.flag)); row.append(el('b', '', p.name + (p.host ? ' 👑' : '') + (p.pid === S.player ? ' (você)' : '')), el('small', 'dim', n ? natName(n) : '—'));
+    if (NET.host && p.peer) row.append(btn('Expulsar', () => { NET.kick(p.peer); drawRoom(); drawTop(); }, 'sm red', '', 'Tira o jogador da sala; o país volta para a IA'));
+    pl.append(row); }); r.append(pl);
+  const log0 = el('div', 'rchat'); NET.chat.forEach(l => log0.append(el('div', l.sys ? 'rl sys' : 'rl', (l.at ? l.at + ' · ' : '') + (l.sys ? l.m : l.from + ': ' + l.m)))); r.append(log0);
+  const inp = el('input'); inp.placeholder = 'Mensagem…'; inp.maxLength = 300; const send = () => { NET.say(inp.value); inp.value = ''; inp.focus(); };
+  inp.onkeydown = e => { e.stopPropagation(); if (e.key === 'Enter') send(); }; const row = el('div', 'row'); row.append(inp, btn('Enviar', send, 'sm')); r.append(row);
+  log0.scrollTop = log0.scrollHeight; if (UI.roomFocus) { inp.focus(); UI.roomFocus = false; }
+}
 function netHooks() {
+  NET.onChat = () => { if (UI.room) { const f = document.activeElement && document.activeElement.closest && document.activeElement.closest('#room'); UI.roomFocus = !!f; drawRoom(); } else drawTop(); };
   NET.onInfo = m => say(m, 'info');
   NET.onPauseReq = who => { say(who + ' pediu pausa.', 'info'); };
-  NET.onClosed = () => { NET.close(); S = null; menu(); say('A sala foi fechada.', 'bad'); };
+  NET.onClosed = () => { NET.close(); UI.room = false; drawRoom(); S = null; menu(); say('A sala foi fechada.', 'bad'); };
 }
 function hostRoomModal() {
   netHooks(); const code = roomCode();
   modal(m => { m.append(el('h2', '', '🌐 Abrir sala'), el('p', '', 'Você será o anfitrião: só o seu jogo simula e você controla a velocidade e a pausa.'), el('p', 'dim', 'Mande o código para os amigos (Entrar numa sala, no menu inicial). Código começando com LOCAL testa entre abas do mesmo navegador.'));
     const inp = el('input'); inp.value = code; inp.maxLength = 16; const r = el('div', 'row');
-    r.append(btn('Abrir', async () => { try { await NET.openRoom(inp.value.trim() || code); closeModal(); say('Sala ' + NET.code + ' aberta.', 'good'); drawTop(); } catch (e) { say('Não foi possível abrir a sala: ' + e.message, 'bad'); } }, 'grn'), btn('Cancelar', closeModal));
-    m.append(inp, r); });
+    const nm = el('input'); nm.placeholder = 'Seu nome'; nm.maxLength = 24;
+    r.append(btn('Abrir', async () => { try { await NET.openRoom(inp.value.trim() || code, null, nm.value.trim() || 'Anfitrião'); closeModal(); say('Sala ' + NET.code + ' aberta.', 'good'); drawTop(); } catch (e) { say('Não foi possível abrir a sala: ' + e.message, 'bad'); } }, 'grn'), btn('Cancelar', closeModal));
+    m.append(inp, nm, r); });
 }
 function joinRoomModal() {
   netHooks();
   modal(m => { m.append(el('h2', '', '🌐 Entrar numa sala'), el('p', 'dim', 'Peça o código ao anfitrião. Você escolhe um país livre e joga na partida dele.'));
     const code = el('input'), nm = el('input'); code.placeholder = 'Código da sala'; nm.placeholder = 'Seu nome'; nm.maxLength = 24; const msgEl = el('div', 'msg'), list = el('div', 'col');
-    NET.onLobby = L => { list.innerHTML = ''; msgEl.textContent = L.why || ('Partida em ' + L.year + (L.host ? ' · anfitrião: ' + L.host : '') + ' — escolha um país:');
-      (L.nations || []).slice(0, 60).forEach(x => list.append(btn(x.name + ' · ' + x.provs + ' províncias · ' + x.gov, () => { NET.pick(x.id); msgEl.textContent = 'Entrando…'; }, 'sm'))); };
-    NET.onState = () => { if (UI.scr !== 'game') { closeModal(); startPlay(false); } else refresh(); S.mapDirty = true; };
+    NET.onLobby = L => { list.innerHTML = ''; msgEl.textContent = L.why || ('Partida em ' + L.year + (L.host ? ' · anfitrião: ' + L.host : '') + (L.players && L.players.length ? ' · na sala: ' + L.players.join(', ') : '') + ' — escolha um país:');
+      (L.nations || []).slice(0, 60).forEach(x => list.append(btn((x.was ? '↩ ' : '') + x.name + ' · ' + x.provs + ' províncias · ' + x.gov + (x.was ? ' · era de ' + x.was : ''), () => { NET.pick(x.id); msgEl.textContent = 'Entrando…'; }, 'sm' + (x.was ? ' grn' : '')))); };
+    NET.onState = () => { if (UI.scr !== 'game') { closeModal(); startPlay(false); } else { refresh(); drawRoom(); } S.mapDirty = true; };
     const r = el('div', 'row'); r.append(btn('Conectar', async () => { msgEl.textContent = 'Procurando a sala…'; try { await NET.join(code.value.trim(), nm.value.trim() || 'Jogador'); } catch (e) { msgEl.textContent = 'Falhou: ' + e.message; } }, 'grn'), btn('Cancelar', () => { if (NET.client) NET.close(); closeModal(); }));
     m.append(code, nm, r, msgEl, list); });
 }
@@ -173,7 +188,7 @@ function drawTop() {
   drawNav();
   t.append(el('span', 'grow'));
   const spd = NET.client ? NET.speed || 0 : UI.speed, sp = el('div', 'speed'); [0, 1, 2, 3, 4, 5].forEach(k => sp.append(btn(k ? '▶'.repeat(Math.min(k, 3)) + (k > 3 ? k : '') : '⏸', () => setSpeed(k), spd === k ? 'on' : '', NET.client && k ? 'O anfitrião controla a velocidade' : '', NET.client ? (k ? '' : 'Pedir pausa ao anfitrião') : k ? 'Velocidade ' + k + ' (tecla ' + k + ')' : 'Pausar (espaço)'))); t.append(sp);
-  if (NET.host || NET.client) t.append(tip(el('div', 'netb', '🌐 ' + (NET.host ? NET.peers.size + 1 : (S.humans || []).length) + '/' + NET_MAX), (NET.host ? 'Você é o anfitrião · sala ' + NET.code : 'Sala ' + NET.code) + '\nJogadores: ' + humans().map(id => natName(nat(id))).join(', ')));
+  if (NET.host || NET.client) { const nb = el('div', 'netb' + (NET.unread ? ' new' : ''), '🌐 ' + NET.players().length + '/' + NET_MAX + (NET.unread ? ' · 💬' + NET.unread : '')); nb.onclick = () => { UI.room = !UI.room; drawRoom(); drawTop(); }; t.append(tip(nb, (NET.host ? 'Você é o anfitrião · sala ' + NET.code : 'Sala ' + NET.code) + '\nClique: jogadores e chat')); }
   t.append(tip(el('div', 'date', dateStr()), eraOf(curYear()) + '\nCada mês: economia, pesquisa, obras e política. Cada dia: movimento e batalhas.'));
   t.append(btn('☰', () => gameMenu(), '', '', 'Menu: salvar, sair e controles'));
 }
@@ -1226,12 +1241,13 @@ const mineFirst = L => L && L.length ? L.filter(mineP).concat(L.filter(x => !min
 function pendingModals() {
   if (!$('#modal').hidden) return;
   S.evq = mineFirst(S.evq); S.calls = mineFirst(S.calls); S.dipOffers = mineFirst(S.dipOffers);
-  if (S.offer && mineP(S.offer)) { peaceOffer(); return; }
-  if (S.conf && mineP(S.conf)) { const w = S.wars.find(x => x.id === S.conf.w); UI.peaceL = S.conf.L; UI.peacePick = null; S.conf = null; if (w) { UI.resume = 0; UI.speed = 0; drawTop(); (S.evq = S.evq || []).push({ t: '🏳️ O inimigo capitulou', m: 'Escolha os termos: estados, vassalagem ou reparações, com os pontos da rendição deles.' }); openWin('peace', w.id); } }
-  if (S.leadPick && S.leadPick.id === S.player) { const L = S.leadPick, n = me(); autoPause();   // eleição: o jogador escolhe o novo líder entre 4
+  const off = pendGet('offer', S.player), cf = pendGet('conf', S.player), lp = pendGet('lead', S.player);   // pendências deste jogador (cada um tem as suas)
+  if (off) { peaceOffer(off); return; }
+  if (cf) { const w = S.wars.find(x => x.id === cf.w); UI.peaceL = cf.L; UI.peacePick = null; act('dismiss', 'conf'); pendDel('conf', S.player); if (w) { UI.resume = 0; UI.speed = 0; drawTop(); (S.evq = S.evq || []).push({ t: '🏳️ O inimigo capitulou', m: 'Escolha os termos: estados, vassalagem ou reparações, com os pontos da rendição deles.' }); openWin('peace', w.id); } }
+  if (lp) { const L = lp, n = me(); autoPause();   // eleição: o jogador escolhe o novo líder entre 4
     modal(m => { m.append(el('h2', '', '🗳️ Quem vai governar?'), el('p', '', L.why + ' Escolha quem assume como ' + titleOf(n).toLowerCase() + ' (' + GOVS[n.gov].n + ').'));
       const c = el('div', 'cols'); L.cands.forEach(ch => c.append(noCtx(seatCard(n, ch, (ch === n.ruler ? '🔁 Atual · ' : COUNCIL.some(([k]) => n.council[k] === ch) ? '👥 Do conselho · ' : '✨ Novo nome · ') + charName(ch), null,
-        btn('Escolher', () => { act('setLeader', ch.id); closeModal(); refresh(); }, 'sm grn'), true))));
+        btn('Escolher', () => { act('setLeader', ch.id); pendDel('lead', S.player); closeModal(); refresh(); }, 'sm grn'), true))));
       m.append(c); }, true); return; }
   { const n = me(); if (n && n.vpend) { const V = VERT[n.vpend]; autoPause();
     const area = CATS[V.entry.c], dm = {}; for (const k in V.m) dm[k] = V.m[k] * VERT_DECLINE;
@@ -1246,21 +1262,22 @@ function pendingModals() {
       d.opts.forEach(o => { const k = ok.indexOf(o), t = fxTxt(o.fx).join('\n') || 'Sem efeito';
         r.append(btn(o.n, () => { act('chooseEvent', ev.ev, k); closeModal(); refresh(); }, '', k < 0 ? condFail(n, o.when).join(', ') : '', t)); });
       m.append(r); }); return; }
-  if (S.evq && S.evq.length && mineP(S.evq[0])) { const ev = S.evq.shift(); autoPause();
+  if (S.evq && S.evq.length && mineP(S.evq[0])) { const ev = S.evq.shift(); autoPause(); if (ev.nid != null && NET.client) act('ackNote', ev.nid);   // o anfitrião tira o aviso da fila
     modal(m => { m.append(el('h2', '', ev.t), el('p', '', ev.m)); const r = el('div', 'row'); if (ev.quar) r.append(btn('🚧 Decretar quarentena (💰' + quarCost(me()) + ')', () => { const e = quarantine(me()); if (e) say(e, 'bad'); else log('Quarentena decretada por dois anos.', 'info', [S.player]); closeModal(); refresh(); }, 'red', '', 'Contágio nas suas províncias cai 70% por 2 anos; comércio −30%')); r.append(btn('Que assim seja', closeModal)); m.append(r); }); return; }
   if (S.calls && S.calls.length && mineP(S.calls[0])) { const c = S.calls[0], w = S.wars.find(x => x.id === c.w); if (!w) { S.calls.shift(); return; } const lead = nat(c.from), foe = nat(c.side === 'A' ? w.d : w.a); autoPause();
-    modal(m => { m.append(el('h2', '', 'Chamado às armas'), el('p', '', natName(lead) + ' pede sua ajuda na guerra contra ' + natName(foe) + '.'), el('p', 'dim', 'Recusar acaba com a aliança.')); const r = el('div', 'row'); r.append(btn('Entrar na guerra', () => { act('answerCall', c.w, true); closeModal(); refresh(); S.mapDirty = true; }, 'red'), btn('Recusar', () => { act('answerCall', c.w, false); closeModal(); refresh(); })); m.append(r); }); return; }
-  if (S.dipOffers && S.dipOffers.length && mineP(S.dipOffers[0])) { const o = S.dipOffers.shift(), from = nat(o.from); if (!from.alive) return; autoPause();
+    modal(m => { m.append(el('h2', '', 'Chamado às armas'), el('p', '', natName(lead) + ' pede sua ajuda na guerra contra ' + natName(foe) + '.'), el('p', 'dim', 'Recusar acaba com a aliança.')); const r = el('div', 'row'); r.append(btn('Entrar na guerra', () => { act('answerCall', c.w, true); S.calls = S.calls.filter(x => x !== c); closeModal(); refresh(); S.mapDirty = true; }, 'red'), btn('Recusar', () => { act('answerCall', c.w, false); S.calls = S.calls.filter(x => x !== c); closeModal(); refresh(); })); m.append(r); }); return; }
+  if (S.dipOffers && S.dipOffers.length && mineP(S.dipOffers[0])) { const o = S.dipOffers[0], from = nat(o.from); const done = yes => { const e = act('answerOffer', o.from, o.kind, yes); S.dipOffers = (S.dipOffers || []).filter(x => x !== o); if (e) say(e, 'bad'); closeModal(); refresh(); }; if (!from.alive) { done(false); return; } autoPause();
     const txt = { ally: 'propõe uma aliança.', marr: 'propõe um casamento real.', trade: 'propõe um acordo comercial.' }[o.kind];
-    modal(m => { m.append(flagEl(from.flag, 'mflag'), el('h2', '', natName(from)), el('p', '', txt)); const r = el('div', 'row'); r.append(btn('Aceitar', () => { const e = act('acceptOffer', from.id, o.kind); if (e) say(e, 'bad'); closeModal(); refresh(); }, 'grn'), btn('Recusar', () => { from.rel[S.player] = (from.rel[S.player] || 0) - 10; closeModal(); })); m.append(r); }); }
+    modal(m => { m.append(flagEl(from.flag, 'mflag'), el('h2', '', natName(from)), el('p', '', txt)); const r = el('div', 'row'); r.append(btn('Aceitar', () => done(true), 'grn'), btn('Recusar', () => done(false))); m.append(r); }); }
 }
-function peaceOffer() {
-  const o = S.offer; S.offer = null; const w = S.wars.find(x => x.id === o.w); if (!w) return;
+function peaceOffer(o) {
+  const w = S.wars.find(x => x.id === o.w), answer = yes => { act('peaceOffer', yes); pendDel('offer', S.player); closeModal(); refresh(); };
+  if (!w) { answer(false); return; }
   const n = me(), e = nat(sideOf(w, n.id) === 'A' ? w.d : w.a); autoPause();
   modal(m => {
     m.append(el('h2', '', 'Proposta de paz'), el('p', '', natName(o.winner != null ? nat(o.winner) : e) + (o.winner == null ? ' propõe paz branca.' : ' exige: ' + termsTxt(n.id, o.t) + '.')));
     m.append(el('p', 'dim', 'Recusar mantém a guerra; se sua rendição chegar a 100%, eles tomam o que quiserem.'));
-    const r = el('div', 'row'); r.append(btn('Aceitar', () => { act('peace', w.id, o.L ?? S.player, o.winner, o.t); closeModal(); refresh(); }, 'grn'), btn('Recusar', closeModal, 'red')); m.append(r);
+    const r = el('div', 'row'); r.append(btn('Aceitar', () => answer(true), 'grn'), btn('Recusar', () => answer(false), 'red')); m.append(r);
   });
 }
 function endScreen() {
@@ -1366,7 +1383,7 @@ function loop(now) {
   if (S && NET.host) NET.hostTick(now);
   if (S && UI.scr === 'game' && !S.over && UI.speed && $('#modal').hidden && !NET.client) {
     UI.acc += dt * SPEEDS[UI.speed]; let n = 0;
-    while (UI.acc >= 1 && n < 30) { UI.acc -= 1; n++; advanceDay(); if (S.offer || S.over || S.leadPick || (S.calls && S.calls.length) || (S.dipOffers && S.dipOffers.length)) break; if (S.t % 360 === 0 && !NET.client) saveGame(); }
+    while (UI.acc >= 1 && n < 30) { UI.acc -= 1; n++; advanceDay(); if (S.over || hasPending(S.player)) break; if (S.t % 360 === 0 && !NET.client) saveGame(); }
     if (UI.acc > 3) UI.acc = 0;
   }
   if (S && UI.scr === 'game') {
@@ -1397,7 +1414,7 @@ initRender(cv); menu(); requestAnimationFrame(loop);
     for (let d = 0; d < +q.get('war'); d++) advanceDay();
   }
   if (q.get('plague')) { const y0 = S.t; S.t = 360 * (1361 - START_YEAR); for (let d = 0; d < +q.get('plague'); d++) advanceDay(); }
-  S.offer = null; S.calls = []; S.dipOffers = [];
+  S.pend = {}; S.calls = []; S.dipOffers = [];
   if (q.get('reload')) { saveGame(); S = null; if (!loadGame()) throw new Error('load falhou'); }
   startPlay(false); if (q.get('mode')) { R.mode = q.get('mode'); drawModes($('#modes'), true); if (R.mode === 'res') select('res'); }
   if (q.get('z')) { R.cam.z = +q.get('z'); centerOn(WD.provs[main.capital].cx * K, WD.provs[main.capital].cy * K); }
