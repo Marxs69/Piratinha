@@ -52,7 +52,7 @@ function invade(I) {
   victims.forEach(v => { if (nat(v).alive) declareWar(n, nat(v), null, null); });
   if (I.from === 'cold') { const t = S.nations.filter(x => x.alive && x.kind === 'main' && provsOf(x.id).some(p => WD.provs[p].coast)).sort((x, y) => strength(x) - strength(y))[rint(5)]; if (t && !atWar(n.id, t.id)) declareWar(n, t, null, null); }
   log(I.e + ' ' + I.n + ' surgiu! ' + I.m, 'world', [n.id, ...victims]);
-  notify(S.player, I.e + ' ' + I.n, I.m + ' (' + natName(n) + ', ' + Math.round(regs0) + 'k homens)');
+  notifyAll(I.e + ' ' + I.n, I.m + ' (' + natName(n) + ', ' + Math.round(regs0) + 'k homens)');
 }
 
 /* ---------- revoluções: monarquias instáveis que conhecem o Iluminismo podem explodir ---------- */
@@ -71,10 +71,10 @@ function bigWar(id) {
   a.truce[b.id] = 0; const e = declareWar(a, b, null, null); if (e) return;
   const w = S.wars[S.wars.length - 1]; w.big = id;
   // as outras potências escolhem lado pela relação
-  top.filter(x => x !== a && x !== b && !sideOf(w, x.id) && !x.truce[a.id] && !x.truce[b.id]).forEach(x => { const ra = x.rel[a.id] || 0, rb = x.rel[b.id] || 0; if (Math.abs(ra - rb) > 20 && x.id !== S.player) joinWar(w, x.id, ra > rb ? 'A' : 'D'); });
+  top.filter(x => x !== a && x !== b && !sideOf(w, x.id) && !x.truce[a.id] && !x.truce[b.id]).forEach(x => { const ra = x.rel[a.id] || 0, rb = x.rel[b.id] || 0; if (Math.abs(ra - rb) > 20 && !isHuman(x.id)) joinWar(w, x.id, ra > rb ? 'A' : 'D'); });
   S.hist[id] = { y: curYear(), w: w.id };
   log(W.e + ' ' + W.n + ': ' + natName(a) + ' contra ' + natName(b) + '. O mundo inteiro escolhe um lado.', 'world', [...w.A, ...w.D]);
-  notify(S.player, W.e + ' ' + W.n, natName(a) + ' declarou guerra a ' + natName(b) + '. ' + (w.A.length + w.D.length) + ' países já estão em guerra.');
+  notifyAll(W.e + ' ' + W.n, natName(a) + ' declarou guerra a ' + natName(b) + '. ' + (w.A.length + w.D.length) + ' países já estão em guerra.');
 }
 /* Guerra Fria: as duas maiores potências de ideologias diferentes não se atacam, mas correm em armas e ciência */
 function coldWar() {
@@ -82,7 +82,7 @@ function coldWar() {
   const a = top[0], b = top.slice(1).find(x => x.ideo !== a.ideo); if (!a || !b) return;
   S.cold = { a: a.id, b: b.id }; S.hist.coldwar = { y: curYear() };
   log(WORLD_EVENTS.coldwar.e + ' ' + WORLD_EVENTS.coldwar.n + ': ' + natName(a) + ' e ' + natName(b) + ' disputam o mundo sem guerra aberta.', 'world', [a.id, b.id]);
-  notify(S.player, WORLD_EVENTS.coldwar.e + ' ' + WORLD_EVENTS.coldwar.n, natName(a) + ' e ' + natName(b) + ' dividem o mundo em blocos.');
+  notifyAll(WORLD_EVENTS.coldwar.e + ' ' + WORLD_EVENTS.coldwar.n, natName(a) + ' e ' + natName(b) + ' dividem o mundo em blocos.');
 }
 const coldMods = n => S.cold && (S.cold.a === n.id || S.cold.b === n.id) ? [['Guerra Fria', { research: .08, army: .05, stab: .03 }]] : [];
 const coldBlocked = (a, b) => S.cold && ((S.cold.a === a && S.cold.b === b) || (S.cold.a === b && S.cold.b === a));

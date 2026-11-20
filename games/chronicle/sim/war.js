@@ -45,7 +45,7 @@ function explore(n, v) {
   const P = WD.provs.length;
   if (v < P) { n.exP[v] = 1; WD.provs[v].adj.forEach(o => n.exP[o] = 1); WD.provs[v].seas.forEach(z => n.exZ[z] = 1); }
   else { const z = WD.seas[v - P]; n.exZ[z.id] = 1; z.adj.forEach(w => n.exZ[w] = 1); z.provs.forEach(p => n.exP[p] = 1); }
-  if (n.id === S.player) S.mapDirty = true;
+  if (isHuman(n.id)) S.mapDirty = true;
 }
 
 /* ---------- diário: movimento, batalhas, cercos ---------- */
@@ -104,7 +104,7 @@ function retreat(a) {
     if (v < P) for (const o of WD.provs[v].adj) if (!seen.has(o) && n.exP[o] && (S.ctrl[o] === a.o || S.own[o] === a.o || S.own[o] === -1)) { seen.add(o); q.push([o, path.concat(o)]); }
   }
   a.inf = a.cav = a.art = a.vrt = 0;                         // cercado: o exército se rende
-  if (a.o === S.player) log('Um exército seu foi cercado e se rendeu.', 'bad', [S.player]);
+  if (isHuman(a.o)) log('Um exército seu foi cercado e se rendeu.', 'bad', [S.player]);
 }
 
 function siegeAt(p, list) {
@@ -118,18 +118,18 @@ function siegeAt(p, list) {
   if (reb) besiegers.forEach(a => { const k = Math.min(.012, reb.s * .0006); a.inf *= 1 - k; a.cav *= 1 - k; a.art *= 1 - k; a.vrt *= 1 - k; a.inBattle = true; });   // os rebeldes resistem
   if (sg.v >= 1) {
     delete S.sieges[p];
-    if (reb) { delete S.rebels[p]; S.ctrl[p] = own; S.mapDirty = true; if (own === S.player) log('Rebeldes vencidos em ' + WD.provs[p].n + '.', 'good', [own]); return; }
+    if (reb) { delete S.rebels[p]; S.ctrl[p] = own; S.mapDirty = true; if (isHuman(own)) log('Rebeldes vencidos em ' + WD.provs[p].n + '.', 'good', [own]); return; }
     const liberate = own === o;
     S.ctrl[p] = liberate ? own : o; S.mapDirty = true;
-    if (!liberate && own >= 0 && nat(own).capital === p) log('A capital de ' + natName(nat(own)) + ', ' + WD.provs[p].n + ', caiu diante de ' + natName(n) + '!', own === S.player ? 'bad' : 'world', [own, o]);
-    if (o === S.player || own === S.player) log((liberate ? 'Libertamos ' : 'Cerco concluído: ') + WD.provs[p].n + (liberate ? '' : ' foi ocupada por ' + natName(n)) + '.', o === S.player ? 'good' : 'bad', [S.player]);
+    if (!liberate && own >= 0 && nat(own).capital === p) log('A capital de ' + natName(nat(own)) + ', ' + WD.provs[p].n + ', caiu diante de ' + natName(n) + '!', isHuman(own) ? 'bad' : 'world', [own, o]);
+    if (isHuman(o) || isHuman(own)) log((liberate ? 'Libertamos ' : 'Cerco concluído: ') + WD.provs[p].n + (liberate ? '' : ' foi ocupada por ' + natName(n)) + '.', isHuman(o) ? 'good' : 'bad', [S.player]);
   }
 }
 function autoExplore(f) {                                    // vai ao mar de fronteira mais próximo (desconhecido, com costa ou vizinhos desconhecidos)
   const n = nat(f.o), Z = WD.seas.length, seen = new Uint8Array(Z), q = [f.z]; seen[f.z] = 1;
   const frontier = w => !n.exZ[w] || WD.seas[w].provs.some(p => !n.exP[p]) || WD.seas[w].adj.some(x => !n.exZ[x] && seaOk(n, x));
   for (let h = 0; h < q.length; h++) { const u = q[h]; for (const w of WD.seas[u].adj) { if (seen[w] || !seaOk(n, w)) continue; seen[w] = 1; if (frontier(w)) { const path = seaPath(n, f.z, w); if (path) { f.path = path; return; } } q.push(w); } }
-  f.auto = false; if (f.o === S.player) log('Uma frota terminou de explorar o que conseguia alcançar' + (n.fx.sea < 2 ? '; para cruzar o oceano aberto, pesquise Caravela.' : '.'), 'info', [S.player]);
+  f.auto = false; if (isHuman(f.o)) log('Uma frota terminou de explorar o que conseguia alcançar' + (n.fx.sea < 2 ? '; para cruzar o oceano aberto, pesquise Caravela.' : '.'), 'info', [S.player]);
   if (n.fx.sea < 2) notify(f.o, '🧭 Exploração', 'A frota explorou tudo o que alcança costeando. O oceano aberto exige navegação oceânica (Caravela).');
 }
 
@@ -150,15 +150,15 @@ function callAllies(w, side) {                                // aliados e parce
     const al = nat(id); if (!al.alive || sideOf(w, id) || id === foe) return;
     if (al.senior === lead.id && (!al.subj || SUBJECTS[al.subj.tier].war)) { joinWar(w, id, side); return; }
     if (lead.senior === id) { joinWar(w, id, side); return; }
-    if (id === S.player) { S.calls = S.calls || []; S.calls.push({ w: w.id, side, from: lead.id }); return; }
+    if (isHuman(id)) { S.calls = S.calls || []; S.calls.push({ w: w.id, side, from: lead.id, to: id }); return; }
     const p = (al.ruler.tr.includes('honest') ? 1 : side === 'D' ? .75 : .45) + (al.rel[lead.id] || 0) / 400 - (al.ruler.tr.includes('craven') ? .3 : 0);
     if (chance(p)) joinWar(w, id, side);
     else { breakTies(al, lead); al.rel[lead.id] -= 40; lead.rel[id] = (lead.rel[id] || 0) - 60; log(natName(al) + ' recusou o chamado de ' + natName(lead) + ' e a aliança acabou.', 'world', [id, lead.id]); }
   });
 }
 function answerCall(c, yes) {
-  const w = S.wars.find(x => x.id === c.w), me = nat(S.player), lead = nat(c.from); if (!w) return;
-  if (yes) joinWar(w, S.player, c.side);
+  const pid = c.to ?? S.player, w = S.wars.find(x => x.id === c.w), me = nat(pid), lead = nat(c.from); if (!w) return;
+  if (yes) joinWar(w, pid, c.side);
   else { breakTies(me, lead); lead.rel[me.id] = (lead.rel[me.id] || 0) - 60; me.stab = Math.max(0, me.stab - 5); log('Você recusou o chamado de ' + natName(lead) + '. A aliança acabou.', 'bad', [S.player]); }
 }
 function declareWar(n, t, s, cb) {                           // cb 'holy' = guerra santa (pouca perda de estabilidade)
@@ -184,7 +184,7 @@ function checkDead() {
       n.alive = false; S.armies = S.armies.filter(a => a.o !== n.id); S.fleets = S.fleets.filter(f => f.o !== n.id); S.cols = S.cols.filter(c => c.o !== n.id);
       S.wars = S.wars.filter(w => w.a !== n.id && w.d !== n.id); S.wars.forEach(w => { w.A = w.A.filter(x => x !== n.id); w.D = w.D.filter(x => x !== n.id); }); warsChanged(); S.fronts = (S.fronts || []).filter(f => S.wars.some(x => x.id === f.w));   // front sem guerra não fica
       S.nations.forEach(o => { breakTies(o, n); if (o.senior === n.id) { delete o.senior; delete o.subj; } }); if (n.senior != null) { delete n.senior; delete n.subj; }
-      log(natName(n) + ' deixou de existir.', 'world', [n.id]); if (n.id === S.player) S.over = 'dead';
+      log(natName(n) + ' deixou de existir.', 'world', [n.id]); if (isHuman(n.id)) S.over = 'dead';
     } else if (S.own[n.capital] !== n.id) { const ps = provsOf(n.id); n.capital = ps.reduce((a, b) => S.pop[a] >= S.pop[b] ? a : b); }
   });
 }

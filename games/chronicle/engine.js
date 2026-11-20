@@ -31,7 +31,7 @@ const COND = {
   rulerAge:{ ok: (n, v) => !!n.ruler && inR(ageOf(n.ruler), v), txt: v => rTxt('Idade do governante', v) },
   trait:   { ok: (n, v) => !!n.ruler && arr(v).some(t => n.ruler.tr.includes(t)), txt: v => 'Governante ' + orTxt(arr(v).map(t => TRAITS[t].n.toLowerCase())), ids: v => arr(v).map(t => ['TRAITS', t]) },
   heir:    { ok: (n, v) => ((n.kids || []).length > 0) === v, txt: v => v ? 'Com herdeiro' : 'Sem herdeiro' },
-  player:  { ok: (n, v) => (n.id === S.player) === v, txt: v => v ? 'Só o jogador' : 'Só a IA' },
+  player:  { ok: (n, v) => (isHuman(n.id)) === v, txt: v => v ? 'Só o jogador' : 'Só a IA' },
   faith:   { ok: (n, v) => arr(v).some(k => n.relig === REL_IDS.indexOf(k)), txt: v => 'Fé: ' + orTxt(arr(v).map(k => RELIGIONS[k].n)), ids: v => arr(v).map(k => ['RELIGIONS', k]) },
   ferv:    { ok: (n, v) => inR(n.ferv ?? 50, v), txt: v => rTxt('Fervor', v) },
   reform:  { ok: (n, v) => { const R = (S.reforms || {}).reformation; if (!R || n.relig !== R.from) return false; return ((n.rels || {})[R.to] || 0) / Math.max(1, n.popT || 0) >= v; }, txt: v => 'A Reforma tem ' + Math.round(v * 100) + '% dos seus fiéis' },
@@ -76,7 +76,7 @@ const EFF = {
   ideo:     { do: (n, v) => { n.ideo = v; calcMods(n); }, txt: v => 'Ideologia vira ' + IDEOS[v].n, ids: v => [['IDEOS', v]] },
   law:      { do: (n, v) => { Object.assign(n.laws, v); calcMods(n); }, txt: v => Object.keys(v).map(k => LAWS[k].n + ': ' + LAWS[k].o[v[k]].n).join('; '),
               ids: v => Object.keys(v).flatMap(k => [['LAWS', k], ['LAWS.' + k + '.o', v[k]]]) },
-  ruler:    { do: (n, v) => { if (v === 'die') { log(titleOf(n) + ' ' + charName(n.ruler) + ' de ' + natName(n) + ' morreu.', n.id === S.player ? 'bad' : 'info', [n.id]); succeed(n, true); } }, txt: v => v === 'die' ? 'O governante morre' : '' },
+  ruler:    { do: (n, v) => { if (v === 'die') { log(titleOf(n) + ' ' + charName(n.ruler) + ' de ' + natName(n) + ' morreu.', isHuman(n.id) ? 'bad' : 'info', [n.id]); succeed(n, true); } }, txt: v => v === 'die' ? 'O governante morre' : '' },
   log:      { do: (n, v) => log(fillTxt(n, v), 'world', [n.id]), txt: () => '' },
   faith:    { do: (n, v) => { n.relig = v === '@reform' ? S.reforms.reformation.to : REL_IDS.indexOf(v); n.fav = 50; n.excom = false; provsOf(n.id).forEach(p => { if (chance(.3)) S.relg[p] = n.relig; }); calcMods(n); }, txt: v => 'A fé oficial vira ' + (v === '@reform' ? (S.reforms && S.reforms.reformation ? RELIGIONS[REL_IDS[S.reforms.reformation.to]].n : 'a fé reformada') : RELIGIONS[v].n), ids: v => v === '@reform' ? [] : [['RELIGIONS', v]] },
   ferv:     { do: (n, v) => { n.ferv = clamp((n.ferv ?? 50) + v, 0, 100); }, txt: v => '🙏 Fervor ' + sgnN(v) },
@@ -116,7 +116,8 @@ const fillTxt = (n, s) => s.replace(/\{lei\}/g, n.enact ? enactName(n.enact) : '
 
 /* ---------- avisos e eventos ---------- */
 /* aviso ao jogador (janela sem escolha); só chega se n for o jogador */
-function notify(id, t, m, extra) { if (id !== S.player) return; (S.evq = S.evq || []).push(Object.assign({ t, m }, extra)); }
+function notify(id, t, m, extra) { if (!isHuman(id)) return; (S.evq = S.evq || []).push(Object.assign({ t, m, to: id }, extra)); }   // to = de qual jogador é o aviso
+const notifyAll = (t, m, extra) => humans().forEach(id => notify(id, t, m, extra));
 
 /* eventos (EVENTS em events.js): uma vez por mês, cada país vivo sorteia no máximo um evento cujas condições valem.
    p = chance por mês; once = só uma vez por país; cd = anos até poder repetir; opts = escolhas (ai = peso para a IA, when = condição da escolha) */
@@ -128,11 +129,11 @@ function evReady(n, ev) {
 }
 function fireEvent(n, ev) {
   (n.evd = n.evd || {})[ev.id] = S.t;
-  if (n.id === S.player) { n.evWait = ev.id; notify(n.id, ev.e + ' ' + ev.t, fillTxt(n, ev.m), { ev: ev.id }); return; }
+  if (isHuman(n.id)) { n.evWait = ev.id; notify(n.id, ev.e + ' ' + ev.t, fillTxt(n, ev.m), { ev: ev.id }); return; }
   const os = evOpts(n, ev), w = os.map(o => o.ai == null ? 1 : o.ai), tot = w.reduce((a, b) => a + b, 0); let x = rnd() * tot, k = 0; while (k < os.length - 1 && (x -= w[k]) >= 0) k++; applyFx(n, os[k].fx);
 }
 function eventsTick(n) {
-  if (n.evWait) { if (n.id === S.player && (S.evq || []).some(e => e.ev === n.evWait)) return; chooseEvent(n, n.evWait, 0); }   // perdido (save antigo, troca de país): primeira escolha
+  if (n.evWait) { if (isHuman(n.id) && (S.evq || []).some(e => e.ev === n.evWait)) return; chooseEvent(n, n.evWait, 0); }   // perdido (save antigo, troca de país): primeira escolha
   if (n.evNext && n.evNext.length) {                          // cadeias: o que foi agendado vem antes do sorteio (some se a condição não valer mais)
     const due = n.evNext.filter(x => x.t <= S.t); n.evNext = n.evNext.filter(x => x.t > S.t);
     for (const x of due) { const ev = EVENT[x.id]; if (ev && condOk(n, ev.when) && evOpts(n, ev).length) { fireEvent(n, ev); return; } }

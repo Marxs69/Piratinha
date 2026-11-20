@@ -100,7 +100,7 @@ function ai(n) {
   }
   // guerra: declarar
   const horde = n.horde && curYear() <= n.horde;              // invasores: atacam sem parar, sem olhar estabilidade nem limite de domínio
-  if ((slow || horde) && (!atWarN || (horde && atWarN < 2)) && n.senior == null && (horde || (!overCap(n) && n.stab > 35 && n.money > 0)) && chance(horde ? .3 : .012 * IDEOS[n.ideo].war * P.war * (GOVS[n.gov].cat === 'Tribal' ? 1.4 : 1))) {
+  if ((slow || horde) && (!atWarN || (horde && atWarN < 2)) && n.senior == null && (horde || (!overCap(n) && n.stab > 35 && n.money > 0 && (n.ae || 0) < PEACE.aeBlock)) && chance(horde ? .3 : .012 * IDEOS[n.ideo].war * P.war * (GOVS[n.gov].cat === 'Tribal' ? 1.4 : 1))) {
     const nb = new Set(); for (const p of provsOf(n.id)) for (const o of WD.provs[p].adj) { const t = S.own[o]; if (t >= 0 && t !== n.id) nb.add(t); }
     if (n.kind === 'cold' || n.fx.col) S.nations.forEach(t => { if (t.alive && t.id !== n.id && provsOf(t.id).some(p => n.exP[p] && WD.provs[p].coast) && chance(.15)) nb.add(t.id); });
     const myP = myR * (1 + n.m.army) * n.up.inf;

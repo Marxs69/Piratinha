@@ -14,7 +14,7 @@ function mkChar(n, o = {}) {
   const st = {}; ['dip', 'mar', 'adm', 'int', 'lea'].forEach(k => st[k] = Math.round(clamp(rand(2, 14) + (o.boost === k ? 5 : 0), 0, 20)));
   const tids = Object.keys(TRAITS), tr = []; while (tr.length < 2 + (chance(.4) ? 1 : 0)) { const t = pickR(tids); if (!tr.includes(t)) tr.push(t); }
   const ld = pickIdeo(n);
-  return leanOf(n, { n: pickR(f ? cul.f : cul.m), dyn: o.dyn || n.dyn, f, born: curYear() - age, st, tr, ld, cul: cl, rel: rl });
+  return leanOf(n, { id: S.id++, n: pickR(f ? cul.f : cul.m), dyn: o.dyn || n.dyn, f, born: curYear() - age, st, tr, ld, cul: cl, rel: rl });   // id: comandos e rede referem pessoas por id
 }
 /* inclinação de cada personagem: uma forma de governo e uma lei — sempre entre as que o país já pode adotar */
 /* ideologia de um personagem novo: as que já surgiram na era (IDEOS.y0), com peso pela fase (em alta até y1, depois perde adeptos devagar, sem sumir);
@@ -56,15 +56,15 @@ function deathChance(c) {                                    // por mês; dispar
 }
 function charMonthly(n) {
   const g = GOVS[n.gov], R = n.ruler, y = curYear();
-  for (const [k, t] of COUNCIL) { const c = n.council[k]; if (c && chance(deathChance(c))) { n.council[k] = councilChar(n, k); apptSet(n, k, true); if (n.id === S.player) log(roleName(n, k) + ' ' + charName(c) + ' morreu aos ' + ageOf(c) + ' anos; um substituto assumiu.', 'info', [n.id]); } }
-  if (n.spouse && chance(deathChance(n.spouse))) { if (n.id === S.player) log('Morreu ' + charName(n.spouse) + ', cônjuge do governante.', 'info', [n.id]); n.spouse = null; }
+  for (const [k, t] of COUNCIL) { const c = n.council[k]; if (c && chance(deathChance(c))) { n.council[k] = councilChar(n, k); apptSet(n, k, true); if (isHuman(n.id)) log(roleName(n, k) + ' ' + charName(c) + ' morreu aos ' + ageOf(c) + ' anos; um substituto assumiu.', 'info', [n.id]); } }
+  if (n.spouse && chance(deathChance(n.spouse))) { if (isHuman(n.id)) log('Morreu ' + charName(n.spouse) + ', cônjuge do governante.', 'info', [n.id]); n.spouse = null; }
   if (g.succ === 'hered' && !n.spouse && ageOf(R) >= 16 && ageOf(R) < 60 && chance(.02)) n.spouse = mkChar(n, { f: !R.f, dyn: newDynasty(n), age: Math.max(16, ageOf(R) - 3) });
   if (n.senior != null && (!n.subj || n.subj.tier === 'union')) { const s = nat(n.senior); if (s.alive && GOVS[s.gov].succ === 'hered') { n.ruler = s.ruler; n.dyn = s.dyn; return; } freeSubject(n, null); succeed(n, false); return; }
   if (g.succ === 'ai') return;
   const age = ageOf(R), pDie = deathChance(R);
-  if (chance(pDie)) { if (g.succ === 'elect') { log(titleOf(n, R) + ' ' + charName(R) + ' de ' + natName(n) + ' morreu; há eleição.', 'none', [n.id]); election(n, true); return; } log(titleOf(n, R) + ' ' + charName(R) + ' de ' + natName(n) + ' morreu aos ' + age + ' anos.', n.id === S.player ? 'bad' : 'info', [n.id]); succeed(n, true); return; }
+  if (chance(pDie)) { if (g.succ === 'elect') { log(titleOf(n, R) + ' ' + charName(R) + ' de ' + natName(n) + ' morreu; há eleição.', 'none', [n.id]); election(n, true); return; } log(titleOf(n, R) + ' ' + charName(R) + ' de ' + natName(n) + ' morreu aos ' + age + ' anos.', isHuman(n.id) ? 'bad' : 'info', [n.id]); succeed(n, true); return; }
   if (g.succ === 'term' || g.succ === 'council') { if (!n.termEnd) n.termEnd = y + (g.term || 4); if (y >= n.termEnd && S.t % 360 === 0) { n.termEnd = y + (g.term || 4); if (g.succ === 'term') election(n); else succeed(n, false); } }
-  if (g.succ === 'hered' && n.spouse && n.kids && S.t % 360 === 0 && age < 50 && ageOf(n.spouse) < 45 && chance(.22 * (docOpt(n.relig, 'marriage').kids || 1))) { const k = mkChar(n, { age: 0 }); n.kids.push(k); if (n.id === S.player) log('Nasceu ' + k.n + ', filho do governante.', 'good', [n.id]); }
+  if (g.succ === 'hered' && n.spouse && n.kids && S.t % 360 === 0 && age < 50 && ageOf(n.spouse) < 45 && chance(.22 * (docOpt(n.relig, 'marriage').kids || 1))) { const k = mkChar(n, { age: 0 }); n.kids.push(k); if (isHuman(n.id)) log('Nasceu ' + k.n + ', filho do governante.', 'good', [n.id]); }
   // golpe
   generalCoups(n); if (!n.alive) return;
   const risk = g.coup * .0012 * (n.stab < 40 ? 1 + (40 - n.stab) / 8 : .35) * Math.max(.1, 1 + (n.m.coup || 0));
@@ -73,8 +73,8 @@ function charMonthly(n) {
 /* num regime autoritário, se o novo governante é de outra cultura ou fé, o país passa a ser a dele (a antiga vira minoria) */
 function rulerIdentity(n) {
   const R = n.ruler; if (!R || !isAuth(n) || (n.subj && n.subj.tier === 'union')) return;
-  if (R.cul != null && R.cul !== n.cul) { const old = n.cul; n.cul = R.cul; (n.cpol = n.cpol || {})[old] = 2; delete n.cpol[R.cul]; log(natName(n) + ' passa a ter ' + CULTURES[R.cul].n + ' como cultura principal, a do novo governante.', n.id === S.player ? 'info' : 'none', [n.id]); }
-  if (R.rel != null && R.rel !== n.relig) { const old = n.relig; n.relig = R.rel; n.fav = 50; n.excom = false; (n.rpol = n.rpol || {})[old] = 2; delete n.rpol[R.rel]; log(natName(n) + ' adota ' + RELIGIONS[REL_IDS[R.rel]].n + ', a fé do novo governante.', n.id === S.player ? 'info' : 'none', [n.id]); }
+  if (R.cul != null && R.cul !== n.cul) { const old = n.cul; n.cul = R.cul; (n.cpol = n.cpol || {})[old] = 2; delete n.cpol[R.cul]; log(natName(n) + ' passa a ter ' + CULTURES[R.cul].n + ' como cultura principal, a do novo governante.', isHuman(n.id) ? 'info' : 'none', [n.id]); }
+  if (R.rel != null && R.rel !== n.relig) { const old = n.relig; n.relig = R.rel; n.fav = 50; n.excom = false; (n.rpol = n.rpol || {})[old] = 2; delete n.rpol[R.rel]; log(natName(n) + ' adota ' + RELIGIONS[REL_IDS[R.rel]].n + ', a fé do novo governante.', isHuman(n.id) ? 'info' : 'none', [n.id]); }
 }
 /* ---------- escolha do novo líder em governos com eleição (popular, interna, vitalícia ou do partido): 4 candidatos ---------- */
 const PICK_SUCC = ['term', 'council', 'elect', 'party'];
@@ -88,21 +88,21 @@ function leaderCands(n, ideo, keepOld) {
 }
 function chooseLeader(n, why, ideo, keepOld) {
   const cands = leaderCands(n, ideo, keepOld);
-  if (n.id === S.player) { S.leadPick = { id: n.id, why, cands }; return; }
+  if (isHuman(n.id)) { S.leadPick = { id: n.id, why, cands }; return; }
   setLeader(n, cands.slice().sort((a, b) => leaderScore(b) - leaderScore(a))[0]);
 }
 function setLeader(n, c) {
   const g = GOVS[n.gov], seat = COUNCIL.find(([k]) => n.council[k] === c), same = c === n.ruler;
   if (seat) { n.council[seat[0]] = councilChar(n, seat[0]); apptSet(n, seat[0], true); }
   n.ruler = c; n.dyn = c.dyn; n.regent = null; n.kids = []; n.spouse = null; n.termEnd = curYear() + (g.term || 4); rulerIdentity(n); calcMods(n);
-  log((same ? 'Reconduzido em ' + natName(n) + ': ' : 'Novo governo em ' + natName(n) + ': ') + titleOf(n).toLowerCase() + ' ' + charName(c) + '.', n.id === S.player ? 'info' : 'none', [n.id]);
+  log((same ? 'Reconduzido em ' + natName(n) + ': ' : 'Novo governo em ' + natName(n) + ': ') + titleOf(n).toLowerCase() + ' ' + charName(c) + '.', isHuman(n.id) ? 'info' : 'none', [n.id]);
 }
 function succeed(n, death) {
   const g = GOVS[n.gov], old = n.ruler;
   if (g.succ === 'hered') {
     if (lawSuccession(n)) { /* lei de sucessão (sim/court.js) */ }
     else if (tryUnion(n)) { calcMods(n); return; }
-    else { n.ruler = mkChar(n, { ruler: true }); n.spouse = mkChar(n, { f: !n.ruler.f, dyn: newDynasty(n), age: ageOf(n.ruler) - 2 }); n.kids = []; n.stab -= 15; log('Crise de sucessão em ' + natName(n) + ': um parente distante assume.', n.id === S.player ? 'bad' : 'info', [n.id]); }
+    else { n.ruler = mkChar(n, { ruler: true }); n.spouse = mkChar(n, { f: !n.ruler.f, dyn: newDynasty(n), age: ageOf(n.ruler) - 2 }); n.kids = []; n.stab -= 15; log('Crise de sucessão em ' + natName(n) + ': um parente distante assume.', isHuman(n.id) ? 'bad' : 'info', [n.id]); }
   } else if (PICK_SUCC.includes(g.succ)) {                   // governos com eleição: 4 candidatos, o jogador escolhe
     n.stab = clamp(n.stab - (g.succ === 'elect' ? 5 : 2), 0, 100); chooseLeader(n, death ? 'morte do governante' : 'fim do mandato', n.ideo, !death); return;
   } else {
@@ -110,7 +110,7 @@ function succeed(n, death) {
     n.stab -= g.succ === 'junta' ? 10 : g.succ === 'elect' ? 5 : 2;
   }
   n.termEnd = curYear() + (g.term || 4); rulerIdentity(n); n.stab = clamp(n.stab, 0, 100);
-  log('Novo governo em ' + natName(n) + ': ' + titleOf(n).toLowerCase() + ' ' + charName(n.ruler) + '.', n.id === S.player ? 'info' : 'none', [n.id]);
+  log('Novo governo em ' + natName(n) + ': ' + titleOf(n).toLowerCase() + ' ' + charName(n.ruler) + '.', isHuman(n.id) ? 'info' : 'none', [n.id]);
   calcMods(n);
 }
 function coup(n, gen) {                                       // golpe militar (gen = o general que o lidera; sem ele, um oficial ambicioso). O novo governo só adota o que o país já pode ter
@@ -125,13 +125,13 @@ function coup(n, gen) {                                       // golpe militar (
   else if (y > 1800 && chance(.4)) { const ii = ['natpop', 'warrior'].filter(i => n.fx.i.has(i)); if (ii.length) n.ideo = pickR(ii); }
   n.dyn = leader.dyn; n.ruler = leader; n.kids = []; n.spouse = null; n.regent = null; rulerIdentity(n); n.stab = Math.max(20, n.stab - 15); n.coupCd = S.t + 360 * 10; n.press = 0; n.enact = null;
   const txt = (gen ? 'O general ' : '') + charName(n.ruler) + ' tomou o poder em ' + natName(n) + (I.n ? ' (' + I.n + ')' : '') + '.';
-  log('Golpe! ' + txt, n.id === S.player ? 'bad' : 'world', [n.id]);
+  log('Golpe! ' + txt, isHuman(n.id) ? 'bad' : 'world', [n.id]);
   notify(n.id, '⚔️ Golpe militar', txt + ' Agora governa como ' + titleOf(n).toLowerCase() + ' (' + GOVS[n.gov].n + ').');
   formCouncil(n); calcMods(n);
 }
 /* generais com ideologia muito diferente da do país (2+ pontos de radicalismo) e exército grande podem tentar o golpe; ambiciosos e com estabilidade baixa, mais */
 function generalCoups(n) {
-  if (n.coupCd > S.t || n.id === S.player && S.t < 360) return; const ax0 = (IDEOS[n.ideo] || {}).ax || 0;
+  if (n.coupCd > S.t || isHuman(n.id) && S.t < 360) return; const ax0 = (IDEOS[n.ideo] || {}).ax || 0;
   for (const a of S.armies) { const c = a.gen; if (a.o !== n.id || !c || regs(a) < 8) continue; const I = IDEOS[c.ld]; if (!I || Math.abs((I.ax || 0) - ax0) < 2) continue;
     const p = .0004 * (n.stab < 40 ? 1 + (40 - n.stab) / 10 : .5) * (c.tr.includes('ambitious') ? 2 : 1) * (c.tr.includes('just') || c.tr.includes('honest') ? .4 : 1) * Math.max(.1, 1 + (n.m.coup || 0));
     if (chance(p)) { coup(n, c); return; } }
@@ -168,7 +168,7 @@ function councilCoup(n, d) {                                   // o conselheiro 
   n.council[slot] = councilChar(n, slot);
   n.dyn = c.dyn; n.ruler = c; n.kids = []; n.spouse = null; n.stab = Math.max(10, n.stab - 12); n.coupCd = S.t + 360 * 10; n.press = 0;
   const txt = 'Golpe do conselho em ' + natName(n) + ': ' + charName(c) + ' tomou o poder' + (done.length ? ' e impôs ' + done.join(', ') : '') + '.';
-  log(txt, n.id === S.player ? 'bad' : 'world', [n.id]); notify(n.id, '🗡️ Golpe do conselho', txt);
+  log(txt, isHuman(n.id) ? 'bad' : 'world', [n.id]); notify(n.id, '🗡️ Golpe do conselho', txt);
   calcMods(n);
 }
 const BASE_GOVS = ['tribal', 'tribal_conf', 'horde', 'feudal', 'elective', 'empire'];
@@ -223,7 +223,7 @@ function swapCouncil(n, k, c) { const w = apptWhy(n, k); if (w) return w; const 
 /* troca de um conselheiro por motivo político (renúncia, novo gabinete, expurgo): o substituto é da ideologia do governo quando o regime exige */
 function replaceCouncil(n, k, why, sameIdeo) {
   const c = n.council[k], nc = councilChar(n, k); if (sameIdeo) nc.ld = n.ideo;
-  n.council[k] = nc; if (n.id === S.player && c) log(roleName(n, k) + ' ' + charName(c) + ' ' + why + '; assume ' + charName(nc) + '.', 'info', [n.id]); calcMods(n);
+  n.council[k] = nc; if (isHuman(n.id) && c) log(roleName(n, k) + ' ' + charName(c) + ' ' + why + '; assume ' + charName(nc) + '.', 'info', [n.id]); calcMods(n);
 }
 const flagCost = () => Math.round(30 * eraScale());
 function setFlag(n, f) { const c = flagCost(); if (n.money < c) return 'Sem dinheiro'; n.money -= c; n.flag = JSON.parse(JSON.stringify(f)); return ''; }
@@ -245,9 +245,9 @@ function startEnact(n, ty, k, v) {
   if (n.enact) return 'Já há uma votação em andamento: ' + enactName(n.enact);
   const c = ty === 'law' ? lawCost() : govCost(); if (n.money < c) return 'Sem dinheiro';
   n.money -= c; n.enact = { ty, k, v, prog: 0, ph: 0, t0: S.t };
-  if (n.id === S.player) log('Proposta em votação: ' + enactName(n.enact) + '.', 'info', [n.id]); return '';
+  if (isHuman(n.id)) log('Proposta em votação: ' + enactName(n.enact) + '.', 'info', [n.id]); return '';
 }
-function cancelEnact(n) { if (!n.enact) return 'Nada em votação'; if (n.id === S.player) log('Proposta retirada: ' + enactName(n.enact) + '.', 'info', [n.id]); n.enact = null; return ''; }
+function cancelEnact(n) { if (!n.enact) return 'Nada em votação'; if (isHuman(n.id)) log('Proposta retirada: ' + enactName(n.enact) + '.', 'info', [n.id]); n.enact = null; return ''; }
 /* posição de um personagem sobre a proposta (−1 a +1,5) e por quê */
 function enactStance(n, c, E, isRuler) {
   let v = 0; const why = [], I = IDEOS[c.ld] || {}, nm = I.n ? I.n.toLowerCase() : '';
@@ -272,27 +272,27 @@ function enactSupport(n, E) {
 const enactRate = (n, E) => { const D = ENACT[E.ty], s = enactSupport(n, E); return D.base * Math.max(.15, 1 + ENACT.k * s.tot + s.push) * (enactCatChange(n, E) ? D.cat : 1); };
 function enactTick(n) {
   const E = n.enact; if (!E) return;
-  if (E.ty === 'law' ? !lawOk(n, E.k, E.v) || n.laws[E.k] === E.v : n.gov === E.v || !govEdgeOk(n, E.v)) { if (n.id === S.player) log('A proposta ' + enactName(E) + ' perdeu o sentido e foi arquivada.', 'info', [n.id]); n.enact = null; return; }
+  if (E.ty === 'law' ? !lawOk(n, E.k, E.v) || n.laws[E.k] === E.v : n.gov === E.v || !govEdgeOk(n, E.v)) { if (isHuman(n.id)) log('A proposta ' + enactName(E) + ' perdeu o sentido e foi arquivada.', 'info', [n.id]); n.enact = null; return; }
   const s = enactSupport(n, E), P = enactPhases(n);
   E.prog += enactRate(n, E);
   if (E.prog >= (E.ph + 1) * 100) {
     if (E.ph === 2) {
-      if (s.tot <= ENACT.fail && chance(.35)) { n.enact = null; n.stab = Math.max(0, n.stab - 2); if (n.id === S.player) log('A proposta ' + enactName(E) + ' foi derrotada na ' + P[2].toLowerCase() + '.', 'bad', [n.id]); return; }
+      if (s.tot <= ENACT.fail && chance(.35)) { n.enact = null; n.stab = Math.max(0, n.stab - 2); if (isHuman(n.id)) log('A proposta ' + enactName(E) + ' foi derrotada na ' + P[2].toLowerCase() + '.', 'bad', [n.id]); return; }
       enactDone(n, E); return;
     }
-    if (chance(clamp(ENACT.stall - s.tot * .05, 0, .6))) { E.prog = (E.ph + 1) * 100 - ENACT.back; if (n.id === S.player) log('A proposta ' + enactName(E) + ' emperrou: ' + P[E.ph].toLowerCase() + ' pediu mais debate.', 'info', [n.id]); }
-    else { E.ph++; if (n.id === S.player) log(enactName(E) + ': passou para ' + P[E.ph].toLowerCase() + '.', 'info', [n.id]); }
+    if (chance(clamp(ENACT.stall - s.tot * .05, 0, .6))) { E.prog = (E.ph + 1) * 100 - ENACT.back; if (isHuman(n.id)) log('A proposta ' + enactName(E) + ' emperrou: ' + P[E.ph].toLowerCase() + ' pediu mais debate.', 'info', [n.id]); }
+    else { E.ph++; if (isHuman(n.id)) log(enactName(E) + ': passou para ' + P[E.ph].toLowerCase() + '.', 'info', [n.id]); }
   }
 }
 function enactDone(n, E) {
   n.enact = null;
   if (E.ty === 'law') { n.laws[E.k] = E.v; (n.lawCd = n.lawCd || {})[E.k] = S.t + 360 * 2; n.stab = clamp(n.stab + ENACT.law.stab, 0, 100); calcMods(n);
-    log((n.id === S.player ? 'Lei aprovada: ' : 'Lei aprovada em ' + natName(n) + ': ') + enactName(E) + '.', n.id === S.player ? 'good' : 'none', [n.id]); return; }
+    log((isHuman(n.id) ? 'Lei aprovada: ' : 'Lei aprovada em ' + natName(n) + ': ') + enactName(E) + '.', isHuman(n.id) ? 'good' : 'none', [n.id]); return; }
   const oc = GOVS[n.gov].cat, nc = GOVS[E.v].cat, wasHered = GOVS[n.gov].succ === 'hered';
   n.stab = clamp(n.stab + (oc !== nc ? ENACT.gov.catStab : ENACT.gov.stab), 0, 100); applyGov(n, E.v);
-  log('Reforma aprovada em ' + natName(n) + ': agora é ' + GOVS[E.v].n.toLowerCase() + '.', n.id === S.player ? 'good' : 'world', [n.id]);
+  log('Reforma aprovada em ' + natName(n) + ': agora é ' + GOVS[E.v].n.toLowerCase() + '.', isHuman(n.id) ? 'good' : 'world', [n.id]);
   const tr = oc !== nc && GOV_TR.find(x => x.from.includes(oc) && x.to.includes(nc)), ev = tr && EVENT[tr.ev];
-  if (ev && evOpts(n, ev).length) { if (n.id === S.player && n.evWait) (n.evNext = n.evNext || []).push({ id: ev.id, t: S.t }); else fireEvent(n, ev); return; }   // o evento de transição decide quem governa
+  if (ev && evOpts(n, ev).length) { if (isHuman(n.id) && n.evWait) (n.evNext = n.evNext || []).push({ id: ev.id, t: S.t }); else fireEvent(n, ev); return; }   // o evento de transição decide quem governa
   if (wasHered && GOVS[E.v].succ !== 'hered') succeed(n, false); else if (!wasHered && GOVS[E.v].succ === 'hered') n.dyn = n.ruler.dyn;
 }
 /* novo governante depois de uma reforma (efeito 'leader' dos eventos de transição) */
@@ -305,7 +305,7 @@ function newLeader(n, how) {
   } else { n.dyn = newDynasty(n); n.ruler = mkChar(n, { ruler: true, age: how === 'clergy' ? 50 + (rnd() * 20 | 0) : undefined, boost: how === 'clergy' ? 'lea' : null, rel: how === 'clergy' ? n.relig : undefined }); }
   n.regent = null; n.kids = []; n.spouse = GOVS[n.gov].succ === 'hered' ? mkChar(n, { f: !n.ruler.f, dyn: newDynasty(n), age: Math.max(16, ageOf(n.ruler) - 3) }) : null;
   n.termEnd = curYear() + (GOVS[n.gov].term || 4); rulerIdentity(n); calcMods(n);
-  log('Novo governo em ' + natName(n) + ': ' + titleOf(n).toLowerCase() + ' ' + charName(n.ruler) + '.', n.id === S.player ? 'info' : 'none', [n.id]);
+  log('Novo governo em ' + natName(n) + ': ' + titleOf(n).toLowerCase() + ' ' + charName(n.ruler) + '.', isHuman(n.id) ? 'info' : 'none', [n.id]);
 }
 /* golpe que encerra uma transição: o país cai num dos governos de COUP_GOVS do novo tipo */
 function govCoupTo(n) { const L = (COUP_GOVS[GOVS[n.gov].cat] || COUP_GOVS.Monarquia).filter(g => g !== n.gov && GOVS[g] && govOk(n, g)); if (L.length) applyGov(n, L[0]); }
@@ -340,7 +340,7 @@ function election(n, death) {                                  // o partido mais
   const pctv = Math.round((sup[win] || 0) * 100), changed = win !== n.ideo;
   if (changed) { n.ideo = win; COUNCIL.forEach(([k]) => { const c = n.council[k]; if (c && c.ld !== win && chance(.6)) replaceCouncil(n, k, 'deixou o gabinete após a eleição', true); }); calcMods(n); }   // novo governo, novo gabinete
   const txt = 'Eleições em ' + natName(n) + ': ' + (changed ? 'o partido ' + IDEOS[win].n + ' venceu' : 'o governo (' + IDEOS[win].n + ') foi reeleito') + ' com ' + pctv + '%.';
-  log(txt, n.id === S.player ? (changed ? 'bad' : 'good') : 'none', [n.id]);
+  log(txt, isHuman(n.id) ? (changed ? 'bad' : 'good') : 'none', [n.id]);
   chooseLeader(n, txt, win, !changed && !death);
   return changed;
 }

@@ -311,3 +311,5 @@ h4.bgrp { font: 700 11px var(--title); color: var(--dim); letter-spacing: 1px; m
 .tabs .tab-div { flex: 1; } .tabs .tab-right { border-left: 2px solid var(--line); margin-left: 8px; }
 .milcols { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); } table.t.compact td, table.t.compact th { padding: 4px 6px; } table.t.compact td small { display: block; font-size: 10px; }
 table.t select { margin: 0; max-width: 150px; } .docrow { display: flex; flex-direction: column; gap: 2px; padding: 6px 0; border-top: 1px solid rgba(90,74,50,.35); } .docrow:first-of-type { border-top: 0; }
+
+.netb { font-size: 12px; padding: 2px 8px; border: 1px solid var(--line); border-radius: 10px; margin-right: 6px; }

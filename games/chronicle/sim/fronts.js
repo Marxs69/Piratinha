@@ -61,9 +61,9 @@ const sieging = a => !a.path.length && S.sieges[a.p] && S.sieges[a.p].o === a.o;
 /* cautela da IA: quem marcha para uma província (ou passa por uma) onde o inimigo ficou mais forte que o grupo que está chegando, para */
 function aiCaution() {
   const head = new Map();                                     // força a caminho de cada destino, por país
-  for (const a of S.armies) if (a.o !== S.player && a.path.length && !a.retreat && !a.exp && a.p < WD.provs.length) { const k = a.o + ':' + a.path[a.path.length - 1]; head.set(k, (head.get(k) || 0) + armyPower(a)); }
+  for (const a of S.armies) if (!isHuman(a.o) && a.path.length && !a.retreat && !a.exp && a.p < WD.provs.length) { const k = a.o + ':' + a.path[a.path.length - 1]; head.set(k, (head.get(k) || 0) + armyPower(a)); }
   for (const a of S.armies) {
-    if (a.o === S.player || !a.path.length || a.retreat || a.exp || a.inv || a.p >= WD.provs.length) continue;
+    if (isHuman(a.o) || !a.path.length || a.retreat || a.exp || a.inv || a.p >= WD.provs.length) continue;
     const ep = enemyPower(a.o), dst = a.path[a.path.length - 1], nx = a.path[0], mine = armyPower(a), grp = head.get(a.o + ':' + dst) || mine;
     if ((ep.get(dst) || 0) > grp * .9 || (nx !== dst && (ep.get(nx) || 0) > mine * .9)) { a.path = []; a.need = 0; a.prog = 0; }
   }

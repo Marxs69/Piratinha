@@ -40,11 +40,11 @@ function frontBattleTick() {
     if (!B) {
       if (!att.length || (S.fcd[f.id] || 0) > S.t || !att.some(a => wantsAttack(a, f))) continue;
       const ep = enemyPower(att[0].o), pa = att.reduce((s, a) => s + armyPower(a), 0), pd = defs.reduce((s, a) => s + armyPower(a), 0);
-      if (att.every(a => a.o !== S.player) && pd && pa < pd * FB.aiEdge) continue;   // a IA só ataca com vantagem
+      if (att.every(a => !isHuman(a.o)) && pd && pa < pd * FB.aiEdge) continue;   // a IA só ataca com vantagem
       const q = f.foe.slice().sort((x, y) => ((ep.get(x) || 0) + fortOf(x) * 3) - ((ep.get(y) || 0) + fortOf(y) * 3))[0]; if (q == null) continue;
       B = S.fbat[f.id] = { f: f.id, w: f.w, side: f.side, q, t0: S.t, prog: 0, ev: [], a: att[0].o, d: defs.length ? defs[0].o : S.ctrl[q] };
       fbLog(B, 'Ataque a ' + WD.provs[q].n + ' (' + Math.round(pa) + ' × ' + Math.round(pd) + ')');
-      if (att.concat(defs).some(a => a.o === S.player)) log('Batalha de front em ' + WD.provs[q].n + '.', 'info', [S.player]);
+      if (att.concat(defs).some(a => isHuman(a.o))) log('Batalha de front em ' + WD.provs[q].n + '.', 'info', [S.player]);
     }
     if (!att.length || !f.foe.includes(B.q)) { endFront(B, f, null, 'A ofensiva parou'); continue; }
     if (!defs.length) {                                         // sem defensores: a ocupação avança

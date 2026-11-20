@@ -154,7 +154,7 @@ function econNation(n, acc) {
     n.money += n.income; n.gdp = gdp;
     if (n.money < -Math.max(400, gdp * 2)) {                   // falência: dívida perdoada, estabilidade despenca, metade do exército debanda
       n.money = 0; n.stab = Math.max(0, n.stab - 30); S.armies.forEach(a => { if (a.o === n.id) { a.inf /= 2; a.cav /= 2; a.art /= 2; a.vrt /= 2; } });
-      log(natName(n) + ' declarou falência!', n.id === S.player ? 'bad' : 'world', [n.id]);
+      log(natName(n) + ' declarou falência!', isHuman(n.id) ? 'bad' : 'world', [n.id]);
     } n.popT = popT; n.employed = employedT;
   }
 }
@@ -203,7 +203,7 @@ function prospectDone(n, s) {
   const can = HIDDEN.filter(r => hasT(n, GOODS[r].pros)), st = WD.states[s], found = [];
   st.provs.forEach(p => { const r = provRes(p); if (can.includes(r) && !S.found[p]) { S.found[p] = 1; found.push(GOODS[r].n + ' em ' + WD.provs[p].n); } });
   if (chance(.35)) { const free = st.provs.filter(p => !provRes(p)); if (free.length) { const p = pickR(free), t = WD.provs[p].terr, r = pickR(can.filter(x => !GOODS[x].terr || GOODS[x].terr.includes(t))); if (r) { S.newRes[p] = r; S.found[p] = 1; found.push('nova jazida de ' + GOODS[r].n + ' em ' + WD.provs[p].n); } } }
-  if (n.id === S.player) log('Prospecção em ' + st.n + ': ' + (found.length ? found.join(', ') : 'nada encontrado') + '.', found.length ? 'good' : 'info', [n.id]);
+  if (isHuman(n.id)) log('Prospecção em ' + st.n + ': ' + (found.length ? found.join(', ') : 'nada encontrado') + '.', found.length ? 'good' : 'info', [n.id]);
   if (found.length) S.mapDirty = true;
 }
 function canBuild(n, s, b) {
@@ -237,7 +237,7 @@ function rankUp(n) {                                          // proclama o pró
   if (r === 4 && contShare(n) < RANK_EMP) return 'Exige controlar 2/3 de ' + WD.conts[homeCont(n)].n + ' (tem ' + Math.round(contShare(n) * 100) + '%)';
   const c = rankCost(n); if (n.money < c) return 'Sem dinheiro';
   n.money -= c; n.rank = r; n.stab = Math.max(0, n.stab - 5);
-  log(n.name + ' agora é ' + natName(n) + ' (' + RANK_N[r] + ').', n.id === S.player ? 'good' : 'world', [n.id]); S.mapDirty = true; return '';
+  log(n.name + ' agora é ' + natName(n) + ' (' + RANK_N[r] + ').', isHuman(n.id) ? 'good' : 'world', [n.id]); S.mapDirty = true; return '';
 }
 const rankCost = n => Math.round(150 * ((n.rank || 0) + 1) * eraScale());
 function freeLabor(n, s) {                                    // mil trabalhadores ainda sem emprego no estado (contando obras em andamento)
@@ -251,7 +251,7 @@ function setCapital(n, p) {
   if (S.own[p] !== n.id || S.ctrl[p] !== n.id) return 'Só numa província sua e controlada'; if (p === n.capital) return 'Já é a capital';
   if (S.ctrl[n.capital] !== n.id) return 'A capital atual está ocupada'; if (n.capCd > S.t) return 'Só a cada 10 anos (até ' + yearOf(n.capCd) + ')';
   if (n.money < capCost()) return 'Sem dinheiro'; n.money -= capCost(); n.capital = p; n.capCd = S.t + 360 * 10; n.stab = Math.max(0, n.stab - 5); S.mapDirty = true;
-  log('A capital de ' + natName(n) + ' agora é ' + WD.provs[p].n + '.', n.id === S.player ? 'good' : 'none', [n.id]); return '';
+  log('A capital de ' + natName(n) + ' agora é ' + WD.provs[p].n + '.', isHuman(n.id) ? 'good' : 'none', [n.id]); return '';
 }
 const slotsRaw = n => n.fx.slots + Math.floor((n.popT || 0) / 1000) + Math.floor(Math.max(0, n.money) / (2500 * eraScale())) + (n.xslots || 0);
 const slotCap = n => RANK_SLOTS[n.rank || 0] + (n.xslots || 0);   // o título limita os canteiros (comprados somam ao teto)
@@ -284,9 +284,12 @@ function buildShips(n, k, p) {
 const GEN_TR = { brave: .05, strategist: .1, craven: -.06, cruel: .03, genius: .03, ambitious: .02, paranoid: -.02, lazy: -.04, diligent: .03 };
 const genMul = c => c ? Math.max(.7, 1 + (c.st.mar - 6) * .015 + c.tr.reduce((a, t) => a + (GEN_TR[t] || 0), 0) + ((IDEOS[c.ld] || {}).gen || 0)) : 1;   // ideologia do general: IDEOS.gen
 const genCost = () => Math.round(20 * eraScale());
-function genCands(n) { return [0, 1, 2].map(() => mkChar(n, { boost: 'mar', dyn: newDynasty(n), age: 24 + (rnd() * 30 | 0) })); }
+function genCands(n) {                                         // candidatos a general: a lista fica a mesma por 5 anos (comandos referem por id)
+  const G = n.gcands; if (G && G.t > S.t && G.list.length) return G.list;
+  const list = [0, 1, 2].map(() => mkChar(n, { boost: 'mar', dyn: newDynasty(n), age: 24 + (rnd() * 30 | 0) })); n.gcands = { t: S.t + 360 * 5, list }; return list;
+}
 const genWhy = a => a.genCd > S.t ? 'Nomeação recente: de novo em ' + dateStr(a.genCd) : '';
-function setGeneral(n, a, c) { if (!a || a.o !== n.id) return 'Inválido'; const w = genWhy(a); if (w) return w; const k = genCost(); if (n.money < k) return 'Sem dinheiro'; n.money -= k; a.gen = c; a.genCd = S.t + APPOINT_CD * 30; if (a.g != null) groupOf(a).forEach(x => x.genCd = a.genCd); if (a.g != null) groupOf(a).forEach(x => x.gen = c); return ''; }
+function setGeneral(n, a, c) { if (!a || a.o !== n.id) return 'Inválido'; const w = genWhy(a); if (w) return w; const k = genCost(); if (n.money < k) return 'Sem dinheiro'; n.money -= k; a.gen = c; a.genCd = S.t + APPOINT_CD * 30; if (n.gcands) n.gcands.list = n.gcands.list.filter(x => x !== c); if (a.g != null) groupOf(a).forEach(x => x.genCd = a.genCd); if (a.g != null) groupOf(a).forEach(x => x.gen = c); return ''; }
 /* exploradores: tropa barata (só infantaria, até 5 regimentos) anda sozinha até a terra incógnita mais próxima */
 const expWhy = a => a.cav > .05 || a.art > .05 || a.vrt > .05 ? 'Só infantaria (tropa barata) explora' : regs(a) > 5.05 ? 'Grande demais: até 5 regimentos' : a.p >= WD.provs.length ? 'Precisa estar em terra' : '';
 function exploreStep(a) {
@@ -300,10 +303,10 @@ function exploreStep(a) {
       q.push(o);
     }
   }
-  a.exp = false; if (a.o === S.player) log('Seus exploradores não acham mais terra incógnita ao alcance a pé.', 'info', [a.o]);
+  a.exp = false; if (isHuman(a.o)) log('Seus exploradores não acham mais terra incógnita ao alcance a pé.', 'info', [a.o]);
   else { n.manpower += regs(a); a.inf = a.cav = a.art = a.vrt = 0; }   // IA: a expedição volta para casa e debanda
 }
-function addArmy(o, p, u, xp = .1) { const a = { id: S.id++, o, p, inf: u.inf || 0, cav: u.cav || 0, art: u.art || 0, vrt: u.vrt || 0, mor: 1, xp, fat: 0, st: 'bal', sup: {}, path: [], prog: 0, need: 0, arr: S.t }; if (o === S.player) a.g = a.id; S.armies.push(a); return a; }
+function addArmy(o, p, u, xp = .1) { const a = { id: S.id++, o, p, inf: u.inf || 0, cav: u.cav || 0, art: u.art || 0, vrt: u.vrt || 0, mor: 1, xp, fat: 0, st: 'bal', sup: {}, path: [], prog: 0, need: 0, arr: S.t }; if (isHuman(o)) a.g = a.id; S.armies.push(a); return a; }
 function addFleet(o, z, ships) { const f = { id: S.id++, o, z, ships, path: [], prog: 0, need: 0, auto: false }; S.fleets.push(f); return f; }
 
 /* ---------- pesquisa ---------- */
@@ -335,13 +338,13 @@ function techState(n, t) {                                  // '' = pode pesquis
    Quem já tem uma vertente recusa as outras automaticamente. A escolha é para sempre. */
 function vertOffer(n, v) {
   if (n.vert || !vertNeedOk(n, v)) { vertDecide(n, v, false); return; }
-  if (n.id === S.player) { n.vpend = v; return; }
+  if (isHuman(n.id)) { n.vpend = v; return; }
   vertDecide(n, v, v === n.vpref || (!n.vpref && chance(.15)));
 }
 function vertDecide(n, v, keep) {
   n.vpend = null; const V = VERT[v];
-  if (keep && !n.vert) { n.vert = v; V.rep.forEach(id => { if (n.techs[id]) n.techs['vr_' + v + '_' + id] = 1; }); if (n.res && TECH[n.res] && V.rep.has(n.res)) n.res = null; log(natName(n) + ' abraçou a vertente ' + V.n + '.', n.id === S.player ? 'good' : 'world', [n.id]); }
-  else { (n.vdec = n.vdec || {})[v] = 1; if (n.id === S.player) log('Você seguiu pela via comum e ficou com parte das vantagens de ' + V.n + '.', 'info', [n.id]); }
+  if (keep && !n.vert) { n.vert = v; V.rep.forEach(id => { if (n.techs[id]) n.techs['vr_' + v + '_' + id] = 1; }); if (n.res && TECH[n.res] && V.rep.has(n.res)) n.res = null; log(natName(n) + ' abraçou a vertente ' + V.n + '.', isHuman(n.id) ? 'good' : 'world', [n.id]); }
+  else { (n.vdec = n.vdec || {})[v] = 1; if (isHuman(n.id)) log('Você seguiu pela via comum e ficou com parte das vantagens de ' + V.n + '.', 'info', [n.id]); }
   calcMods(n);
 }
 /* escolher uma vertente depois: país sem vertente cujo ponto inicial já passou (recusado antes, ou começo numa era posterior).
@@ -363,7 +366,7 @@ function finishTech(n, t) {
   n.techs[t.id] = 1;
   if (t.entry) vertOffer(n, t.v);
   calcMods(n);
-  if (n.id === S.player) log('Pesquisa concluída: ' + t.n + '.', 'good', [n.id]);
+  if (isHuman(n.id)) log('Pesquisa concluída: ' + t.n + '.', 'good', [n.id]);
 }
 
 /* ---------- colonização ---------- */

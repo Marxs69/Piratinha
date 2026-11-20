@@ -5,7 +5,7 @@
 function hsl(h, s, l) { const a = s * Math.min(l, 1 - l), f = k => { const x = (k + h * 12) % 12; return Math.round(255 * (l - a * Math.max(-1, Math.min(x - 3, 9 - x, 1)))); }; return [f(0), f(8), f(4)]; }
 
 function newGame(seed, y0 = START_YEAR) {
-  WD = generateWorld(seed); resetCaches();
+  WD = generateWorld(seed); WD.seed = seed; resetCaches();
   const P = WD.provs.length, r = mkRng(seed ^ 0x5eed);
   S = { v: 3, faith: rollFaiths(seed), culx: rollCultures(seed), rs: (seed ^ 0x2545F491) | 0, moon: null, seed, y0, t: 360 * (y0 - START_YEAR), player: -1, nations: [], own: new Int16Array(P).fill(-1), ctrl: new Int16Array(P).fill(-1), pop: new Float32Array(P), bld: WD.states.map(() => ({})),
         armies: [], fleets: [], wars: [], cols: [], sieges: {}, battles: {}, log: [], news: [], id: 1, wp: {}, over: false };

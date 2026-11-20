@@ -46,7 +46,7 @@ function faithAct(n, k, t) {
   if (k === 'donate') { const c = donateCost(); if (n.money < c) return 'Sem dinheiro'; n.money -= c; n.fav = Math.min(100, n.fav + 10); return ''; }
   if (k === 'invest') { if (n.fav < FERV.invest) return 'Favor insuficiente (' + FERV.invest + ')'; if (n.investCd > S.t) return 'Investidura recente'; n.fav -= FERV.invest; n.investCd = S.t + 360 * 10; applyFx(n, { mod: { l: 'Investidura do ' + h[1].toLowerCase(), m: { stab: .05 }, mo: 120 } }); n.pres = Math.min(100, (n.pres ?? 50) + 5); return ''; }
   if (k === 'crusade') { if (n.fav < FERV.crusade) return 'Favor insuficiente (' + FERV.crusade + ')'; const e = holyWhy(n, t); if (e) return e; const de = declareWar(n, t, null, 'holy'); if (de) return de; n.fav -= FERV.crusade;
-    const w = S.wars.find(x => sideOf(x, n.id) && sideOf(x, t.id)); if (w) S.nations.forEach(o => { if (o.alive && o.id !== n.id && o.relig === n.relig && (o.fav ?? 50) >= 50 && !sideOf(w, o.id) && !(o.truce[t.id] > S.t) && (o.rel[n.id] || 0) >= 0 && o.id !== S.player && chance(.5)) joinWar(w, o.id, 'A'); });
+    const w = S.wars.find(x => sideOf(x, n.id) && sideOf(x, t.id)); if (w) S.nations.forEach(o => { if (o.alive && o.id !== n.id && o.relig === n.relig && (o.fav ?? 50) >= 50 && !sideOf(w, o.id) && !(o.truce[t.id] > S.t) && (o.rel[n.id] || 0) >= 0 && !isHuman(o.id) && chance(.5)) joinWar(w, o.id, 'A'); });
     log(holyName(n.relig) + ' convocada por ' + natName(n) + ' contra ' + natName(t) + '!', 'world', [n.id, t.id]); return ''; }
   return 'Inválido';
 }
@@ -67,8 +67,8 @@ function faithTick() {
     if (!headOf(n.relig)) { n.excom = false; continue; }
     n.fav = clamp(n.fav + (n.fav < 50 ? .1 : -.05), 0, 100);   // o favor volta devagar ao meio
     if (!n.excom && n.fav < FERV.excom && chance(.05)) { n.excom = true; S.nations.forEach(o => { if (o.alive && o.relig === n.relig && o.id !== n.id) o.rel[n.id] = (o.rel[n.id] || 0) - 30; });
-      log(headOf(n.relig)[1] + ' excomungou ' + natName(n) + '.', n.id === S.player ? 'bad' : 'world', [n.id]); notify(n.id, '⛔ Excomunhão', 'O ' + headOf(n.relig)[1].toLowerCase() + ' excomungou ' + natName(n) + '. Estabilidade −10% até recuperar o favor (' + FERV.lift + ').'); calcMods(n); }
-    else if (n.excom && n.fav >= FERV.lift) { n.excom = false; log('A excomunhão de ' + natName(n) + ' foi suspensa.', n.id === S.player ? 'good' : 'none', [n.id]); calcMods(n); }
+      log(headOf(n.relig)[1] + ' excomungou ' + natName(n) + '.', isHuman(n.id) ? 'bad' : 'world', [n.id]); notify(n.id, '⛔ Excomunhão', 'O ' + headOf(n.relig)[1].toLowerCase() + ' excomungou ' + natName(n) + '. Estabilidade −10% até recuperar o favor (' + FERV.lift + ').'); calcMods(n); }
+    else if (n.excom && n.fav >= FERV.lift) { n.excom = false; log('A excomunhão de ' + natName(n) + ' foi suspensa.', isHuman(n.id) ? 'good' : 'none', [n.id]); calcMods(n); }
   }
   if (S.t % 360 === 0) reformTick(y);
 }

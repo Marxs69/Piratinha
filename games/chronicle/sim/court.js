@@ -70,15 +70,15 @@ function courtTick(n) {
     c.op = clamp((c.op ?? 0) + clamp(opTarget(n, c) - (c.op ?? 0), -3, 3), -100, 100);
   }
   // o chefe da espionagem descobre segredos da própria corte
-  const sp = n.council.spymaster; if (sp) for (const c of courtOf(n)) if (c.sec && !c.secK && chance(sp.st.int / 600)) { c.secK = 1; if (n.id === S.player) log(roleName(n, 'spymaster') + ': descobrimos um segredo de ' + charName(c) + ' (' + SECRETS[c.sec].n.toLowerCase() + ').', 'info', [n.id]); }
+  const sp = n.council.spymaster; if (sp) for (const c of courtOf(n)) if (c.sec && !c.secK && chance(sp.st.int / 600)) { c.secK = 1; if (isHuman(n.id)) log(roleName(n, 'spymaster') + ': descobrimos um segredo de ' + charName(c) + ' (' + SECRETS[c.sec].n.toLowerCase() + ').', 'info', [n.id]); }
   // educação: dos 6 aos 16 anos com um tutor; aos 16 aprende
   for (const k of n.kids || []) { const a = ageOf(k);
     if (a >= 6 && !k.tut) k.tut = COUNCIL.map(([s, , st]) => [s, (n.council[s] ? n.council[s].st[st] : 0)]).sort((x, y) => y[1] - x[1])[0][0];
     if (a >= 16 && k.tut && !k.edu) { k.edu = 1; const st = COUNCIL.find(c => c[0] === k.tut)[2]; k.st[st] = Math.min(20, k.st[st] + 3);
       if (chance(.6)) { const t = pickR(TUTOR_TR[k.tut].filter(t => !k.tr.includes(t))); if (t) { const o = TRAIT_OPP.find(p => p.includes(t)); k.tr = k.tr.filter(x => !(o && o.includes(x))); k.tr.push(t); } }
-      if (n.id === S.player) log(charName(k) + ' terminou a educação com ' + roleName(n, k.tut).toLowerCase() + ' ' + charName(n.council[k.tut] || k) + '.', 'good', [n.id]); } }
+      if (isHuman(n.id)) log(charName(k) + ' terminou a educação com ' + roleName(n, k.tut).toLowerCase() + ' ' + charName(n.council[k.tut] || k) + '.', 'good', [n.id]); } }
   // regência
-  if (n.regent && ageOf(n.ruler) >= 16) { n.regent = null; addPres(n, 5); if (n.id === S.player) log(charName(n.ruler) + ' atingiu a maioridade e governa sozinho.', 'good', [n.id]); calcMods(n); }
+  if (n.regent && ageOf(n.ruler) >= 16) { n.regent = null; addPres(n, 5); if (isHuman(n.id)) log(charName(n.ruler) + ' atingiu a maioridade e governa sozinho.', 'good', [n.id]); calcMods(n); }
   n._dem = null; councilPolitics(n); schemeTick(n); plotTick(n);
   if (S.t % 360 === (n.id * 12) % 360) for (const c of [n.ruler, ...courtOf(n)]) { ideoDrift(n, c); if (c) leanOf(n, c); }   // uma vez por ano: ideologias mudam aos poucos e as vontades se refazem
 }
@@ -116,7 +116,7 @@ function interactWhy(n, c, k) {
 }
 const interactChance = (n, c, k) => { const d = INTERACT[k], x = (plotPower(n, c) - plotDefense(n, c)) * .02; return k === 'coopt' ? clamp(d.base + x + (c.secK ? d.dirt : 0) + (c.op ?? 0) / 300, .05, .97) : k === 'slander' ? clamp(d.base + x, .1, .92) : 1; };
 function interact(n, c, k) {
-  const e = interactWhy(n, c, k); if (e) return e; const d = INTERACT[k], me = n.id === S.player;
+  const e = interactWhy(n, c, k); if (e) return e; const d = INTERACT[k], me = isHuman(n.id);
   n.money -= interactCost(n, c, k); if (d.pres) addPres(n, -d.pres); c.id = c.id ?? S.id++; (c.icd = c.icd || {})[k] = S.t + (d.cd || 12) * 30;
   if (d.op) { c.op = clamp((c.op ?? 0) + d.op, -100, 100); return ''; }
   if (k === 'coopt') { if (chance(interactChance(n, c, k))) { c.coopt = S.t + d.mo * 30; c.op = clamp((c.op ?? 0) + 10, -100, 100); if (c.secK === 1) c.secK = 2; if (me) log(charName(c) + ' foi cooptado: vai apoiar o governo.', 'good', [n.id]); }
@@ -131,15 +131,15 @@ function interact(n, c, k) {
 function removeCourt(n, c) { const k = seatOfC(n, c); if (k) { n.council[k] = councilChar(n, k); apptSet(n, k, true); } else if (n.spouse === c) n.spouse = null; else if (n.kids) n.kids = n.kids.filter(x => x !== c); calcMods(n); }
 function plotTick(n) {
   for (const c of courtOf(n)) if (c.inv && c.inv <= S.t) { c.inv = null;   // investigação terminou
-    if (chance(clamp(.35 + (plotPower(n, c) - plotDefense(n, c)) * .03, .1, .95))) { c.sec = c.sec || pickR(SEC_IDS); c.secK = 1; if (n.id === S.player) log('A investigação achou os podres de ' + charName(c) + ': ' + SECRETS[c.sec].n.toLowerCase() + '.', 'good', [n.id]); }
-    else if (n.id === S.player) log('A investigação sobre ' + charName(c) + ' não achou nada.', 'info', [n.id]); }
+    if (chance(clamp(.35 + (plotPower(n, c) - plotDefense(n, c)) * .03, .1, .95))) { c.sec = c.sec || pickR(SEC_IDS); c.secK = 1; if (isHuman(n.id)) log('A investigação achou os podres de ' + charName(c) + ': ' + SECRETS[c.sec].n.toLowerCase() + '.', 'good', [n.id]); }
+    else if (isHuman(n.id)) log('A investigação sobre ' + charName(c) + ' não achou nada.', 'info', [n.id]); }
   const P = n.plot; if (!P) return; const t = courtFind(n, P.cid); if (!t) { n.plot = null; return; }
   P.ok = Math.min(100, P.ok + PLOT.ok + plotPower(n, t) * PLOT.ok_k + rnd() * PLOT.rnd); P.bad = Math.min(100, P.bad + PLOT.bad + plotDefense(n, t) * PLOT.bad_k + rnd() * PLOT.rnd);
-  if (P.ok >= 100 && P.ok - P.bad >= 0) { n.plot = null; if (n.id === S.player) log(charName(t) + ' morreu de repente. Ninguém sabe dizer do quê.', 'good', [n.id]); removeCourt(n, t); return; }
+  if (P.ok >= 100 && P.ok - P.bad >= 0) { n.plot = null; if (isHuman(n.id)) log(charName(t) + ' morreu de repente. Ninguém sabe dizer do quê.', 'good', [n.id]); removeCourt(n, t); return; }
   if (P.bad >= 100) { n.plot = null; const disc = chance(clamp(PLOT.disc + (plotDefense(n, t) - plotPower(n, t)) * .02, .05, .95));
     if (disc) { addPres(n, PLOT.pres); for (const c of courtOf(n)) c.op = clamp((c.op ?? 0) + PLOT.opAll, -100, 100); t.op = clamp((t.op ?? 0) - 60, -100, 100);
-      if (n.id === S.player) { log('O plano contra ' + charName(t) + ' foi descoberto!', 'bad', [n.id]); notify(n.id, '🗡️ Plano descoberto', 'Todos sabem que tentamos eliminar ' + charName(t) + '. A corte desconfia de nós.'); } }
-    else if (n.id === S.player) log('O plano contra ' + charName(t) + ' fracassou, mas ninguém descobriu.', 'info', [n.id]); }
+      if (isHuman(n.id)) { log('O plano contra ' + charName(t) + ' foi descoberto!', 'bad', [n.id]); notify(n.id, '🗡️ Plano descoberto', 'Todos sabem que tentamos eliminar ' + charName(t) + '. A corte desconfia de nós.'); } }
+    else if (isHuman(n.id)) log('O plano contra ' + charName(t) + ' fracassou, mas ninguém descobriu.', 'info', [n.id]); }
 }
 
 /* ---------- esquemas ---------- */
@@ -164,30 +164,30 @@ function schemeTick(n) {
   s.prog = Math.min(1, s.prog + Math.max(.2, schemePower(n) / Math.max(4, 10 + def)) / d.m);
   if (chance(d.risk * (1 + def / 15))) {                          // descoberta
     n.scheme = null; addPres(n, -10); t.rel[n.id] = (t.rel[n.id] || 0) - 50;
-    log('Descoberto: ' + natName(n) + ' tentou ' + schemeName(s.k).toLowerCase() + ' em ' + natName(t) + '.', [n.id, t.id].includes(S.player) ? 'bad' : 'world', [n.id, t.id]);
+    log('Descoberto: ' + natName(n) + ' tentou ' + schemeName(s.k).toLowerCase() + ' em ' + natName(t) + '.', [n.id, t.id].some(isHuman) ? 'bad' : 'world', [n.id, t.id]);
     notify(t.id, '🕵️ Operação descoberta', natName(n) + ' agia contra nós (' + schemeName(s.k).toLowerCase() + ').'); return;
   }
   if (s.prog < 1) return;
   n.scheme = null;
-  if (s.k === 'spy') { n.spyT = t.id; const ev = EVENT.intel_haul; if (ev && evOpts(n, ev).length) { if (n.id === S.player && n.evWait) (n.evNext = n.evNext || []).push({ id: ev.id, t: S.t }); else fireEvent(n, ev); } }
+  if (s.k === 'spy') { n.spyT = t.id; const ev = EVENT.intel_haul; if (ev && evOpts(n, ev).length) { if (isHuman(n.id) && n.evWait) (n.evNext = n.evNext || []).push({ id: ev.id, t: S.t }); else fireEvent(n, ev); } }
   if (s.k === 'slander') spreadTopic(t, s.tgt.topic, n);
   if (s.k === 'murder') { const w = s.tgt.who, who = schemeTarget(n, s);
     if (!w || w === 'ruler') { log(titleOf(t) + ' ' + charName(t.ruler) + ' de ' + natName(t) + ' morreu de repente.', 'world', [t.id]); succeed(t, true); }
-    else if (w.startsWith('gen:')) { const a = S.armies.find(x => x.id === +w.slice(4)); if (a) { a.gen = null; a.genCd = Math.max(a.genCd || 0, S.t + APPOINT_CD_DEATH * 30); } log('O general ' + charName(who) + ', de ' + natName(t) + ', morreu de repente.', [n.id, t.id].includes(S.player) ? 'info' : 'none', [t.id]); }
-    else { t.council[w] = councilChar(t, w); apptSet(t, w, true); log(roleName(t, w) + ' ' + charName(who) + ', de ' + natName(t) + ', morreu de repente.', [n.id, t.id].includes(S.player) ? 'info' : 'none', [t.id]); } }
-  if (n.id === S.player && s.k !== 'spy') log('Operação concluída — ' + schemeTxt(n, s) + '.', 'good', [n.id]);
+    else if (w.startsWith('gen:')) { const a = S.armies.find(x => x.id === +w.slice(4)); if (a) { a.gen = null; a.genCd = Math.max(a.genCd || 0, S.t + APPOINT_CD_DEATH * 30); } log('O general ' + charName(who) + ', de ' + natName(t) + ', morreu de repente.', [n.id, t.id].some(isHuman) ? 'info' : 'none', [t.id]); }
+    else { t.council[w] = councilChar(t, w); apptSet(t, w, true); log(roleName(t, w) + ' ' + charName(who) + ', de ' + natName(t) + ', morreu de repente.', [n.id, t.id].some(isHuman) ? 'info' : 'none', [t.id]); } }
+  if (isHuman(n.id) && s.k !== 'spy') log('Operação concluída — ' + schemeTxt(n, s) + '.', 'good', [n.id]);
 }
 /* panfletos: governante e conselheiros do alvo podem passar a querer a ideia; a pressão do conselho deles sobe */
 function spreadTopic(t, T, by) {
   let k = 0; for (const c of [t.ruler, ...COUNCIL.map(([s]) => t.council[s])]) { if (!c || !chance(.5)) continue;
     if (T.ty === 'ideo' && IDEOS[T.v]) { c.ld = T.v; leanOf(t, c); k++; } else if (T.ty === 'law' && lawOk(t, T.k, T.v) && t.laws[T.k] !== T.v) { c.ll = { k: T.k, o: T.v }; k++; } else if (T.ty === 'gov' && govEdgeOk(t, T.v)) { c.lg = T.v; k++; } }
   t.press = clamp((t.press || 0) + 10, 0, 100); t.stab = Math.max(0, t.stab - 2);
-  if ([t.id, by.id].includes(S.player)) log('As ideias de ' + topicTxt(T) + ' se espalham em ' + natName(t) + ' (' + k + ' do governo convencidos).', 'info', [t.id, by.id]);
+  if ([t.id, by.id].some(isHuman)) log('As ideias de ' + topicTxt(T) + ' se espalham em ' + natName(t) + ' (' + k + ' do governo convencidos).', 'info', [t.id, by.id]);
 }
 /* operação de inteligência: o que levar (efeitos do evento intel_haul) */
 const spyTechOf = n => { const t = n.spyT != null ? nat(n.spyT) : null; if (!t) return null; return Object.keys(t.techs).map(id => TECH[id]).filter(x => x && !x.v && !n.techs[x.id] && techState(n, x) === '' && !(n.tdisc || {})[x.id]).sort((a, b) => a.y - b.y)[0] || null; };
 function spyDo(n, what) {
-  const t = n.spyT != null ? nat(n.spyT) : null; if (!t || !t.alive) return; const me = n.id === S.player;
+  const t = n.spyT != null ? nat(n.spyT) : null; if (!t || !t.alive) return; const me = isHuman(n.id);
   if (what === 'tech') { const x = spyTechOf(n); if (x) { (n.tdisc = n.tdisc || {})[x.id] = SPY.tech; if (me) log('Planos roubados de ' + natName(t) + ': ' + x.n + ' fica ' + Math.round(SPY.tech * 100) + '% mais barata.', 'good', [n.id]); } }
   if (what === 'mil') { (n.milAdv = n.milAdv || {})[t.id] = S.t + rand(SPY.milMo[0], SPY.milMo[1]) * 30; if (me) log('Conhecemos as táticas de ' + natName(t) + ': +' + Math.round(SPY.mil * 100) + '% de dano contra eles até ' + yearOf(n.milAdv[t.id]) + '.', 'good', [n.id]); }
   if (what === 'gold') { const x = Math.min(Math.max(0, t.money) * SPY.gold, Math.max(0, (n.inc || {}).tax || 0) * SPY.goldCap); t.money -= x; n.money += x; if (me) log('Desviamos ' + Math.round(x) + ' do tesouro de ' + natName(t) + '.', 'good', [n.id]); }
@@ -228,7 +228,7 @@ function partition(n, heir) {
   S.armies.forEach(a => { if (a.o === n.id && take.includes(a.p)) a.p = n.capital; });
   const m = spawnNation(take, { from: n.id, dyn: n.dyn, ruler: heir, gov: n.gov, money: Math.round(n.money * .2) }); n.money *= .8;
   n.kids = n.kids.filter(x => x !== heir); link(n, m, 'allies'); link(n, m, 'marr'); n.rel[m.id] = 60; m.rel[n.id] = 60;
-  log('Partilha: ' + charName(heir) + ' herdou parte do reino e fundou ' + natName(m) + '.', [n.id].includes(S.player) ? 'bad' : 'world', [n.id, m.id]);
+  log('Partilha: ' + charName(heir) + ' herdou parte do reino e fundou ' + natName(m) + '.', isHuman(n.id) ? 'bad' : 'world', [n.id, m.id]);
   notify(n.id, '👑 Partilha', 'Pela lei de partilha, ' + charName(heir) + ' levou ' + take.length + ' províncias e fundou ' + natName(m) + ', aliado da dinastia.');
 }
 /* IA: suborna conselheiro hostil; difama ou espiona rivais; os cruéis e conspiradores matam */

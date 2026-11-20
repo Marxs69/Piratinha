@@ -30,13 +30,16 @@ const rankTitle = (n, r = n.rank || 0) => { const g = GOVS[n.gov], set = RANKSET
 const natName = n => rankFmt(n).replace('{}', n.name);
 const FEM = { 'Rei': 'Rainha', 'Rei eleito': 'Rainha eleita', 'Imperador': 'Imperatriz', 'Chefe supremo': 'Chefe suprema', 'Sumo-sacerdote': 'Suma-sacerdotisa', 'Grão-mestre': 'Grã-mestra', 'Caudilho': 'Caudilha', 'Diretor técnico': 'Diretora técnica', 'Secretário-geral': 'Secretária-geral', 'Arquissábio': 'Arquissábia', 'Delegado': 'Delegada', 'Presidente do congresso': 'Presidenta do congresso', 'Mediador': 'Mediadora', 'Líder supremo': 'Líder suprema', 'Cônsul': 'Cônsul', 'Doge': 'Dogaresa', 'Cã': 'Cátum', 'Barão': 'Baronesa', 'Conde': 'Condessa', 'Duque': 'Duquesa', 'Grão-cã': 'Grã-cátum', 'Prefeito': 'Prefeita', 'Burgomestre': 'Burgomestra', 'Primeiro Cidadão': 'Primeira Cidadã', 'Comissário': 'Comissária', 'Secretário regional': 'Secretária regional', 'Prior': 'Prioresa', 'Bispo': 'Bispa', 'Arcebispo': 'Arcebispa', 'Governador militar': 'Governadora militar', 'Protetor': 'Protetora', 'Engenheiro-chefe': 'Engenheira-chefe', 'Supervisor': 'Supervisora', 'Diretor': 'Diretora', 'Arquiteto supremo': 'Arquiteta suprema', 'Monarca': 'Monarca', 'Alto rei': 'Alta rainha', 'Primeiro-ministro': 'Primeira-ministra' };
 const titleOf = (n, c = n.ruler) => { const t = rankTitle(n); return c && c.f ? (FEM[t] || t) : t; };
-const log = (m, k = 'info', who = []) => { S.log.unshift({ d: dateStr(), m, k }); if (S.log.length > 120) S.log.pop(); if (who.includes(S.player) || k === 'world') S.news.push({ m, k }); };
+const log = (m, k = 'info', who = []) => { S.log.unshift({ d: dateStr(), m, k }); if (S.log.length > 120) S.log.pop(); if (who.some(isHuman) || k === 'world') S.news.push({ m, k }); };
 
 /* ---------- consultas ---------- */
 let ownCache = null;                                         // listas de províncias por dono (refeitas quando muda dono)
 function provsOf(id) { if (!ownCache) { ownCache = S.nations.map(() => []); for (let p = 0; p < S.own.length; p++) if (S.own[p] >= 0) ownCache[S.own[p]].push(p); } return ownCache[id] || []; }
 /* zera todos os caches da simulação (mundo novo ou save carregado): nada do mundo anterior pode vazar */
 function resetCaches() { ownCache = null; warSet = null; strC = null; nbC.clear(); epC = null; abC = null; frC = null; supC = null; enterC = null; cnC = null; BI = null; }
+/* jogadores humanos: S.humans (multiplayer) ou o jogador local (S.player). A simulação só pergunta isHuman; a interface usa me() */
+const humans = () => S.humans ? S.humans.filter(id => nat(id) && nat(id).alive) : S.player >= 0 ? [S.player] : [];
+const isHuman = id => id != null && id >= 0 && (S.humans ? S.humans.includes(id) : id === S.player);
 function ownChanged() { ownCache = null; S.mapDirty = true; enterC = null; }
 const hasTech = (n, id) => !!n.techs[id];
 let warSet = null;                                          // pares em guerra (refeito quando guerras começam ou acabam)
@@ -89,6 +92,7 @@ function charMods(n, c, seat) {
   return out;
 }
 const MOD_SOURCES = [
+  n => (n.ae || 0) >= 1 ? [['Expansão agressiva ' + Math.round(n.ae), { stab: -n.ae * PEACE.aeStab }]] : [],   // terra tomada em tratados (sim/peace.js); some devagar
   n => [['Governo: ' + GOVS[n.gov].n, GOVS[n.gov].m], ['Ideologia: ' + IDEOS[n.ideo].n, IDEOS[n.ideo].m]],
   n => [...n.eff].filter(id => TECH[id] && TECH[id].fx.m).map(id => ['Tecnologia: ' + TECH[id].n, TECH[id].fx.m]),
   n => Object.keys(n.vdec || {}).map(k => { const v = VERT[k], o = {}; for (const m in v.m) o[m] = v.m[m] * VERT_DECLINE; return ['Vertente recusada: ' + v.n, o]; }),   // quem não escolhe leva 10% do bônus

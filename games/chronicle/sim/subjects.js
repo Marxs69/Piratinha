@@ -30,7 +30,7 @@ function libParts(t) {
 const libTarget = t => clamp(libParts(t).reduce((a, x) => a + x[1], 0), 0, 100);
 const integOk = t => t.subj && t.subj.lib <= 50;            // "feliz": só integra quem está na metade de baixo da barra
 const integCost = () => Math.round(6 * eraScale());          // por mês
-const integRate = t => 1.5 * SUBJECTS[t.subj.tier].int * (SUBJ_LAWS.rule.o[t.subj.laws.rule].int || 1);
+const integRate = t => 1.5 * PEACE.integK * SUBJECTS[t.subj.tier].int * (SUBJ_LAWS.rule.o[t.subj.laws.rule].int || 1);
 function setSubjLaw(o, t, k, v) { if (t.senior !== o.id || !SUBJ_LAWS[k] || !SUBJ_LAWS[k].o[v]) return 'Inválido'; if (t.subj.lawCd > S.t) return 'Mudança recente'; t.subj.laws[k] = v; t.subj.lawCd = S.t + 360; t.rel[o.id] = (t.rel[o.id] || 0) - 5; return ''; }
 function setSubjTier(o, t, tier) {
   if (t.senior !== o.id || !SUBJECTS[tier] || tier === 'union' || t.subj.tier === 'union') return 'Inválido'; if (t.subj.tierCd > S.t) return 'Mudança recente';
@@ -44,7 +44,7 @@ function independence(t) {
   const o = nat(t.senior), tier = t.subj.tier; freeSubject(t, tier === 'union' ? 'rompeu a união pessoal com' : 'declarou independência de');
   if (tier === 'union') { succeed(t, false); return; }
   if (o.alive && !atWar(t.id, o.id)) { t.truce[o.id] = 0; declareWar(t, o, null); }
-  if (t.id === S.player || o.id === S.player) notify(S.player, '🏴 Independência', natName(t) + ' rompeu com ' + natName(o) + '.');
+  if (isHuman(t.id) || isHuman(o.id)) notifyAll('🏴 Independência', natName(t) + ' rompeu com ' + natName(o) + '.');
 }
 /* mensal: tributo, contingentes, barra de liberdade, integração e independência */
 function subjectsTick() {
@@ -68,5 +68,5 @@ function aiSubjects(n) {
     if (s.lib > 75 && s.laws.tribute !== 'none') setSubjLaw(n, t, 'tribute', s.laws.tribute === 'heavy' ? 'normal' : 'none');
     else if (s.lib < 35 && s.laws.tribute === 'normal' && P.gold > 1) setSubjLaw(n, t, 'tribute', 'heavy');
     if (s.lib < 45 && s.laws.rule !== 'governor' && chance(.3)) setSubjLaw(n, t, 'rule', s.laws.rule === 'self' ? 'advisors' : 'governor');
-    s.integ = integOk(t) && n.money > integCost() * 24 && statesOf(n) + statesOf(t) <= domCap(n) * 1.1 + 1; }
+    s.integ = integOk(t) && (n.ae || 0) < PEACE.aeBlock && n.money > integCost() * 24 && statesOf(n) + statesOf(t) <= domCap(n) * 1.1 + 1; }
 }

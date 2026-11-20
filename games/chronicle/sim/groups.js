@@ -28,8 +28,9 @@ function mergeGroupParts(id) {
   if (any) S.armies = S.armies.filter(a => regs(a) > .08);
 }
 /* exércitos do jogador fora dos fronts: entram sozinhos no front mais ameaçado; sem guerra, vão atrás de rebeldes e se reagrupam */
-function playerArmies() {
-  const n = S.player >= 0 ? nat(S.player) : null; if (!n || !n.alive) return;
+function playerArmies() { for (const id of humans()) humanArmies(nat(id)); }
+function humanArmies(n) {
+  if (!n || !n.alive) return;
   for (const a of armiesOf(n.id)) if (a.g == null) a.g = a.id;
   const fs = frontsOf(n.id), groups = groupsOf(n.id).filter(G => !G.some(a => a.exp || a.inv));
   if (fs.length) { const need = f => f.foe.reduce((s, q) => s + foeNear(n.id, q), 0);

@@ -123,10 +123,30 @@ function computeLinks() {
   }));
 }
 const LINK_STYLE = { 1: ['#8b6b3a', 1.2, [4, 3]], 2: ['#2a2a2a', 2, []], 3: ['#d9d9d9', 2.6, []], 4: ['#ffffff', 2.2, [10, 3]], 5: ['#5ff2ff', 2.4, []], 6: ['#d38cff', 2.6, [2, 2]], 7: ['#fff6b0', 3, [1, 4]] };
-function computeLabels() {                                   // rótulo de cada nação no centro de massa das suas províncias
-  const acc = new Map(), me = S.player >= 0 ? nat(S.player) : null;
-  WD.provs.forEach(p => { const o = S.own[p.id]; if (o < 0) return; if (me && !me.exP[p.id]) return; let a = acc.get(o); if (!a) acc.set(o, a = { x: 0, y: 0, n: 0, minx: 1e9, maxx: -1e9 }); a.x += p.cx * p.size; a.y += p.cy * p.size; a.n += p.size; a.minx = Math.min(a.minx, p.cx); a.maxx = Math.max(a.maxx, p.cx); });
-  R.labels = []; acc.forEach((a, o) => { const n = nat(o); R.labels.push({ o, x: a.x / a.n * K + K / 2, y: a.y / a.n * K, s: Math.sqrt(a.n), w: (a.maxx - a.minx) * K, t: n.name.toUpperCase() }); });
+/* rótulos das nações: um por bloco contínuo de território (o maior sempre; os outros se forem grandes), num ponto bem dentro dele
+   (a província mais longe da fronteira, perto do centro) e com a largura disponível naquela altura para caber o nome */
+function computeLabels() {
+  const me = S.player >= 0 ? nat(S.player) : null, P = WD.provs.length, comp = new Int32Array(P).fill(-1), comps = [];
+  const ok = p => S.own[p] >= 0 && (!me || me.exP[p]);
+  for (let p0 = 0; p0 < P; p0++) { if (comp[p0] >= 0 || !ok(p0)) continue; const o = S.own[p0], list = [p0]; comp[p0] = comps.length;
+    for (let h = 0; h < list.length; h++) for (const q of WD.provs[list[h]].adj) if (comp[q] < 0 && S.own[q] === o && ok(q)) { comp[q] = comps.length; list.push(q); }
+    comps.push({ o, list, size: list.reduce((a, q) => a + WD.provs[q].size, 0) }); }
+  const byO = new Map(); comps.forEach(c => { if (!byO.has(c.o)) byO.set(c.o, []); byO.get(c.o).push(c); });
+  R.labels = [];
+  byO.forEach((cs, o) => { cs.sort((a, b) => b.size - a.size); const n = nat(o), main = cs[0];
+    cs.forEach((c, k) => { if (k > 0 && (c.size < main.size * .35 || c.size < 40)) return;
+      // profundidade a partir da fronteira (BFS dentro do bloco)
+      const id = comp[c.list[0]], depth = new Map(), q = [];
+      c.list.forEach(p => { if (WD.provs[p].adj.some(x => comp[x] !== id)) { depth.set(p, 0); q.push(p); } }); if (!q.length) { depth.set(c.list[0], 0); q.push(c.list[0]); }
+      for (let h = 0; h < q.length; h++) for (const x of WD.provs[q[h]].adj) if (comp[x] === id && !depth.has(x)) { depth.set(x, depth.get(q[h]) + 1); q.push(x); }
+      let mx = 0, my = 0; c.list.forEach(p => { mx += WD.provs[p].cx * WD.provs[p].size; my += WD.provs[p].cy * WD.provs[p].size; }); mx /= c.size; my /= c.size;
+      const maxD = Math.max(...depth.values()); let best = c.list[0], bs = -1e9;
+      for (const p of c.list) { const pr = WD.provs[p], sc = (depth.get(p) || 0) / Math.max(1, maxD) * 2 - Math.hypot(pr.cx - mx, pr.cy - my) / Math.sqrt(c.size); if (sc > bs) { bs = sc; best = p; } }
+      const bp = WD.provs[best], band = Math.max(3, Math.sqrt(c.size) * .25); let x0 = 1e9, x1 = -1e9;
+      for (const p of c.list) { const pr = WD.provs[p]; if (Math.abs(pr.cy - bp.cy) <= band) { x0 = Math.min(x0, pr.cx - Math.sqrt(pr.size) * .5); x1 = Math.max(x1, pr.cx + Math.sqrt(pr.size) * .5); } }
+      const cx = (x0 + x1) / 2;   // centra na faixa horizontal disponível
+      R.labels.push({ o, x: cx * K + K / 2, y: bp.cy * K + K / 2, s: Math.sqrt(c.size) * (k ? .8 : 1), w: Math.max(1, x1 - x0) * K, t: n.name.toUpperCase(), main: !k }); }); });
+  R.labels.sort((a, b) => b.s - a.s);   // os maiores desenham primeiro e têm prioridade
 }
 
 /* posição de um exército na tela (interpola entre nós durante o movimento) */
@@ -152,12 +172,18 @@ function drawFrame() {
   }
   // rótulos
   c.textAlign = 'center'; c.textBaseline = 'middle';
-  if (z < 4) for (const L of R.labels) {
-    const fs = clamp(L.s * K * z * .18, 0, 60); if (fs < 7) continue; if (!vis(L.x, L.y, 200)) continue;
-    const [sx, sy] = toScreen(L.x, L.y); c.font = '600 ' + fs + 'px Cinzel, serif';
-    c.lineWidth = Math.max(2, fs / 7); c.strokeStyle = 'rgba(20,16,10,.55)'; c.fillStyle = 'rgba(255,248,230,.92)';
-    c.strokeText(L.t, sx, sy); c.fillText(L.t, sx, sy);
-  }
+  if (z < 4) { const placed = [];   // retângulos já ocupados na tela: rótulo que cobriria outro diminui ou fica de fora
+    for (const L of R.labels) {
+      if (!vis(L.x, L.y, 300)) continue; const [sx, sy] = toScreen(L.x, L.y);
+      let fs = clamp(L.s * K * z * .18, 0, 60); c.font = '600 ' + 10 + 'px Cinzel, serif'; const w10 = c.measureText(L.t).width / 10;
+      fs = Math.min(fs, L.w * z * .95 / Math.max(1, w10)); if (fs < 7) continue;   // cabe na largura do território
+      let rect = null;
+      for (let tries = 0; tries < 3 && fs >= 7; tries++, fs *= .8) { const w = w10 * fs, h = fs * 1.05, r = [sx - w / 2, sy - h / 2, sx + w / 2, sy + h / 2];
+        if (!placed.some(o => r[0] < o[2] && r[2] > o[0] && r[1] < o[3] && r[3] > o[1])) { rect = r; break; } }
+      if (!rect) continue; placed.push(rect);
+      c.font = '600 ' + fs.toFixed(1) + 'px Cinzel, serif'; c.lineWidth = Math.max(2, fs / 7); c.strokeStyle = 'rgba(20,16,10,.55)'; c.fillStyle = 'rgba(255,248,230,.92)';
+      c.strokeText(L.t, sx, sy); c.fillText(L.t, sx, sy);
+    } }
   if (R.mode === 'res' && z >= 1.1 && z < 2.2) {   // de média distância: nome de cada estado
     c.font = '10px "Alegreya Sans", sans-serif';
     for (const st of WD.states) { const p = WD.provs[st.cap]; if (me && !me.exP[p.id]) continue; const wx = p.cx * K + K / 2, wy = p.cy * K + K / 2; if (!vis(wx, wy)) continue; const [sx, sy] = toScreen(wx, wy);

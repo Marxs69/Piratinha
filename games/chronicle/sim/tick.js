@@ -10,7 +10,7 @@ function researchTick(n) {
   n.rp = Math.min(n.rp, techBase(y) * 3);
 }
 function worksTick(n) {                                         // obras concluídas e recrutas prontos
-  n.cons.forEach(c => c.m--); n.cons.filter(c => c.m <= 0).forEach(c => { if (stateOwnerOf(c.s) === n.id) { S.bld[c.s][c.b] = (S.bld[c.s][c.b] || 0) + 1; const f = BUILDINGS[c.b].fx; if (f && (f.infra || f.pipe)) S.mapDirty = true; if (n.id === S.player) log(BUILDINGS[c.b].n + ' concluída em ' + WD.states[c.s].n + '.', 'good', [n.id]); } }); n.cons = n.cons.filter(c => c.m > 0);
+  n.cons.forEach(c => c.m--); n.cons.filter(c => c.m <= 0).forEach(c => { if (stateOwnerOf(c.s) === n.id) { S.bld[c.s][c.b] = (S.bld[c.s][c.b] || 0) + 1; const f = BUILDINGS[c.b].fx; if (f && (f.infra || f.pipe)) S.mapDirty = true; if (isHuman(n.id)) log(BUILDINGS[c.b].n + ' concluída em ' + WD.states[c.s].n + '.', 'good', [n.id]); } }); n.cons = n.cons.filter(c => c.m > 0);
   n.rec.forEach(r => r.m--);
   n.rec.filter(r => r.m <= 0).forEach(r => {
     if (r.type === 'ship') { const pr = WD.provs[r.at]; if (S.own[r.at] === n.id) { const z = pr.seas[0], f = S.fleets.find(f => f.o === n.id && f.z === z && !f.path.length); if (f) f.ships += r.k; else addFleet(n.id, z, r.k); } return; }
@@ -31,14 +31,14 @@ function mpStabTick(n) {                                        // contingente, 
   n.stab = clamp(n.stab + clamp(target - n.stab, -2, 2), 0, 100);
 }
 function projTick(n) {                                          // reivindicações, prospecções e projetos espaciais
-  if (n.fab && --n.fab.m <= 0) { n.claims[n.fab.s] = 1; if (n.id === S.player) log('Reivindicação sobre ' + WD.states[n.fab.s].n + ' fabricada.', 'good', [n.id]); n.fab = null; }
+  if (n.fab && --n.fab.m <= 0) { n.claims[n.fab.s] = 1; if (isHuman(n.id)) log('Reivindicação sobre ' + WD.states[n.fab.s].n + ' fabricada.', 'good', [n.id]); n.fab = null; }
   (n.pros || []).forEach(x => x.m--); (n.pros || []).filter(x => x.m <= 0).forEach(x => prospectDone(n, x.s)); if (n.pros) n.pros = n.pros.filter(x => x.m > 0);
   if (n.sproj && --n.sproj.m <= 0) { const k = n.sproj.k; n.sproj = null; spaceDone(n, k); }
 }
-const aiTick = n => { if (n.id !== S.player) ai(n); };
+const aiTick = n => { if (!isHuman(n.id)) ai(n); };
 const aliveEvents = n => { if (n.alive) eventsTick(n); };
 /* por país vivo, todo mês */
-const tidyNation = n => { n.stab = clamp(n.stab, 0, 100); n.pres = clamp(n.pres ?? 50, 0, 100); if (n.manpower < 0) n.manpower = 0; };   // limites depois de tudo o que mexeu no mês
+const tidyNation = n => { if (n.ae) n.ae = n.ae < .5 ? 0 : n.ae * (1 - PEACE.aeDecay); n.stab = clamp(n.stab, 0, 100); n.pres = clamp(n.pres ?? 50, 0, 100); if (n.manpower < 0) n.manpower = 0; };   // limites depois de tudo o que mexeu no mês
 const NATION_MONTH = [calcMods, researchTick, worksTick, enactTick, mpStabTick, projTick, supportTick, slaveTick, unrestTick, pressTick, charMonthly, courtTick, tmodTick, aliveEvents, aiTick, tidyNation];
 
 function nanGuard() { if (S.nations.some(n => n.alive && !Number.isFinite(n.money + n.stab + n.manpower + (n.income || 0)))) repairGame(false); }   // nunca deixa um −NaN se espalhar
@@ -52,7 +52,7 @@ function nationsDay() {
 }
 function econClose() { if (S.wacc) econFinish(S.wacc); S.wacc = econAcc(); priceTick(false); }
 function generalsDie() {
-  for (const a of S.armies) if (a.gen && chance(deathChance(a.gen))) { if (a.o === S.player) log('O general ' + charName(a.gen) + ' morreu aos ' + ageOf(a.gen) + ' anos.', 'info', [a.o]); a.gen = null; a.genCd = Math.max(a.genCd || 0, S.t + APPOINT_CD_DEATH * 30); }
+  for (const a of S.armies) if (a.gen && chance(deathChance(a.gen))) { if (isHuman(a.o)) log('O general ' + charName(a.gen) + ' morreu aos ' + ageOf(a.gen) + ' anos.', 'info', [a.o]); a.gen = null; a.genCd = Math.max(a.genCd || 0, S.t + APPOINT_CD_DEATH * 30); }
   S._threat = null; strC = null; enterC = null;
 }
 function reinforce() {                                           // exércitos parados em casa voltam ao tamanho máximo usando o contingente
@@ -77,7 +77,7 @@ function popTick() {
 }
 function colonyTick() {
   S.cols.forEach(c => c.m--);
-  S.cols.filter(c => c.m <= 0).forEach(c => { if (S.own[c.p] === -1 && nat(c.o).alive) { S.own[c.p] = c.o; S.ctrl[c.p] = c.o; S.pop[c.p] = Math.max(2, S.pop[c.p] * .5 + 1.5); ownChanged(); if (c.o === S.player) log('Nova colônia: ' + WD.provs[c.p].n + '.', 'good', [S.player]); } });
+  S.cols.filter(c => c.m <= 0).forEach(c => { if (S.own[c.p] === -1 && nat(c.o).alive) { S.own[c.p] = c.o; S.ctrl[c.p] = c.o; S.pop[c.p] = Math.max(2, S.pop[c.p] * .5 + 1.5); ownChanged(); if (isHuman(c.o)) log('Nova colônia: ' + WD.provs[c.p].n + '.', 'good', [S.player]); } });
   S.cols = S.cols.filter(c => c.m > 0);
 }
 function warsTick() { S.wars.slice().forEach(w => { w.score = warScore(w); aiPeace(w); }); }
@@ -116,7 +116,7 @@ function repairGame(full) {
   S.armies.forEach(a => { ['inf', 'cav', 'art', 'vrt'].forEach(t => fin(a, t, 0)); fin(a, 'mor', 1); fin(a, 'prog', 0); fin(a, 'need', 0); if (a.path.some(v => !(v >= 0))) { a.path = []; fixed++; } });
   S.fleets.forEach(f => { fin(f, 'ships', 0); fin(f, 'prog', 0); });
   S.armies = S.armies.filter(a => regs(a) > .08); S.fleets = S.fleets.filter(f => f.ships > .2);
-  if (full) S.nations.forEach(n => { if (n.alive && n.id !== S.player) { merged += mergeIdle(n.id); S.armies.forEach(a => { if (a.o === n.id && a.path.length && !a.exp && !a.retreat) { a.path = []; a.need = 0; a.prog = 0; } }); } });   // IA: replaneja os caminhos
+  if (full) S.nations.forEach(n => { if (n.alive && !isHuman(n.id)) { merged += mergeIdle(n.id); S.armies.forEach(a => { if (a.o === n.id && a.path.length && !a.exp && !a.retreat) { a.path = []; a.need = 0; a.prog = 0; } }); } });   // IA: replaneja os caminhos
   ownChanged(); warsChanged(); enterC = null; strC = null; nbC.clear(); S._threat = null; if (full) { S.stS = null; S.stD = null; S.stHas = null; }
   S.nations.forEach(n => { if (n.alive) calcMods(n); }); econAll(); S.nations.forEach(n => { if (n.alive) calcMods(n); }); S.mapDirty = true;
   return { fixed, merged };

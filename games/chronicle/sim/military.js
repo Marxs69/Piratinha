@@ -118,7 +118,7 @@ function attritionOf(a) {
 function attritionTick() {
   for (const a of S.armies) {
     const [x, why] = attritionOf(a); a.attr = x; a.supOk = inSupply(a);
-    if (x > 0) { UT.forEach(t => a[t] *= 1 - x); if (a.o === S.player && x >= .03) log('Exército em ' + WD.provs[a.p].n + ' perde ' + Math.round(x * 100) + '% por atrito (' + why.join(', ').toLowerCase() + ').', 'bad', [S.player]); }
+    if (x > 0) { UT.forEach(t => a[t] *= 1 - x); if (isHuman(a.o) && x >= .03) log('Exército em ' + WD.provs[a.p].n + ' perde ' + Math.round(x * 100) + '% por atrito (' + why.join(', ').toLowerCase() + ').', 'bad', [S.player]); }
     if (drillOk(a)) a.xp = Math.min(DRILL_CAP, Math.max(a.xp || 0, (a.xp || 0) + .015));
   }
   S.armies = S.armies.filter(a => regs(a) > .08);
@@ -169,7 +169,7 @@ function battleDay(p, A, B) {
   const aDef = A.some(a => a.o === ctrl) || (!B.some(b => b.o === ctrl) && lastA < lastB);
   let bt = S.battles[p];
   if (!bt) { bt = S.battles[p] = { d: 0, ra: 0, rb: 0, t0: S.t, a: A[0].o, b: B[0].o };
-    if (A.some(a => a.o === S.player) || B.some(b => b.o === S.player)) log('Batalha começou em ' + WD.provs[p].n + '.', 'info', [S.player]); }
+    if (A.some(a => isHuman(a.o)) || B.some(b => isHuman(b.o))) log('Batalha começou em ' + WD.provs[p].n + '.', 'info', [S.player]); }
   bt.seen = S.t;
   if (bt.d % 3 === 0) { bt.ra = rint(10); bt.rb = rint(10); }
   const ph = (bt.d / 3 | 0) % 2 === 0 ? 'fire' : 'shock'; bt.ph = ph; bt.d++;
@@ -194,8 +194,8 @@ function battleDay(p, A, B) {
   if (w) { w.bp = w.bp || {}; w.bp[Wn[0].o] = (w.bp[Wn[0].o] || 0) + clamp(Math.round(lr * .5), 1, 10); }
   Wn.forEach(a => a.xp = Math.min(1, (a.xp || 0) + .05)); addPres(nat(Wn[0].o), 1); addPres(nat(L[0].o), -1); L.forEach(a => { a.xp = Math.min(1, (a.xp || 0) + .015); a.fat = Math.min(1, (a.fat || 0) + .15); });
   const ln = nat(L[0].o), wn = nat(Wn[0].o), wiped = L.reduce((t, a) => t + regs(a), 0) < wr * .1;
-  L.forEach(a => { if (a.gen && chance(wiped ? .3 : .06)) { if (a.o === S.player) log('O general ' + charName(a.gen) + ' morreu em ' + WD.provs[p].n + '.', 'bad', [S.player]); a.gen = null; } });
-  if (L[0].o === S.player || Wn[0].o === S.player) log('Batalha em ' + WD.provs[p].n + ': ' + natName(wn) + ' venceu ' + natName(ln) + (wiped ? ' e aniquilou o exército inimigo' : '') + ' (' + bt.d + ' dias).', Wn[0].o === S.player ? 'good' : 'bad', [S.player]);
+  L.forEach(a => { if (a.gen && chance(wiped ? .3 : .06)) { if (isHuman(a.o)) log('O general ' + charName(a.gen) + ' morreu em ' + WD.provs[p].n + '.', 'bad', [S.player]); a.gen = null; } });
+  if (isHuman(L[0].o) || isHuman(Wn[0].o)) log('Batalha em ' + WD.provs[p].n + ': ' + natName(wn) + ' venceu ' + natName(ln) + (wiped ? ' e aniquilou o exército inimigo' : '') + ' (' + bt.d + ' dias).', isHuman(Wn[0].o) ? 'good' : 'bad', [S.player]);
   if (wiped) L.forEach(a => UT.forEach(t => a[t] = 0)); else L.forEach(a => retreat(a));
   delete S.battles[p];
 }

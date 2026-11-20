@@ -65,6 +65,12 @@ CONTENT.ELECT_FORMS = {
   ai:      { n: 'A máquina decide', d: 'Não há sucessão: a inteligência regente governa.' },
 };
 
+/* paz e expansão (vale para a IA e para o jogador)
+   maxShare = no máximo esta parte do país derrotado (pela população) por tratado · annexProvs = países deste tamanho ou menores podem ser anexados inteiros
+   truce = anos de trégua · ae = expansão agressiva ganha por ponto de parte tomada · aeDecay = quanto some por mês · aeBlock = acima disto a IA não declara guerra nem integra
+   aeStab = estabilidade perdida por ponto · aeRel = relação dos vizinhos perdida por ponto ganho · integK = velocidade da integração de súditos */
+CONTENT.PEACE = { maxShare: 40, annexProvs: 3, truce: 10, ae: .6, aeDecay: .025, aeBlock: 20, aeStab: .0025, aeRel: .8, integK: .5 };
+
 /* golpe militar: para qual governo o país pode cair, pelo tipo de governo atual (chance de mudar a forma: chance) */
 CONTENT.COUP_GOVS = { chance: .45, Monarquia: ['junta', 'caudillo', 'mil_regime', 'protectorate'], República: ['junta', 'caudillo', 'mil_regime'], Tribal: ['junta', 'caudillo'],
   Socialista: ['totalitarian', 'junta'], Ditadura: ['junta', 'caudillo', 'totalitarian'], Tecnocracia: ['junta', 'surveillance'] };

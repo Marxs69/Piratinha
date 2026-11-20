@@ -43,14 +43,14 @@ function dipAct(n, t, kind) {                                 // '' = feito/acei
   }
   for (const [k, why] of D.deny || []) if (DIP_TEST[k](n, t, D.link)) return why;
   if (atWar(n.id, t.id)) return 'Em guerra';
-  if (t.id !== S.player) { const [v] = accept(t, n, kind); if (v < 0) return 'Recusado'; }
+  if (!isHuman(t.id)) { const [v] = accept(t, n, kind); if (v < 0) return 'Recusado'; }
   n.money -= c; link(n, t, D.link);
   relAdd(t, n, D.bonus); relAdd(n, t, D.bonus);
-  log(D.log + ' entre ' + natName(n) + ' e ' + natName(t) + '.', n.id === S.player || t.id === S.player ? 'good' : 'none', [n.id, t.id]);
+  log(D.log + ' entre ' + natName(n) + ' e ' + natName(t) + '.', isHuman(n.id) || isHuman(t.id) ? 'good' : 'none', [n.id, t.id]);
   return '';
 }
 function aiPropose(n, t, kind) {                              // IA propõe; para o jogador vira uma janela
-  if (t.id === S.player) { S.dipOffers = S.dipOffers || []; if (S.dipOffers.length < 2 && !(n.offerCd > S.t)) { S.dipOffers.push({ from: n.id, kind }); n.offerCd = S.t + 360 * 5; } return; }
+  if (isHuman(t.id)) { S.dipOffers = S.dipOffers || []; if (S.dipOffers.length < 2 && !(n.offerCd > S.t)) { S.dipOffers.push({ from: n.id, kind, to: t.id }); n.offerCd = S.t + 360 * 5; } return; }
   dipAct(n, t, kind);
 }
 function relDrift() {                                         // uma vez por ano: relações vão na direção do que as nações têm em comum
@@ -89,7 +89,7 @@ function aiDiplomacy(n) {
   aiSubjects(n);
 }
 function tryUnion(n) {                                        // sem herdeiros: um parceiro de casamento pode herdar (união pessoal)
-  if (n.id === S.player || GOVS[n.gov].succ !== 'hered') return false;
+  if (isHuman(n.id) || GOVS[n.gov].succ !== 'hered') return false;
   const cands = (n.marr || []).map(nat).filter(t => t.alive && t.senior == null && GOVS[t.gov].succ === 'hered' && t.id !== n.id);
   if (!cands.length || !chance(.6)) return false;
   const s = cands.sort((a, b) => strength(b) - strength(a))[0];

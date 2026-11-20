@@ -35,7 +35,7 @@ function epiTick() {
     const pool = Object.keys(DISEASES).filter(k => { const D = DISEASES[k]; return y >= D.y[0] && y <= D.y[1] && (!D.vert || S.nations.some(n => n.alive && n.vert === D.vert)); });
     const tot = pool.reduce((a, k) => a + DISEASES[k].w, 0); let x = rnd() * tot, d = pool[0]; for (const k of pool) { x -= DISEASES[k].w; if (x < 0) { d = k; break; } }
     const p0 = d ? diseaseOrigin(DISEASES[d]) : null;
-    if (p0 != null) { const E = { d, n: DISEASES[d].n + ' em ' + WD.provs[p0].n, inf: { [p0]: DISEASES[d].dur }, done: {} }; S.epis.push(E); log('Surto de ' + E.n.toLowerCase().replace(' em ', ' em ') + '.', S.own[p0] === S.player ? 'bad' : 'none', [S.own[p0]]); }
+    if (p0 != null) { const E = { d, n: DISEASES[d].n + ' em ' + WD.provs[p0].n, inf: { [p0]: DISEASES[d].dur }, done: {} }; S.epis.push(E); log('Surto de ' + E.n.toLowerCase().replace(' em ', ' em ') + '.', isHuman(S.own[p0]) ? 'bad' : 'none', [S.own[p0]]); }
   }
   S.epis = S.epis.filter(E => { spreadTick(E, DISEASES[E.d]); return Object.keys(E.inf).length > 0 && Object.keys(E.done).length < 60; });
 }
@@ -44,7 +44,7 @@ function pandStart(id) {
   const cands = WD.provs.filter(p => (!D.cont || p.cont === main.id) && p.coast && S.own[p.id] >= 0 && S.pop[p.id] > 10);
   if (!cands.length) { S.pandDone[id] = { done: {} }; return; }
   const p0 = pickR(cands); S.pands.push({ id, inf: { [p0.id]: D.dur }, done: {}, start: S.t, warned: {} });
-  log(D.n + ': surgiu em ' + p0.n + '!', 'world'); notify(S.player, D.e + ' ' + D.n, D.m.replace('{p}', p0.n));
+  log(D.n + ': surgiu em ' + p0.n + '!', 'world'); notifyAll(D.e + ' ' + D.n, D.m.replace('{p}', p0.n));
 }
 function plagueTick() {
   epiTick();
@@ -52,7 +52,7 @@ function plagueTick() {
   for (const id in PANDEMICS) { const D = PANDEMICS[id]; if (S.pandDone[id] || S.pands.some(P => P.id === id) || y < D.y[0]) continue; if (y >= D.y[1] || chance(1 / ((D.y[1] - D.y[0]) * 12))) pandStart(id); }
   S.pands = S.pands.filter(P => {
     const D = PANDEMICS[P.id], hit = spreadTick(P, D);
-    hit.forEach(o => { const n = nat(o); n.stab = Math.max(0, n.stab - .8); if (o === S.player && !P.warned[o]) { P.warned[o] = 1; notify(S.player, D.e + ' ' + D.n + ' chegou', 'A doença chegou às terras de ' + natName(n) + '. Uma quarentena fecha portos e estradas: o contágio cai muito, mas o comércio também.', { quar: true }); log(D.n + ' chegou a ' + natName(n) + '.', 'bad', [o]); } });
+    hit.forEach(o => { const n = nat(o); n.stab = Math.max(0, n.stab - .8); if (isHuman(o) && !P.warned[o]) { P.warned[o] = 1; notifyAll(D.e + ' ' + D.n + ' chegou', 'A doença chegou às terras de ' + natName(n) + '. Uma quarentena fecha portos e estradas: o contágio cai muito, mas o comércio também.', { quar: true }); log(D.n + ' chegou a ' + natName(n) + '.', 'bad', [o]); } });
     if (Object.keys(P.inf).length) return true;
     S.pandDone[P.id] = { done: P.done }; log(D.n + ' terminou depois de ' + Math.max(1, Math.round((S.t - P.start) / 360)) + ' anos.', 'world'); return false;
   });
@@ -89,12 +89,12 @@ function revolt(n, kind) {
   if (force > str) {                                            // tropas no local reprimem na hora
     here.forEach(a => { const k = Math.min(.4, str / force * .3); ['inf', 'cav', 'art', 'vrt'].forEach(t => a[t] *= 1 - k); });
     n.stab = Math.max(0, n.stab - 2); if (kind === 'slave') n.slv *= .97;
-    log(ic + ' ' + nm + ' em ' + st.n + ' foi esmagada pelas tropas.', n.id === S.player ? 'info' : 'none', [n.id]); return;
+    log(ic + ' ' + nm + ' em ' + st.n + ' foi esmagada pelas tropas.', isHuman(n.id) ? 'info' : 'none', [n.id]); return;
   }
   ps.forEach(p => { S.ctrl[p] = -1; S.rebels[p] = { k: kind, o: n.id, s: str / ps.length }; delete S.sieges[p]; });
   n.stab = Math.max(0, n.stab - 5); S.mapDirty = true; ownChanged();
   const txt = ic + ' ' + nm + ' em ' + st.n + ': ' + ps.length + ' província' + (ps.length > 1 ? 's' : '') + ' nas mãos dos rebeldes.';
-  log(txt, n.id === S.player ? 'bad' : 'none', [n.id]);
+  log(txt, isHuman(n.id) ? 'bad' : 'none', [n.id]);
   notify(n.id, ic + ' ' + nm, txt + ' Mande tropas para retomá-las (elas cercam como num cerco comum). Se os rebeldes tomarem 30% do país, impõem o que querem.');
 }
 function rebelTick() {
@@ -127,7 +127,7 @@ function rebelsWin(n, kind, ps) {
   }
   ps.forEach(p => { delete S.rebels[p]; if (S.own[p] >= 0) S.ctrl[p] = S.own[p]; else S.ctrl[p] = -1; });
   n.stab = Math.min(100, n.stab + 10); ownChanged(); checkDead(); calcMods(n);
-  log(txt, n.id === S.player ? 'bad' : 'world', [n.id]); notify(n.id, '🏴 Os rebeldes venceram', txt);
+  log(txt, isHuman(n.id) ? 'bad' : 'world', [n.id]); notify(n.id, '🏴 Os rebeldes venceram', txt);
 }
 function religTick() {                                         // uma vez por ano: conversão à fé do Estado e heresias fictícias
   if (!S.culg) initCul(); if (!S.relg) initRelig(); const y = curYear();
@@ -139,10 +139,10 @@ function religTick() {                                         // uma vez por an
       if (S.culg[p] !== n.cul) { const lv = CPOL[(n.cpol || {})[S.culg[p]] || 0]; if (chance(.008 * lv.as * (1 + edu) * (culKin(S.culg[p], n.cul) ? 2 : 1))) S.culg[p] = n.cul; }
     }
     const ps = provsOf(n.id); if (!ps.length) return;
-    if (y > 1450 && chance(.003)) { const p = pickR(ps); S.relg[p] = REL_IDS.indexOf('aurora'); if (n.id === S.player) log('🌅 Uma heresia, o Culto da Aurora, surgiu em ' + WD.provs[p].n + '.', 'info', [n.id]); }
+    if (y > 1450 && chance(.003)) { const p = pickR(ps); S.relg[p] = REL_IDS.indexOf('aurora'); if (isHuman(n.id)) log('🌅 Uma heresia, o Culto da Aurora, surgiu em ' + WD.provs[p].n + '.', 'info', [n.id]); }
     const AT = FAITH_RULES.atheism, ai = REL_IDS.indexOf('atheism');   // ateus: surgem aos poucos depois de 1700; o Estado laico multiplica
     if (ai >= 0 && y >= RELIGIONS.atheism.y0) { const pk = AT.base * (1 + edu * AT.edu) * (AT.law[n.laws.relig] ?? 1); for (const p of ps) if (S.relg[p] !== ai && chance(pk)) S.relg[p] = ai; }
-    if (y > 1880 && hasT(n, 'eco_factory') && chance(.002)) { const p = pickR(ps); S.relg[p] = REL_IDS.indexOf('machine'); if (n.id === S.player) log('⚙️ A Igreja da Máquina ganhou fiéis em ' + WD.provs[p].n + '.', 'info', [n.id]); }
+    if (y > 1880 && hasT(n, 'eco_factory') && chance(.002)) { const p = pickR(ps); S.relg[p] = REL_IDS.indexOf('machine'); if (isHuman(n.id)) log('⚙️ A Igreja da Máquina ganhou fiéis em ' + WD.provs[p].n + '.', 'info', [n.id]); }
   });
   const fict = new Set(REL_IDS.map((r, i) => RELIGIONS[r].fict ? i : -1).filter(i => i >= 0));     // heresias se espalham devagar
   for (let p = 0; p < S.relg.length; p++) if (fict.has(S.relg[p]) && chance(.08)) { const q = pickR(WD.provs[p].adj); if (q == null) continue; const o = S.own[q]; if (o < 0 || nat(o).laws.relig !== 'state') S.relg[q] = S.relg[p]; }   // ilhas sem vizinhos: nada a espalhar
@@ -170,5 +170,5 @@ function makeMain(n, kind, id) {                               // uma cultura ac
   n.money -= mainCost(); n.stab = Math.max(0, n.stab - 15); n.mainCd = S.t + 360 * 20;
   const old = kind === 'cul' ? n.cul : n.relig; pol[old] = 2; delete pol[id];
   if (kind === 'cul') n.cul = +id; else { n.relig = +id; n.fav = 50; n.excom = false; } calcMods(n);
-  log(natName(n) + (kind === 'cul' ? ' adotou a cultura ' + CULTURES[id].n + ' como principal.' : ' adotou ' + RELIGIONS[REL_IDS[id]].n + ' como fé oficial.'), n.id === S.player ? 'good' : 'world', [n.id]); return '';
+  log(natName(n) + (kind === 'cul' ? ' adotou a cultura ' + CULTURES[id].n + ' como principal.' : ' adotou ' + RELIGIONS[REL_IDS[id]].n + ' como fé oficial.'), isHuman(n.id) ? 'good' : 'world', [n.id]); return '';
 }

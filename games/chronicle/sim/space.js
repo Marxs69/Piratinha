@@ -30,7 +30,7 @@ function spaceDone(n, k) {
   if (k === 'probe') { M.known[n.id] = 1; const lifeT = { none: 'sem vida', micro: 'com vida microscópica', complex: 'com fauna e flora complexas', intel: 'com vida inteligente: ' + M.civs.length + ' civilização' + (M.civs.length > 1 ? 'ões' : '') }[M.life]; notify(n.id, '🌑 ' + M.n, 'A sonda (' + rk + ') chegou a ' + M.n + ': lua ' + M.type.toLowerCase() + ', gravidade ' + M.grav + 'g, ' + lifeT + '.'); }
   if (k === 'land') { M.landed[n.id] = 1; n.stab = Math.min(100, n.stab + 10); }
   if (k === 'base') M.base[n.id] = 1;
-  log((k === 'sat' ? natName(n) + ' pôs um satélite em órbita' : (first ? 'Pela primeira vez na história, ' : '') + natName(n) + ' concluiu: ' + SPACE[k].n + ' em ' + M.n) + ' (' + rk + ').', n.id === S.player ? 'good' : first ? 'world' : 'none', [n.id]);
+  log((k === 'sat' ? natName(n) + ' pôs um satélite em órbita' : (first ? 'Pela primeira vez na história, ' : '') + natName(n) + ' concluiu: ' + SPACE[k].n + ' em ' + M.n) + ' (' + rk + ').', isHuman(n.id) ? 'good' : first ? 'world' : 'none', [n.id]);
 }
 function alienAct(n, ci, kind) {                             // contato, comércio, presente ou guerra com uma civilização da lua
   const c = S.moon.civs[ci]; if (!c) return 'Inválido'; if (!hasT(n, 'spc_contact') || !S.moon.known[n.id]) return 'Exige Protocolos de contato e sondar a lua';
@@ -50,8 +50,8 @@ function alienTick() {                                        // civilizações 
     if (!c.aggro || c.era < 4 || c.subj != null) return;
     S.nations.forEach(n => {
       if (!n.alive) return;
-      if (M.base[n.id] && chance(.01)) { const def = strength(n) * (1 + (n.sats || 0) * .02); if (def * rnd() < c.pow * 3) { M.base[n.id] = 0; log(c.n + ' atacou e destruiu a base lunar de ' + natName(n) + '.', n.id === S.player ? 'bad' : 'world', [n.id]); notify(n.id, '👽 Ataque à base lunar', c.n + ' destruiu sua base em ' + M.n + '.'); } }
-      if (c.era >= 7 && M.known[n.id] && chance(.003)) { const ps = provsOf(n.id); if (ps.length) { const p = pickR(ps); S.pop[p] *= .9; n.stab = Math.max(0, n.stab - 5); log(c.n + ' atacou ' + WD.provs[p].n + ' vindo da lua!', n.id === S.player ? 'bad' : 'world', [n.id]); } }
+      if (M.base[n.id] && chance(.01)) { const def = strength(n) * (1 + (n.sats || 0) * .02); if (def * rnd() < c.pow * 3) { M.base[n.id] = 0; log(c.n + ' atacou e destruiu a base lunar de ' + natName(n) + '.', isHuman(n.id) ? 'bad' : 'world', [n.id]); notify(n.id, '👽 Ataque à base lunar', c.n + ' destruiu sua base em ' + M.n + '.'); } }
+      if (c.era >= 7 && M.known[n.id] && chance(.003)) { const ps = provsOf(n.id); if (ps.length) { const p = pickR(ps); S.pop[p] *= .9; n.stab = Math.max(0, n.stab - 5); log(c.n + ' atacou ' + WD.provs[p].n + ' vindo da lua!', isHuman(n.id) ? 'bad' : 'world', [n.id]); } }
     });
   });
 }

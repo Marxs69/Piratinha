@@ -43,7 +43,7 @@ function planInvasion(n, a, to) {
 function cancelInvasion(a, why) {
   const I = a.inv; if (!I) return; S.fleets.forEach(f => { if (f.inv === a.id) f.inv = null; }); a.inv = null;
   if (a.p >= WD.provs.length) { a.p = I.port; a.fleet = null; }
-  if (a.o === S.player && why) log('Invasão cancelada: ' + why + '.', 'bad', [S.player]);
+  if (isHuman(a.o) && why) log('Invasão cancelada: ' + why + '.', 'bad', [S.player]);
 }
 function invasionTick() {
   const P = WD.provs.length;
@@ -58,28 +58,28 @@ function invasionTick() {
         if (f.z !== I.z0) continue;
         if (fleetCap(f) < regs(a) * .95) { cancelInvasion(a, 'navios insuficientes'); continue; }
         a.p = P + I.z0; a.fleet = f.id; a.path = []; I.st = 'sail'; if (I.z1 !== I.z0) orderFleet(f, I.z1);
-        if (a.o === S.player) log('O exército embarcou em ' + WD.provs[I.port].n + '.', 'info', [S.player]);
+        if (isHuman(a.o)) log('O exército embarcou em ' + WD.provs[I.port].n + '.', 'info', [S.player]);
       } else if (!a.path.length && a.p !== I.port && !orderArmy(a, I.port)) cancelInvasion(a, 'o porto ficou inalcançável');
       continue;
     }
     a.p = P + f.z;                                            // embarcado: anda com a frota
     if (I.st === 'sail' && f.z === I.z1 && !f.path.length && !zoneHostile(a.o, f.z)) {
       const def = S.armies.some(b => b.p === I.to && atWar(a.o, b.o));
-      if (a.o !== S.player && enemyPower(a.o).get(I.to) > armyPower(a) * .8) { I.st = 'back'; orderFleet(f, I.z0); continue; }   // a IA não desembarca em cima de um exército mais forte
+      if (!isHuman(a.o) && enemyPower(a.o).get(I.to) > armyPower(a) * .8) { I.st = 'back'; orderFleet(f, I.z0); continue; }   // a IA não desembarca em cima de um exército mais forte
       I.st = 'land'; I.t = S.t + Math.round((7 + (def ? 7 : 0)) * (a.sup && a.sup.eng ? .5 : 1));
     }
     if (I.st === 'land' && S.t >= I.t) {
       if (!canEnter(a.o, I.to)) { I.st = 'back'; orderFleet(f, I.z0); continue; }
       a.p = I.to; a.fleet = null; a.inv = null; a.arr = S.t; a.amph = S.t + 15; explore(n, a.p);
       S.fleets.forEach(x => { if (x.inv === a.id) x.inv = null; });
-      if (a.o === S.player) log('Desembarque em ' + WD.provs[I.to].n + '.', 'good', [S.player]);
-      else if (S.own[I.to] === S.player) log(natName(n) + ' desembarcou tropas em ' + WD.provs[I.to].n + '!', 'bad', [S.player]);
+      if (isHuman(a.o)) log('Desembarque em ' + WD.provs[I.to].n + '.', 'good', [S.player]);
+      else if (isHuman(S.own[I.to])) log(natName(n) + ' desembarcou tropas em ' + WD.provs[I.to].n + '!', 'bad', [S.player]);
     }
     if (I.st === 'back' && f.z === I.z0 && !f.path.length) {
       const port = S.ctrl[I.port] === a.o ? I.port : WD.seas[I.z0].provs.find(p => S.ctrl[p] === a.o);
-      if (port == null) { UT.forEach(t => a[t] = 0); if (a.o === S.player) log('Sem porto amigo: o exército a bordo se perdeu.', 'bad', [S.player]); continue; }
+      if (port == null) { UT.forEach(t => a[t] = 0); if (isHuman(a.o)) log('Sem porto amigo: o exército a bordo se perdeu.', 'bad', [S.player]); continue; }
       a.p = port; a.fleet = null; a.inv = null; S.fleets.forEach(x => { if (x.inv === a.id) x.inv = null; });
-      if (a.o === S.player) log('A frota trouxe o exército de volta a ' + WD.provs[port].n + '.', 'bad', [S.player]);
+      if (isHuman(a.o)) log('A frota trouxe o exército de volta a ' + WD.provs[port].n + '.', 'bad', [S.player]);
     }
   }
 }
@@ -91,12 +91,12 @@ function navalBattle(f, g) {
   for (const [x, D] of [[f, Df], [g, Dg]]) { const c = carriedRegs(x), cap = fleetCap(x); if (c > cap && c > 0) { const k = (1 - cap / c) * D.cargo; carriedBy(x).forEach(a => UT.forEach(t => a[t] *= 1 - k)); } }
   const fp = f.ships * nat(f.o).fx.ship, gp = g.ships * nat(g.o).fx.ship;
   for (const [x, xp, yp, D] of [[f, fp, gp, Df], [g, gp, fp, Dg]]) if (x.ships > .2 && xp < yp * D.ret) fleetRetreat(x);
-  if ((f.o === S.player || g.o === S.player) && (f0 - f.ships > .5 || g0 - g.ships > .5) && !(f.nb > S.t)) { f.nb = S.t + 30; log('Batalha naval em ' + WD.seas[f.z].n + '.', 'info', [S.player]); }
+  if ((isHuman(f.o) || isHuman(g.o)) && (f0 - f.ships > .5 || g0 - g.ships > .5) && !(f.nb > S.t)) { f.nb = S.t + 30; log('Batalha naval em ' + WD.seas[f.z].n + '.', 'info', [S.player]); }
   const H = S.navHist = S.navHist || [], L = H.find(x => x.z === f.z && S.t - x.t < 30 && ((x.a === f.o && x.b === g.o) || (x.a === g.o && x.b === f.o)));   // a mesma batalha (dias seguidos) acumula
   if (L) { const sw = L.a !== f.o; L.la += sw ? g0 - g.ships : f0 - f.ships; L.lb += sw ? f0 - f.ships : g0 - g.ships; L.t = S.t; } else { H.unshift({ z: f.z, a: f.o, b: g.o, la: f0 - f.ships, lb: g0 - g.ships, t: S.t, t0: S.t }); if (H.length > 30) H.pop(); }
 }
 function fleetRetreat(x) {
   const inv = S.armies.find(a => a.inv && a.fleet === x.id);
-  if (inv) { inv.inv.st = 'back'; orderFleet(x, inv.inv.z0); if (inv.o === S.player) log('A frota de invasão perdeu e está voltando com as tropas.', 'bad', [S.player]); return; }
+  if (inv) { inv.inv.st = 'back'; orderFleet(x, inv.inv.z0); if (isHuman(inv.o)) log('A frota de invasão perdeu e está voltando com as tropas.', 'bad', [S.player]); return; }
   const n = nat(x.o), safe = WD.seas[x.z].adj.find(w => seaOk(n, w) && !zoneHostile(x.o, w)); if (safe != null) { x.path = [safe]; x.prog = 0; }
 }
