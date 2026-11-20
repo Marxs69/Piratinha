@@ -621,51 +621,104 @@ const CPOL = { '-2': { n: 'Escravizada', e: '⛓️', w: 2.5, as: 0, ag: 3, d: '
 const RPOL_N = { '-2': ['Perseguida', 'Fiéis dessa fé viram escravos a cada mês (exige escravidão permitida).'], '-1': ['Discriminada', 'Conversão três vezes mais rápida para a fé oficial, mas pesa mais e gera revoltas.'], '0': ['Livre', 'Situação normal de minoria: converte devagar.'], '1': ['Tolerada', 'Metade do peso como minoria; converte bem devagar.'], '2': ['Reconhecida', 'Conta como fé do país (sem peso). Ocupa uma vaga e pode virar a fé oficial.'] };
 const CUL_SLOTS = { primary: 1, accepted: 3, multi: 8 }, REL_SLOTS = { state: 0, tolerant: 1, free: 3, secular: 8 };
 
-/* ---------- religiões (reais e fictícias): cada cultura nasce com uma; as fictícias surgem como heresias ---------- */
+/* ---------- religiões (todas fictícias) ----------
+   A lista é fixa; a cada partida (pela seed) cada fé sorteia família, doutrina, chefe religioso e nome da guerra santa (rollFaiths).
+   fict = heresia (surge no jogo: Aurora a partir de 1450, Máquina na era industrial, Serpente em bolsões). */
 const RELIGIONS = {
-  roman:     { n: 'Cristianismo romano', e: '✝️', col: '#e8d48a' }, orthodox: { n: 'Cristianismo ortodoxo', e: '☦️', col: '#c9a0dc' },
-  norse:     { n: 'Fé nórdica', e: '🪓', col: '#7aa6c2' }, slavic: { n: 'Fé eslava', e: '🌳', col: '#6f9e5a' },
-  islam:     { n: 'Islã', e: '☪️', col: '#4fa36b' }, buddhism: { n: 'Budismo', e: '☸️', col: '#f0a64a' },
-  confucian: { n: 'Confucionismo', e: '📜', col: '#d46a5a' }, ancestral: { n: 'Fé ancestral', e: '🥁', col: '#a0784a' },
-  fifthsun:  { n: 'Culto do Quinto Sol', e: '🌞', col: '#e0703c' }, ocean: { n: 'Fé do Oceano', e: '🌊', col: '#4a9ec9' },
-  zoroaster: { n: 'Zoroastrismo', e: '🔥', col: '#e6a23c' },
-  aurora:    { n: 'Culto da Aurora', e: '🌅', col: '#ff9ec7', fict: 1 }, machine: { n: 'Igreja da Máquina', e: '⚙️', col: '#9aa4ad', fict: 1 },
-  // religiões menores (sem Estado): bolsões espalhados pelo mundo
-  druid:     { n: 'Fé druídica', e: '🌿', col: '#5f9e6e', minor: 1 }, shaman: { n: 'Xamanismo', e: '🦌', col: '#8f7a5c', minor: 1 },
-  bon:       { n: 'Bön', e: '🏔️', col: '#b0705a', minor: 1 }, kamuy: { n: 'Fé Kamuy', e: '🐻', col: '#7d6a8f', minor: 1 },
-  tengri:    { n: 'Tengrismo', e: '🐺', col: '#6f8fb5', minor: 1 }, gnostic: { n: 'Gnosticismo', e: '👁️', col: '#c8b7e8', minor: 1 },
-  manich:    { n: 'Maniqueísmo', e: '🌗', col: '#9e9e6e', minor: 1 }, serpent: { n: 'Irmandade da Serpente', e: '🐍', col: '#5aa58a', minor: 1, fict: 1 },
-  // surgem no jogo (sempre no fim: S.relg guarda o índice)
-  protestant:{ n: 'Protestantismo', e: '📖', col: '#f2f2e6' },
+  aurora: { n: 'Culto da Aurora', e: '🌅', col: '#d87777', fict: 1 },
+  machine: { n: 'Igreja da Máquina', e: '⚙️', col: '#7793d8', fict: 1 },
+  serpent: { n: 'Irmandade da Serpente', e: '🐍', col: '#b0d877', fict: 1 },
+  veiledsun: { n: 'Culto do Sol Velado', e: '🌞', col: '#d877cc' },
+  firstfire: { n: 'Igreja do Primeiro Fogo', e: '🔥', col: '#77d8c8' },
+  sevenmoons: { n: 'Fé das Sete Luas', e: '🌙', col: '#d8ab77' },
+  void: { n: 'Caminho do Vazio Sereno', e: '🌑', col: '#8f77d8' },
+  openeye: { n: 'Ordem do Olho Aberto', e: '👁️', col: '#7bd877' },
+  tides: { n: 'Culto das Marés', e: '🌊', col: '#d87797' },
+  stoneanc: { n: 'Fé dos Antepassados de Pedra', e: '🗿', col: '#77b4d8' },
+  crown: { n: 'Igreja da Coroa Celeste', e: '👑', col: '#d0d877' },
+  whitewolf: { n: 'Senda do Lobo Branco', e: '🐺', col: '#c477d8' },
+  mothertree: { n: 'Culto da Árvore-Mãe', e: '🌳', col: '#77d8a7' },
+  thunder: { n: 'Fé do Trovão Eterno', e: '⚡', col: '#d88b77' },
+  mirrors: { n: 'Escola dos Mil Espelhos', e: '🪞', col: '#777fd8' },
+  blackfire: { n: 'Culto do Fogo Negro', e: '🖤', col: '#9bd877' },
+  guidestar: { n: 'Igreja da Estrela Guia', e: '⭐', col: '#d877b8' },
+  river: { n: 'Caminho do Rio Sagrado', e: '🏞️', col: '#77d4d8' },
+  redmoon: { n: 'Culto da Lua Vermelha', e: '🔴', col: '#d8c077' },
+  winds: { n: 'Fé dos Quatro Ventos', e: '🌬️', col: '#a377d8' },
+  hammer: { n: 'Ordem do Martelo', e: '🔨', col: '#77d887' },
+  sleep: { n: 'Culto do Sono Eterno', e: '💤', col: '#d87783' },
+  mountain: { n: 'Fé da Montanha Viva', e: '⛰️', col: '#77a0d8' },
+  sealed: { n: 'Igreja do Verbo Selado', e: '📜', col: '#bcd877' },
+  bees: { n: 'Culto das Abelhas Douradas', e: '🐝', col: '#d877d8' },
+  stag: { n: 'Fé do Cervo Alado', e: '🦌', col: '#77d8bb' },
+  ninefl: { n: 'Senda das Nove Chamas', e: '🕯️', col: '#d89f77' },
+  brokensky: { n: 'Culto do Céu Partido', e: '🌩️', col: '#8377d8' },
+  twins: { n: 'Fé dos Gêmeos', e: '♊', col: '#87d877' },
+  salt: { n: 'Igreja do Sal', e: '🧂', col: '#d877a4' },
+  silence: { n: 'Caminho do Silêncio', e: '🤫', col: '#77c0d8' },
+  phoenix: { n: 'Culto da Fênix', e: '🐦‍🔥', col: '#d8d477' },
+  iron: { n: 'Fé do Ferro', e: '⛓️', col: '#b777d8' },
+  scales: { n: 'Ordem da Balança', e: '⚖️', col: '#77d89b' },
+  fish: { n: 'Culto do Grande Peixe', e: '🐟', col: '#d87e77' },
+  sands: { n: 'Fé das Areias Eternas', e: '🏜️', col: '#778bd8' },
+  lamp: { n: 'Igreja da Lâmpada', e: '🪔', col: '#a8d877' },
+  raven: { n: 'Culto do Corvo', e: '🐦‍⬛', col: '#d877c4' },
+  harvest: { n: 'Fé da Colheita', e: '🌾', col: '#77d8d0' },
+  dragon: { n: 'Senda do Dragão Adormecido', e: '🐉', col: '#d8b377' },
+  eclipse: { n: 'Culto do Eclipse', e: '🌘', col: '#9777d8' },
+  bones: { n: 'Fé dos Ossos Cantores', e: '🦴', col: '#77d87a' },
+  oath: { n: 'Igreja do Juramento', e: '🤝', col: '#d87790' },
+  mist: { n: 'Caminho da Névoa', e: '🌫️', col: '#77acd8' },
+  bull: { n: 'Culto do Touro Celeste', e: '🐂', col: '#c9d877' },
+  lotus: { n: 'Fé do Lótus de Prata', e: '🪷', col: '#cb77d8' },
+  clock: { n: 'Ordem do Relógio', e: '🕰️', col: '#77d8af' },
+  rain: { n: 'Culto da Chuva', e: '🌧️', col: '#d89377' },
+  horizon: { n: 'Fé do Horizonte', e: '🌄', col: '#7777d8' },
+  icemart: { n: 'Igreja dos Mártires do Gelo', e: '🧊', col: '#94d877' },
+  maze: { n: 'Culto do Labirinto', e: '🌀', col: '#d877b0' },
+  ember: { n: 'Fé da Brasa Viva', e: '♨️', col: '#77cdd8' },
+  owl: { n: 'Ordem da Coruja', e: '🦉', col: '#d8c777' },
 };
-/* fé com peso: grp = família (guerra santa só contra outra família); doc = doutrina (modificadores enquanto for a fé oficial);
-   head = [instituição, título] do chefe religioso (só fés organizadas); holy = nome da guerra santa */
-const FAITH = {
-  roman:      { grp: 'abr', doc: { stab: .03, research: .02 }, head: ['Papado', 'Papa'], holy: 'Cruzada', d: 'Igreja hierárquica e letrada: ordem e escolas monásticas.' },
-  orthodox:   { grp: 'abr', doc: { stab: .05, admin: .05 }, head: ['Patriarcado', 'Patriarca'], holy: 'Cruzada', d: 'Igreja unida ao trono: estabilidade e administração.' },
-  protestant: { grp: 'abr', doc: { research: .06, tax: .03, stab: -.02 }, holy: 'Guerra de religião', d: 'Fé lida por cada um: ciência e comércio, menos unidade.' },
-  islam:      { grp: 'abr', doc: { tax: .04, trade: .04 }, head: ['Califado', 'Califa'], holy: 'Jihad', d: 'Lei religiosa e rotas de caravana: impostos e comércio.' },
-  norse:      { grp: 'pagan', doc: { army: .06, speed: .05 }, holy: 'Grande saque', d: 'Glória em combate: exércitos fortes e rápidos.' },
-  slavic:     { grp: 'pagan', doc: { manpower: .1 }, holy: 'Guerra santa', d: 'Clãs guerreiros: mais contingente.' },
-  buddhism:   { grp: 'dharma', doc: { stab: .06, army: -.03 }, head: ['Sangha', 'Lama supremo'], d: 'Caminho do meio: paz interna, pouco gosto pela guerra.' },
-  confucian:  { grp: 'dharma', doc: { admin: .1, tax: .03 }, d: 'Burocracia de mérito: obras baratas e impostos bem cobrados.' },
-  ancestral:  { grp: 'pagan', doc: { growth: .05 }, d: 'Os ancestrais protegem a família: a população cresce.' },
-  fifthsun:   { grp: 'pagan', doc: { army: .05, stab: -.02 }, head: ['Templo do Sol', 'Grande sacerdote'], holy: 'Guerra florida', d: 'O sol exige sacrifício: guerra constante.' },
-  ocean:      { grp: 'pagan', doc: { trade: .06, colon: .05 }, d: 'O mar é sagrado: comércio e colonização.' },
-  zoroaster:  { grp: 'iran', doc: { research: .03, stab: .03 }, head: ['Fogo Sagrado', 'Mobed supremo'], holy: 'Guerra da luz', d: 'Luz contra trevas: saber e ordem.' },
-  aurora:     { grp: 'new', doc: { research: .05, stab: -.03 }, d: 'Heresia da renovação: ideias novas, unidade frágil.' },
-  machine:    { grp: 'new', doc: { prod: .08, stab: -.02 }, head: ['Sínodo da Máquina', 'Engenheiro-mor'], d: 'A fábrica é o templo: produção acima de tudo.' },
+/* peculiaridades sorteadas a cada partida: famílias de fé (guerra santa só contra outra família), doutrinas e títulos */
+const FAITH_GRP = { sol: 'Fés solares', lua: 'Fés lunares', anc: 'Fés ancestrais', livro: 'Fés do Livro', nat: 'Fés da natureza', fogo: 'Fés do fogo', vazio: 'Fés do vazio', mar: 'Fés do mar' };
+const DOC_POOL = { stab: [.03, .06], research: [.03, .07], tax: [.03, .06], trade: [.03, .07], army: [.03, .07], manpower: [.05, .12], admin: [.05, .1], growth: [.03, .06], colon: [.05, .1], speed: [.03, .06], prod: [.03, .06], food: [.03, .06] };
+const HEAD_POOL = [['Sínodo', 'Patriarca'], ['Santa Sé', 'Pontífice'], ['Grande Templo', 'Sumo-sacerdote'], ['Conclave', 'Primaz'], ['Oráculo', 'Grande Vidente'], ['Colégio Sagrado', 'Hierofante'], ['Mosteiro-Mãe', 'Abade supremo'], ['Trono Sagrado', 'Profeta'], ['Círculo Interior', 'Arquidruida'], ['Assembleia dos Santos', 'Exarca']];
+const HOLY_POOL = ['Cruzada', 'Guerra santa', 'Peregrinação armada', 'Guerra da luz', 'Purificação', 'Marcha sagrada', 'Grande saque', 'Guerra florida', 'Jornada da fé', 'Vingança divina'];
+const GRP_D = { sol: 'O sol ordena o mundo', lua: 'Os ciclos da lua guiam a vida', anc: 'Os mortos guardam os vivos', livro: 'A palavra escrita é a lei', nat: 'A terra e os bichos são sagrados', fogo: 'O fogo purifica', vazio: 'A paz está no nada', mar: 'O mar dá e o mar toma' };
+/* doutrinas no estilo CK3 (sorteadas por partida): cada fé tem uma opção de cada doutrina e dois princípios.
+   Efeitos: m = modificadores (doutrina da fé oficial); mw = peso das minorias religiosas; noHoly = sem guerra santa; fr = chance de governante mulher ×; kids = filhos × */
+const DOCTRINES = {
+  head:     { n: 'Chefe da fé', o: { none: { n: 'Sem chefe', p: .45 }, spiritual: { n: 'Chefe espiritual', p: .4 }, temporal: { n: 'Chefe temporal', p: .15, m: { stab: .02 } } } },
+  plural:   { n: 'Pluralismo', o: { fund: { n: 'Fundamentalista', p: .3, mw: 1.5 }, right: { n: 'Justa', p: .45, mw: 1 }, plural: { n: 'Pluralista', p: .25, mw: .5, noHoly: 1, m: { stab: .02 } } } },
+  gender:   { n: 'Gênero', o: { male: { n: 'Dominada por homens', p: .55, fr: .5 }, equal: { n: 'Igualitária', p: .35, fr: 2.5, m: { prod: .02 } }, female: { n: 'Dominada por mulheres', p: .1, fr: 8 } } },
+  marriage: { n: 'Casamento', o: { mono: { n: 'Monogamia', p: .55, m: { stab: .02 } }, poly: { n: 'Poligamia', p: .25, kids: 1.6, m: { stab: -.02 } }, conc: { n: 'Concubinato', p: .2, kids: 1.3 } } },
+  clergy:   { n: 'Clero', o: { celib: { n: 'Celibatário', p: .5, m: { stab: .02 } }, married: { n: 'Casado', p: .5, m: { growth: .02 } } } },
 };
-const faithOf = r => FAITH[REL_IDS[r]] || { grp: 'pagan', doc: {}, d: 'Fé local, sem doutrina organizada.' };
-/* reformas e cismas: numa janela de anos, uma fé se divide onde o fervor está baixo (e a condição vale) */
+const TENETS = {
+  pilgrim: { n: 'Peregrinações', m: { stab: .03 } }, warriors: { n: 'Guerreiros da fé', m: { army: .06 } }, merchants: { n: 'Mercadores sagrados', m: { trade: .06 } },
+  scholars: { n: 'Erudição sagrada', m: { research: .05 } }, ascetic: { n: 'Ascetismo', m: { stab: .04, tax: -.02 } }, communal: { n: 'Identidade comunal', m: { manpower: .08 } },
+  earth: { n: 'Terra sagrada', m: { food: .05, growth: .02 } }, builders: { n: 'Templos monumentais', m: { admin: .06 } }, missions: { n: 'Missões', m: { colon: .08 } },
+  tithe: { n: 'Dízimo', m: { tax: .05, stab: -.01 } }, martyrs: { n: 'Culto aos mártires', m: { manpower: .05, stab: .01 } }, sea: { n: 'Mar sagrado', m: { speed: .03, trade: .03 } },
+  struggle: { n: 'Luta eterna', m: { army: .04, stab: -.02 } }, harmony: { n: 'Harmonia', m: { stab: .05, army: -.03 } }, craft: { n: 'Ofício sagrado', m: { prod: .05 } },
+};
+/* sorteia as peculiaridades das fés de uma partida (determinístico pela seed) */
+function rollFaiths(seed) {
+  const r = mkRng(seed ^ 0xfa17), gk = Object.keys(FAITH_GRP), tk = Object.keys(TENETS), out = {};
+  const roll = D => { let x = r(); for (const k in D.o) { x -= D.o[k].p; if (x < 0) return k; } return Object.keys(D.o)[0]; };
+  for (const k in RELIGIONS) { const g = gk[r() * gk.length | 0], dc = {}, doc = {}, add = m => { for (const x in m || {}) doc[x] = Math.round(((doc[x] || 0) + m[x]) * 100) / 100; };
+    for (const d in DOCTRINES) { dc[d] = roll(DOCTRINES[d]); add(DOCTRINES[d].o[dc[d]].m); }
+    const tn = tk.slice().sort(() => r() - .5).slice(0, 2); tn.forEach(t => add(TENETS[t].m));
+    out[k] = { grp: g, dc, tn, doc, head: dc.head === 'none' ? null : HEAD_POOL[r() * HEAD_POOL.length | 0], holy: DOCTRINES.plural.o[dc.plural].noHoly ? null : HOLY_POOL[r() * HOLY_POOL.length | 0], d: GRP_D[g] + '.' }; }
+  return out;
+}
+const docOpt = (r, d) => { const F = faithOf(r); return F.dc ? DOCTRINES[d].o[F.dc[d]] : {}; };
+const faithOf = r => (S && S.faith && S.faith[REL_IDS[r]]) || { grp: 'nat', doc: {}, d: 'Fé local.' };
+/* reformas: numa janela de anos, a maior fé organizada do continente principal se divide onde o fervor está baixo; a fé nova é uma das que não têm povo */
 const REFORMS = [
-  { id: 'reformation', n: 'Reforma', from: 'roman', to: 'protestant', y: [1480, 1600], when: { tech: 'soc_printing' }, ferv: 45, sp: .2 },
+  { id: 'reformation', n: 'Reforma', y: [1480, 1600], when: { tech: 'soc_printing' }, ferv: 45, sp: .2 },
 ];
 const FERV = { donate: 40, invest: 25, crusade: 40, excom: 15, lift: 35 };   // custo em favor/limites
 const REL_IDS = Object.keys(RELIGIONS);
-const CUL_MAJOR = 10;                                         // as 10 primeiras culturas podem ter nação; as outras são menores
-const CUL_REL = ['roman', 'roman', 'norse', 'slavic', 'islam', 'confucian', 'ancestral', 'fifthsun', 'ocean', 'zoroaster'];   // pelo índice de CULTURES
-const CUL_REL2 = ['orthodox', 'orthodox', 'roman', 'orthodox', 'islam', 'buddhism', 'islam', 'fifthsun', 'ocean', 'islam'];    // variante regional
 
 /* ---------- espaço: foguete de cada vertente e a lua sorteada em cada partida ---------- */
 const ROCKETS = { none: 'Foguete químico', clock: 'Foguete de corda', steam: 'Foguete a vapor', tesla: 'Canhão eletromagnético', diesel: 'Foguete a diesel', atom: 'Foguete nuclear', bio: 'Nave orgânica', cyber: 'Lançador em rede', solar: 'Vela solar', nano: 'Elevador de nanotubos', space: 'Nave estelar' };
@@ -726,11 +779,11 @@ const SUBJ_LAW_DEF = { tribute: 'normal', army: 'own', rule: 'advisors' };
    invasões: surgem como países novos com exército grande. from: 'cold' = costa do continente frio; 'edge' = ponta leste do continente principal.
    army = múltiplo da força do vizinho mais forte; cav = parte de cavalaria; years = anos de fúria (IA agressiva) */
 const INVASIONS = [
-  { id: 'vikings', n: 'Grande Exército', y: [860, 920], from: 'cold', cul: 2, relig: 'norse', gov: 'tribal', army: 1.6, min: 22, cav: .1, ships: 1, years: 30, e: '🪓',
+  { id: 'vikings', n: 'Grande Exército', y: [860, 920], from: 'cold', cul: 'local', relig: 'local', gov: 'tribal', army: 1.6, min: 22, cav: .1, ships: 1, years: 30, e: '🪓',
     m: 'Os chefes do norte uniram-se num Grande Exército e cruzam o mar atrás de terras e ouro.' },
-  { id: 'magyars', n: 'Federação das Estepes', y: [895, 960], from: 'edge', cul: 18, relig: 'tengri', gov: 'horde', army: 1.8, min: 25, cav: .7, years: 40, e: '🏹',
+  { id: 'magyars', n: 'Federação das Estepes', y: [895, 960], from: 'edge', cul: 'new', fam: 'gut', relig: 'new', gov: 'horde', army: 1.8, min: 25, cav: .7, years: 40, e: '🏹',
     m: 'Cavaleiros das estepes atravessaram a fronteira leste. Saqueiam tudo o que alcançam.' },
-  { id: 'mongols', n: 'Grande Horda', y: [1206, 1260], from: 'edge', cul: 18, relig: 'tengri', gov: 'horde', army: 3.5, min: 40, cav: .8, years: 60, e: '🐎',
+  { id: 'mongols', n: 'Grande Horda', y: [1206, 1260], from: 'edge', cul: 'new', fam: 'gut', relig: 'new', gov: 'horde', army: 3.5, min: 40, cav: .8, years: 60, e: '🐎',
     m: 'Um grande cã uniu as tribos das estepes. Sua horda avança como uma tempestade.' },
 ];
 /* ondas e guerras do mundo */
@@ -765,27 +818,48 @@ const TUTOR_TR = { chancellor: ['charismatic', 'just', 'honest'], marshal: ['bra
 const TRAIT_OPP = [['brave', 'craven'], ['just', 'cruel'], ['greedy', 'generous'], ['zealous', 'cynical'], ['diligent', 'lazy'], ['honest', 'schemer'], ['content', 'ambitious'], ['genius', 'slow']];
 const COUNCIL = [['chancellor', 'Chanceler', 'dip'], ['marshal', 'Marechal', 'mar'], ['steward', 'Tesoureiro', 'adm'], ['spymaster', 'Mestre espião', 'int'], ['scholar', 'Erudito', 'lea']];
 
-/* ---------- culturas: sílabas para nomes de lugares, pessoas e dinastias ---------- */
-const CULTURES = [
-  { n: 'Latina',   a: ['ro', 'ma', 'va', 'le', 'ti', 'ca', 'sa', 'lu', 'ne', 'ra', 'vi', 'to', 'ce', 'li', 'ri', 'tu'], b: ['ria', 'na', 'lia', 'ssa', 'ntia', 'rum', 'nia', 'ca', 'tia', 'lo'], m: ['Marco', 'Lúcio', 'Tito', 'Caio', 'Paulo', 'Otávio', 'Sérgio', 'Fábio', 'Júlio', 'Vítor'], f: ['Lívia', 'Júlia', 'Cláudia', 'Otávia', 'Paula', 'Flávia', 'Valéria', 'Aurélia'] },
-  { n: 'Germânica', a: ['wal', 'ber', 'gun', 'hel', 'rich', 'win', 'ald', 'sig', 'thor', 'eg', 'hal', 'mund', 'bran', 'dor'], b: ['burg', 'heim', 'land', 'mark', 'stadt', 'feld', 'wald', 'au', 'gard', 'dorf'], m: ['Otto', 'Konrad', 'Heinrich', 'Ludwig', 'Albrecht', 'Siegfried', 'Gunther', 'Friedrich', 'Walter'], f: ['Mathilde', 'Hildegard', 'Gisela', 'Adelheid', 'Brunhilde', 'Irmgard', 'Kunigunde'] },
-  { n: 'Nórdica',  a: ['ska', 'thor', 'ulf', 'bjor', 'sig', 'rag', 'hall', 'frey', 'ein', 'tor', 'vik', 'har', 'gun', 'sve'], b: ['heim', 'vik', 'fjord', 'by', 'gard', 'stad', 'ness', 'holm', 'dal', 'ey'], m: ['Ragnar', 'Bjorn', 'Ivar', 'Harald', 'Sigurd', 'Ulf', 'Halfdan', 'Erik', 'Olaf', 'Thorvald'], f: ['Astrid', 'Sigrid', 'Ingrid', 'Freydis', 'Gunnhild', 'Thyra', 'Ragnhild'] },
-  { n: 'Eslava',   a: ['vla', 'mir', 'bor', 'sla', 'ra', 'do', 'bro', 'ko', 'zla', 'pol', 'kra', 'vo', 'lu', 'ro'], b: ['grad', 'slav', 'nia', 'ovo', 'sk', 'ava', 'mir', 'ice', 'ka', 'stan'], m: ['Vladimir', 'Boris', 'Jaroslav', 'Mstislav', 'Bogdan', 'Dobrogost', 'Kazimir', 'Svetopolk'], f: ['Olga', 'Ludmila', 'Dobrava', 'Milena', 'Rogneda', 'Zlata', 'Vesna'] },
-  { n: 'Árabe',    a: ['al', 'ka', 'ra', 'sa', 'ma', 'ha', 'da', 'ja', 'za', 'qa', 'ba', 'ta', 'na', 'fa'], b: ['bad', 'dar', 'shan', 'mir', 'sur', 'ra', 'qan', 'iyya', 'ira', 'bah'], m: ['Harun', 'Yusuf', 'Ali', 'Tariq', 'Rashid', 'Khalid', 'Hamza', 'Idris', 'Saladin', 'Faisal'], f: ['Zaynab', 'Layla', 'Fatima', 'Aisha', 'Yasmin', 'Salma', 'Nur'] },
-  { n: 'Sínica',   a: ['shan', 'li', 'wu', 'jin', 'han', 'zhou', 'ming', 'qin', 'yan', 'tang', 'lu', 'xia', 'song', 'hua'], b: ['an', 'ing', 'zhou', 'yang', 'du', 'shan', 'ling', 'hai', 'yuan', 'ning'], m: ['Wen', 'Jian', 'Hong', 'Zhi', 'Bao', 'Liang', 'Tao', 'Wei', 'Cheng', 'Kang'], f: ['Mei', 'Lian', 'Yue', 'Hua', 'Xiu', 'Ning', 'Jing'] },
-  { n: 'Bantu',    a: ['ka', 'mba', 'zu', 'lu', 'ngo', 'ta', 'shi', 'ki', 'ma', 'wa', 'nde', 'bo', 'mu', 'si'], b: ['nda', 'mbe', 'zi', 'ngo', 'wa', 'land', 'lu', 'ro', 'kwe', 'shi'], m: ['Mansa', 'Sundiata', 'Chaka', 'Kwame', 'Jabari', 'Tendai', 'Oba', 'Kofi', 'Mbeki'], f: ['Nzinga', 'Amani', 'Zuri', 'Nala', 'Ama', 'Imani', 'Thandiwe'] },
-  { n: 'Nauatle',  a: ['tla', 'xo', 'cha', 'tec', 'ma', 'ix', 'ozo', 'co', 'te', 'mix', 'za', 'qui', 'hua', 'to'], b: ['tlan', 'pan', 'co', 'tepec', 'can', 'apan', 'titlan', 'lco', 'xco', 'huac'], m: ['Itzcoatl', 'Tizoc', 'Ahuitzotl', 'Cuauhtli', 'Xolotl', 'Tlacaelel', 'Mixcoatl'], f: ['Citlali', 'Xochitl', 'Itzel', 'Yaretzi', 'Tonalli', 'Atzi'] },
-  { n: 'Polinésia', a: ['ka', 'mo', 'ha', 'lei', 'ta', 'ri', 'ma', 'oa', 'pu', 'ke', 'na', 'ho', 'ki', 'tu'], b: ['loa', 'kai', 'nui', 'moana', 'rua', 'tea', 'hiva', 'lani', 'aro', 'riki'], m: ['Kamehameha', 'Tane', 'Maui', 'Keola', 'Rangi', 'Tupa', 'Kai', 'Hoku'], f: ['Leilani', 'Moana', 'Kalani', 'Hina', 'Malia', 'Noelani'] },
-  { n: 'Persa',    a: ['par', 'sa', 'kho', 'da', 'ar', 'mi', 'ra', 'sha', 'ba', 'zar', 'ves', 'ta', 'pa', 'go'], b: ['stan', 'abad', 'van', 'shahr', 'gird', 'kand', 'pur', 'dan', 'shan', 'zar'], m: ['Darius', 'Cyrus', 'Khosrow', 'Ardashir', 'Shapur', 'Bahram', 'Rostam', 'Kaveh'], f: ['Roxana', 'Shirin', 'Parisa', 'Azadeh', 'Mitra', 'Soraya', 'Yasaman'] },
-
-  // culturas menores, sem nação própria: nascem em bolsões dentro de outros países
-  { n: 'Basca', minor: 1, rel: 'roman', a: ['ar', 'go', 'ize', 'mai', 'txu', 'be', 'lo', 'za'], b: ['rri', 'tegi', 'eta', 'aga', 'ola', 'ondo'], m: ['Aitor', 'Iñaki', 'Xabier', 'Gorka', 'Unai'], f: ['Ane', 'Maite', 'Nerea', 'Itziar', 'Amaia'] },
-  { n: 'Gaélica', minor: 1, rel: 'druid', a: ['dun', 'kil', 'bal', 'glen', 'inis', 'ard', 'cair', 'loch'], b: ['more', 'beg', 'ach', 'an', 'ree', 'ross'], m: ['Brian', 'Cormac', 'Niall', 'Fergus', 'Conall'], f: ['Brigid', 'Aoife', 'Niamh', 'Saoirse', 'Deirdre'] },
-  { n: 'Lapônica', minor: 1, rel: 'shaman', a: ['sam', 'ki', 'jaur', 'vuo', 'rov', 'ina', 'ana', 'gal'], b: ['ri', 'javri', 'vuopmi', 'oaivi', 'la'], m: ['Ánte', 'Niillas', 'Ásllat', 'Mihkkal'], f: ['Elle', 'Máret', 'Sárá', 'Ristin'] },
-  { n: 'Berbere', minor: 1, rel: 'ancestral', a: ['ta', 'ma', 'zi', 'ghr', 'ou', 'ti', 'ad', 'ag'], b: ['mazirt', 'zou', 'ghen', 'dad', 'ouine', 'tit'], m: ['Masinissa', 'Yugurta', 'Aksil', 'Idir', 'Massin'], f: ['Tiziri', 'Dihya', 'Tanirt', 'Lunja'] },
-  { n: 'Tibetana', minor: 1, rel: 'bon', a: ['lha', 'gyal', 'tse', 'dro', 'sam', 'ri', 'ngar', 'khar'], b: ['sa', 'tse', 'ling', 'gang', 'pa', 'chen'], m: ['Tenzin', 'Norbu', 'Dorje', 'Pema', 'Jampa'], f: ['Dolma', 'Yangchen', 'Lhamo', 'Kunsang'] },
-  { n: 'Andina', minor: 1, rel: 'fifthsun', a: ['wa', 'ti', 'qha', 'pu', 'cha', 'ka', 'yu', 'mar'], b: ['pampa', 'marka', 'llaqta', 'qucha', 'wasi', 'kancha'], m: ['Wayna', 'Tupaq', 'Inti', 'Waman', 'Kusi'], f: ['Killa', 'Sisa', 'Urpi', 'Chaska', 'Nina'] },
-  { n: 'Ainu', minor: 1, rel: 'kamuy', a: ['shi', 'ka', 'ru', 'po', 'ta', 'ni', 'sap', 'pet'], b: ['pet', 'nay', 'shiri', 'kotan', 'ushi', 'to'], m: ['Shakushain', 'Kamuy', 'Ekashi', 'Retar'], f: ['Huchi', 'Pirka', 'Mena', 'Uapo'] },
-  { n: 'Malgaxe', minor: 1, rel: 'ancestral', a: ['ana', 'tsi', 'mi', 'ra', 'vo', 'ki', 'ma', 'fi'], b: ['vo', 'rivo', 'tsara', 'ana', 'be', 'tany'], m: ['Rado', 'Andry', 'Ravo', 'Hery', 'Tojo'], f: ['Lova', 'Soa', 'Hanta', 'Fara', 'Vola'] },
-  { n: 'Estepária', minor: 1, rel: 'tengri', a: ['kur', 'tem', 'bat', 'ak', 'kara', 'sar', 'tol', 'yen'], b: ['tai', 'bek', 'kul', 'tash', 'dar', 'gan'], m: ['Temür', 'Bars', 'Arslan', 'Kutlu', 'Bayan'], f: ['Altani', 'Börte', 'Khulan', 'Ayaz'] },
-];
+/* ---------- culturas (todas fictícias): 52 povos em 10 famílias de idioma ----------
+   As sílabas de lugares (a, b) e os nomes de pessoas (m, f) saem da família, sempre iguais para cada povo.
+   A cada partida (pela seed) muda onde cada povo vive, a fé que segue e as peculiaridades dele (rollCultures). */
+const LANGS = {
+  liq: { on: ['l', 'r', 's', 'th', 'v', 'n', 'el', 'al', 'm'], vo: ['a', 'e', 'i', 'ae', 'ia', 'ie'], co: ['', '', 'n', 'l', 'r', 's'], end: ['ria', 'lis', 'nel', 'thas', 'wen', 'ian', 'oria', 'eth', 'iel', 'anor'], me: ['or', 'ian', 'el', 'ath', 'is'], fe: ['iel', 'a', 'ia', 'wen', 'esse'] },
+  har: { on: ['k', 'g', 'dr', 'br', 'th', 'kr', 'z', 'b', 'd', 'h'], vo: ['a', 'o', 'u', 'e'], co: ['', 'r', 'k', 'g', 'm', 'n', 'rd'], end: ['grim', 'dur', 'rok', 'hald', 'bur', 'mok', 'gar', 'zun', 'heim', 'kar'], me: ['ar', 'or', 'ok', 'in', 'um'], fe: ['a', 'is', 'ra', 'una', 'hild'] },
+  sib: { on: ['s', 'sh', 'z', 'q', 'kh', 'm', 'r', 'n', 'h', 'j'], vo: ['a', 'i', 'u', 'aa'], co: ['', 'r', 'n', 'm', 'sh', 'd'], end: ['ar', 'shan', 'qir', 'zad', 'im', 'un', 'ash', 'rah', 'abad', 'iya'], me: ['ad', 'im', 'un', 'ir', 'as'], fe: ['a', 'iya', 'ah', 'ira', 'ine'] },
+  ton: { on: ['t', 'k', 'm', 'n', 'l', 'ch', 'h', 'sh', 'y', 'j'], vo: ['a', 'o', 'i', 'u', 'ao', 'ei'], co: ['', 'n', 'ng', '', 'n'], end: ['an', 'ong', 'ei', 'u', 'ao', 'in', 'eng', 'ya', 'shan', 'lin'], me: ['an', 'ong', 'ei', 'u', 'ao'], fe: ['a', 'i', 'ei', 'yu', 'lan'] },
+  vow: { on: ['k', 'h', 'm', 'n', 'l', 'p', 't', 'w', 'r'], vo: ['a', 'e', 'i', 'o', 'u'], co: [''], end: ['ua', 'ani', 'olo', 'iki', 'ea', 'oa', 'ehu', 'ina', 'aka', 'ono'], me: ['o', 'u', 'aka', 'ele', 'oa'], fe: ['a', 'ani', 'ea', 'ina', 'ola'] },
+  gut: { on: ['q', 'kh', 't', 'b', 'ch', 'y', 'g', 's', 'm', 'ar'], vo: ['a', 'e', 'u', 'o', 'i'], co: ['', 'r', 'n', 'g', 'l', 'q'], end: ['tai', 'khan', 'gul', 'tur', 'bek', 'dar', 'yr', 'gan', 'tash', 'ordu'], me: ['ai', 'an', 'ur', 'ek', 'ar'], fe: ['a', 'e', 'ai', 'gul', 'tana'] },
+  cel: { on: ['br', 'gw', 'c', 'd', 'll', 'm', 'f', 'rh', 't', 'g'], vo: ['a', 'e', 'o', 'y', 'ae'], co: ['', 'n', 'r', 'th', 'ch', 'dd'], end: ['wyn', 'ach', 'dor', 'lyn', 'an', 'ra', 'eth', 'og', 'mor', 'gal'], me: ['an', 'ric', 'dor', 'wyn', 'og'], fe: ['wen', 'a', 'eth', 'yn', 'ra'] },
+  mes: { on: ['tl', 'x', 'ch', 'c', 'm', 'p', 'y', 't', 'hu', 'qu'], vo: ['a', 'e', 'i', 'o'], co: ['', 'l', 'c', 'x', 'n'], end: ['tlan', 'coatl', 'pan', 'ix', 'ec', 'oc', 'tli', 'ya', 'tepec', 'apan'], me: ['tl', 'oc', 'ix', 'atl', 'in'], fe: ['li', 'a', 'ix', 'tli', 'ya'] },
+  sla: { on: ['v', 'z', 'd', 'br', 'st', 'sv', 'kr', 'm', 'l', 'g'], vo: ['a', 'o', 'e', 'i', 'y'], co: ['', 'r', 'n', 'v', 's', 'sk'], end: ['grad', 'ov', 'ava', 'ink', 'ets', 'ira', 'omir', 'esk', 'ograd', 'ica'], me: ['omir', 'ek', 'an', 'ov', 'imir'], fe: ['ava', 'ina', 'eta', 'ka', 'ena'] },
+  lat: { on: ['v', 'c', 'm', 'r', 's', 't', 'd', 'p', 'l', 'f'], vo: ['a', 'e', 'i', 'o', 'u'], co: ['', 'r', 'n', 's', 'l'], end: ['ia', 'ium', 'ara', 'ona', 'ens', 'itas', 'orum', 'ella', 'ana', 'ino'], me: ['us', 'ius', 'o', 'an', 'or'], fe: ['a', 'ia', 'ina', 'ella', 'ena'] },
+};
+const COLD_FAMS = ['har', 'sla', 'cel'];                      // famílias que podem viver no continente frio
+const CUL_LIST = [['Aelírica', 'liq'], ['Sarvelina', 'liq'], ['Thalassiana', 'liq'], ['Vélien', 'liq'], ['Nimérica', 'liq'],
+  ['Kragmar', 'har'], ['Dorgruna', 'har'], ['Brakhold', 'har'], ['Grimvarda', 'har'], ['Zharkun', 'har'],
+  ['Sahrani', 'sib'], ['Zahmira', 'sib'], ['Khaziri', 'sib'], ['Ushadra', 'sib'], ['Marrakhi', 'sib'], ['Ashvenni', 'sib'],
+  ['Tenhao', 'ton'], ['Lunqai', 'ton'], ['Moryeng', 'ton'], ['Kaoshin', 'ton'], ['Hanlei', 'ton'],
+  ['Moanui', 'vow'], ['Kalehiki', 'vow'], ['Ohalea', 'vow'], ['Tavaiki', 'vow'], ['Lehuoma', 'vow'], ['Orúmbia', 'vow'],
+  ['Khaltai', 'gut'], ['Yurtagi', 'gut'], ['Barkhul', 'gut'], ['Tuvaq', 'gut'], ['Chagrum', 'gut'],
+  ['Gwenmor', 'cel'], ['Brythel', 'cel'], ['Caerwyd', 'cel'], ['Llandoric', 'cel'], ['Morvenna', 'cel'],
+  ['Tlaxuni', 'mes'], ['Ixcoral', 'mes'], ['Chalpaya', 'mes'], ['Mexoqui', 'mes'], ['Yaxtepe', 'mes'],
+  ['Zvarnia', 'sla'], ['Kroviana', 'sla'], ['Belostria', 'sla'], ['Drovaki', 'sla'], ['Svetrova', 'sla'],
+  ['Velária', 'lat'], ['Corvínia', 'lat'], ['Taurena', 'lat'], ['Mirantia', 'lat'], ['Solvária', 'lat']];
+const dataRng = seed => { let a = seed >>> 0; return () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; };
+const CULTURES = CUL_LIST.map(([n, fam], i) => {
+  const L = LANGS[fam], r = dataRng(7919 + i * 104729), pk = a => a[r() * a.length | 0], cap = x => x.charAt(0).toUpperCase() + x.slice(1);
+  const a = [...new Set(Array.from({ length: 24 }, () => pk(L.on) + pk(L.vo) + pk(L.co)))].slice(0, 14), b = L.end.slice().sort(() => r() - .5).slice(0, 8);
+  const V = /[aeiouyáéíóú]/, nm = E => { let st = pk(L.on) + pk(L.vo) + (r() < .6 ? pk(L.on) + pk(L.vo) : ''), e = pk(E);
+    if (V.test(st.slice(-1)) && V.test(e[0])) st = st.slice(0, -1);   // sem vogal colada na junção
+    return cap((st + e).replace(/([aeiouy])[aeiouy]([aeiouy]+)/g, '$1$2').replace(/(.)\1\1/g, '$1$1')); };
+  const names = E => [...new Set(Array.from({ length: 40 }, () => nm(E)))].filter(x => x.length >= 4 && x.length <= 10).slice(0, 10);
+  return { n, fam, a, b, m: names(L.me), f: names(L.fe) };
+});
+CULTURES.forEach((c, i) => { const p = CULTURES.findIndex(x => x.fam === c.fam); if (p !== i) c.par = p; });   // subculturas: a primeira de cada família é a raiz, as outras são filhas (irmãs entre si)
+const culHeritage = c => CULTURES[CULTURES[c].par ?? c].n;
+const culKin = (a, b) => a === b || CULTURES[a].fam === CULTURES[b].fam;           // aparentadas: pesam metade como minoria e se assimilam mais rápido
+const CUL_MAJOR = CULTURES.length;
+/* peculiaridades de cada povo nesta partida: 1–2 modificadores pequenos para o país que tem a cultura como principal */
+function rollCultures(seed) {
+  const r = mkRng(seed ^ 0xc0c0), dk = Object.keys(DOC_POOL);
+  return CULTURES.map(() => { const m = {}; dk.slice().sort(() => r() - .5).slice(0, 1 + (r() < .5 ? 1 : 0)).forEach(k => { const [lo, hi] = DOC_POOL[k]; m[k] = Math.round((lo + r() * (hi - lo)) * 70) / 100; }); return { m }; });
+}

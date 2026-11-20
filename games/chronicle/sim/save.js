@@ -11,7 +11,7 @@ function saveGame() {
 }
 function loadGame() {
   let o; try { o = JSON.parse(localStorage.getItem('chronicle-save')); } catch (e) { return false; }
-  if (!o || o.v !== 2) return false;
+  if (!o || o.v !== 3) return false;
   WD = generateWorld(o.seed);
   o.own = unb64(o.own, Int16Array); o.ctrl = unb64(o.ctrl, Int16Array); o.pop = unb64(o.pop, Float32Array);
   o.nations.forEach(n => { n.exP = unb64(n.exP); n.exZ = unb64(n.exZ); });
@@ -19,4 +19,4 @@ function loadGame() {
   GOOD_IDS.forEach(g => { if (!(S.wp[g] > 0)) S.wp[g] = GOODS[g].p; });   // saves antigos: bens novos sem preço davam −NaN/mês
   ownChanged(); warsChanged(); S.nations.forEach(n => { if (n.alive) calcMods(n); }); econAll(); return true;
 }
-const hasSave = () => { try { const s = localStorage.getItem('chronicle-save'); return !!s && s.startsWith('{"v":2'); } catch (e) { return false; } };
+const hasSave = () => { try { const s = localStorage.getItem('chronicle-save'); return !!s && s.startsWith('{"v":3'); } catch (e) { return false; } };

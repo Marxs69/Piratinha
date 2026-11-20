@@ -2,13 +2,19 @@
 'use strict';
 
 /* ---------- personagens ---------- */
+/* governos autoritários: a cultura e a fé do país são as do governante; nos liberais, o governante sai de qualquer parte da população */
+const AUTH_CATS = ['Monarquia', 'Ditadura', 'Socialista', 'Teocracia', 'Tribal'];
+const isAuth = n => AUTH_CATS.includes(GOVS[n.gov].cat);
+function popPick(map, def) { let tot = 0; for (const k in map || {}) tot += map[k]; if (!tot) return def; let x = rnd() * tot; for (const k in map) { x -= map[k]; if (x < 0) return +k; } return def; }
 function mkChar(n, o = {}) {
-  const cul = CULTURES[n.cul], fr = n.laws && LAWS.women.o[n.laws.women] ? LAWS.women.o[n.laws.women].fr : .08, f = o.f != null ? o.f : (o.ruler && !chance(fr) ? false : chance(.5));
+  const kin = o.age === 0 && n.ruler, cl = o.cul ?? (kin ? n.ruler.cul ?? n.cul : (o.ruler && isAuth(n)) || !n.culs ? n.cul : popPick(n.culs, n.cul));
+  const rl = o.rel ?? (kin ? n.ruler.rel ?? n.relig : (o.ruler && isAuth(n)) || !n.rels ? n.relig : popPick(n.rels, n.relig));
+  const cul = CULTURES[cl], fr = (n.laws && LAWS.women.o[n.laws.women] ? LAWS.women.o[n.laws.women].fr : .08) * (rl != null ? docOpt(rl, 'gender').fr || 1 : 1), f = o.f != null ? o.f : (o.ruler && !chance(Math.min(.9, fr)) ? false : chance(.5));
   const age = o.age != null ? o.age : (o.ruler ? 18 + (rnd() * 35 | 0) : 20 + (rnd() * 40 | 0));
   const st = {}; ['dip', 'mar', 'adm', 'int', 'lea'].forEach(k => st[k] = Math.round(clamp(rand(2, 14) + (o.boost === k ? 5 : 0), 0, 20)));
   const tids = Object.keys(TRAITS), tr = []; while (tr.length < 2 + (chance(.4) ? 1 : 0)) { const t = pickR(tids); if (!tr.includes(t)) tr.push(t); }
   const ids = n.fx ? [...n.fx.i] : ['trad', 'warrior'], ld = chance(.35) ? n.ideo || 'trad' : pickR(ids);
-  return leanOf(n, { n: pickR(f ? cul.f : cul.m), dyn: o.dyn || n.dyn, f, born: curYear() - age, st, tr, ld });
+  return leanOf(n, { n: pickR(f ? cul.f : cul.m), dyn: o.dyn || n.dyn, f, born: curYear() - age, st, tr, ld, cul: cl, rel: rl });
 }
 /* inclinação de cada personagem: uma forma de governo e uma lei — sempre entre as que o país já pode adotar */
 function leanOf(n, c) {
@@ -41,10 +47,16 @@ function charMonthly(n) {
   const age = ageOf(R), pDie = deathChance(R);
   if (chance(pDie)) { if (g.succ === 'elect') { log(titleOf(n, R) + ' ' + charName(R) + ' de ' + natName(n) + ' morreu; há eleição.', 'none', [n.id]); if (!election(n)) succeed(n, true); return; } log(titleOf(n, R) + ' ' + charName(R) + ' de ' + natName(n) + ' morreu aos ' + age + ' anos.', n.id === S.player ? 'bad' : 'info', [n.id]); succeed(n, true); return; }
   if (g.succ === 'term' || g.succ === 'council') { if (!n.termEnd) n.termEnd = y + (g.term || 4); if (y >= n.termEnd && S.t % 360 === 0) { n.termEnd = y + (g.term || 4); if (g.succ === 'term') election(n); else succeed(n, false); } }
-  if (g.succ === 'hered' && n.spouse && n.kids && S.t % 360 === 0 && age < 50 && ageOf(n.spouse) < 45 && chance(.22)) { const k = mkChar(n, { age: 0 }); n.kids.push(k); if (n.id === S.player) log('Nasceu ' + k.n + ', filho do governante.', 'good', [n.id]); }
+  if (g.succ === 'hered' && n.spouse && n.kids && S.t % 360 === 0 && age < 50 && ageOf(n.spouse) < 45 && chance(.22 * (docOpt(n.relig, 'marriage').kids || 1))) { const k = mkChar(n, { age: 0 }); n.kids.push(k); if (n.id === S.player) log('Nasceu ' + k.n + ', filho do governante.', 'good', [n.id]); }
   // golpe
   const risk = g.coup * .0012 * (n.stab < 40 ? 1 + (40 - n.stab) / 8 : .35) * Math.max(.1, 1 + (n.m.coup || 0));
   if (!(n.coupCd > S.t) && chance(risk)) coup(n);
+}
+/* num regime autoritário, se o novo governante é de outra cultura ou fé, o país passa a ser a dele (a antiga vira minoria) */
+function rulerIdentity(n) {
+  const R = n.ruler; if (!R || !isAuth(n) || (n.subj && n.subj.tier === 'union')) return;
+  if (R.cul != null && R.cul !== n.cul) { const old = n.cul; n.cul = R.cul; (n.cpol = n.cpol || {})[old] = 2; delete n.cpol[R.cul]; log(natName(n) + ' passa a ter ' + CULTURES[R.cul].n + ' como cultura principal, a do novo governante.', n.id === S.player ? 'info' : 'none', [n.id]); }
+  if (R.rel != null && R.rel !== n.relig) { const old = n.relig; n.relig = R.rel; n.fav = 50; n.excom = false; (n.rpol = n.rpol || {})[old] = 2; delete n.rpol[R.rel]; log(natName(n) + ' adota ' + RELIGIONS[REL_IDS[R.rel]].n + ', a fé do novo governante.', n.id === S.player ? 'info' : 'none', [n.id]); }
 }
 function succeed(n, death) {
   const g = GOVS[n.gov], old = n.ruler;
@@ -56,7 +68,7 @@ function succeed(n, death) {
     n.dyn = newDynasty(n); n.ruler = mkChar(n, { ruler: true, age: g.succ === 'theo' ? 50 + (rnd() * 20 | 0) : undefined, boost: g.succ === 'junta' ? 'mar' : null });
     n.stab -= g.succ === 'junta' ? 10 : g.succ === 'elect' ? 5 : 2;
   }
-  n.termEnd = curYear() + (g.term || 4);
+  n.termEnd = curYear() + (g.term || 4); rulerIdentity(n);
   log('Novo governo em ' + natName(n) + ': ' + titleOf(n).toLowerCase() + ' ' + charName(n.ruler) + '.', n.id === S.player ? 'info' : 'none', [n.id]);
   calcMods(n);
 }
@@ -67,7 +79,7 @@ function coup(n) {                                           // golpe militar: o
     if (ng) applyGov(n, ng);
     if (y > 1800 && chance(.4)) { const ii = ['natpop', 'warrior'].filter(i => n.fx.i.has(i)); if (ii.length) n.ideo = pickR(ii); }
   }
-  n.dyn = dyn; n.ruler = leader; n.kids = []; n.spouse = null; n.stab = Math.max(20, n.stab - 15); n.coupCd = S.t + 360 * 10; n.press = 0;
+  n.dyn = dyn; n.ruler = leader; n.kids = []; n.spouse = null; rulerIdentity(n); n.stab = Math.max(20, n.stab - 15); n.coupCd = S.t + 360 * 10; n.press = 0;
   log('Golpe em ' + natName(n) + '! ' + charName(n.ruler) + ' tomou o poder.', n.id === S.player ? 'bad' : 'world', [n.id]);
   notify(n.id, '⚔️ Golpe militar', charName(n.ruler) + ' derrubou o governo com o apoio do exército. Agora governa como ' + titleOf(n).toLowerCase() + ' (' + GOVS[n.gov].n + ').');
   calcMods(n);

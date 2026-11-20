@@ -95,7 +95,8 @@ const MOD_SOURCES = [
   n => (n.tmods || []).filter(x => x.u > S.t).map(x => ['Evento: ' + x.l, x.m]),
   n => faithMods(n),
   n => courtMods(n),
-  n => coldMods(n),                                                                        // Guerra Fria (sim/history.js)                                                                       // prestígio, conselho hostil e regência (sim/court.js)                                                                       // doutrina, fervor e excomunhão (sim/faith.js)          // modificadores temporários (EFF.mod)
+  n => coldMods(n),
+  n => S.culx && S.culx[n.cul] ? [['Cultura: ' + CULTURES[n.cul].n, S.culx[n.cul].m]] : [],             // peculiaridades do povo nesta partida                                                                        // Guerra Fria (sim/history.js)                                                                       // prestígio, conselho hostil e regência (sim/court.js)                                                                       // doutrina, fervor e excomunhão (sim/faith.js)          // modificadores temporários (EFF.mod)
 ];
 const modList = n => MOD_SOURCES.flatMap(f => f(n)).filter(x => x[1]);
 /* de onde vem um modificador: [[rótulo, valor]] somando fontes com o mesmo rótulo */

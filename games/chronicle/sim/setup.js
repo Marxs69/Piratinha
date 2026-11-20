@@ -7,7 +7,7 @@ function hsl(h, s, l) { const a = s * Math.min(l, 1 - l), f = k => { const x = (
 function newGame(seed, y0 = START_YEAR) {
   WD = generateWorld(seed); ownCache = null; warSet = null;
   const P = WD.provs.length, r = mkRng(seed ^ 0x5eed);
-  S = { v: 2, rs: (seed ^ 0x2545F491) | 0, moon: null, seed, y0, t: 360 * (y0 - START_YEAR), player: -1, nations: [], own: new Int16Array(P).fill(-1), ctrl: new Int16Array(P).fill(-1), pop: new Float32Array(P), bld: WD.states.map(() => ({})),
+  S = { v: 3, faith: rollFaiths(seed), culx: rollCultures(seed), rs: (seed ^ 0x2545F491) | 0, moon: null, seed, y0, t: 360 * (y0 - START_YEAR), player: -1, nations: [], own: new Int16Array(P).fill(-1), ctrl: new Int16Array(P).fill(-1), pop: new Float32Array(P), bld: WD.states.map(() => ({})),
         armies: [], fleets: [], wars: [], cols: [], sieges: {}, battles: {}, log: [], news: [], id: 1, wp: {}, over: false };
   GOOD_IDS.forEach(g => S.wp[g] = GOODS[g].p);
   const stAdj = WD.states.map(() => new Set());
@@ -88,17 +88,23 @@ function newGame(seed, y0 = START_YEAR) {
   log('O ano é ' + y0 + '. As crônicas começam.', 'world');
   return S;
 }
-/* cultura de cada província (muda com assimilação); culturas menores nascem em bolsões fora das capitais */
+/* cultura de cada província: cada país tem de 45% a 85% da população na cultura principal (perto da capital) e o resto em 1–3 culturas secundárias
+   (muitas vezes subculturas irmãs); sempre ao menos 15% diferente, quando o país tem mais de uma província. Povos sem país viram bolsões. */
 function initCul() {
   S.culg = new Uint8Array(WD.provs.length); WD.provs.forEach(p => { S.culg[p.id] = p.cul; });
-  const r = mkRng(S.seed ^ 0xc017), caps = new Set(S.nations.map(n => WD.provs[n.capital >= 0 ? n.capital : 0].state)), minors = CULTURES.map((c, i) => c.minor ? i : -1).filter(i => i >= 0);
-  const k = Math.max(minors.length, Math.round(WD.states.length / 22));
-  for (let i = 0, t = 0; i < k && t < 500; t++) {
-    const st = WD.states[r() * WD.states.length | 0]; if (caps.has(st.id) || WD.conts[st.cont].cold) continue;
-    const c = i < minors.length ? minors[i] : minors[r() * minors.length | 0]; i++;
-    st.provs.forEach(p => { if (r() < .85) S.culg[p] = c; });
-    if (r() < .5) { const nb = WD.provs[st.cap].adj.map(o => WD.provs[o].state).find(x => x !== st.id && !caps.has(x)); if (nb != null) WD.states[nb].provs.forEach(p => { if (r() < .5) S.culg[p] = c; }); }
+  const r = mkRng(S.seed ^ 0xc017), N = CULTURES.length;
+  for (const n of S.nations) {
+    const cap = WD.provs[n.capital >= 0 ? n.capital : provsOf(n.id)[0]], ps = provsOf(n.id).slice().sort((a, b) => Math.hypot(WD.provs[a].cx - cap.cx, WD.provs[a].cy - cap.cy) - Math.hypot(WD.provs[b].cx - cap.cx, WD.provs[b].cy - cap.cy));
+    if (ps.length < 2) continue; const tot = ps.reduce((t, p) => t + S.pop[p], 0), main = .45 + r() * .4;
+    let acc = 0, cut = ps.length; for (let i = 0; i < ps.length; i++) { if (acc / tot >= main) { cut = i; break; } acc += S.pop[ps[i]]; }
+    while (cut > 1 && ps.slice(cut).reduce((t, p) => t + S.pop[p], 0) / tot < .15) cut--;   // garante 15% de outras culturas
+    const sib = CULTURES.map((c, i) => i).filter(i => i !== n.cul && culKin(i, n.cul)), k = 1 + (r() * 3 | 0), others = [];
+    for (let i = 0; i < k; i++) { let c = r() < .5 && sib.length ? sib[r() * sib.length | 0] : r() * N | 0; if (c === n.cul) c = (c + 1) % N; others.push(c); }
+    ps.forEach((p, i) => { S.culg[p] = i < cut ? n.cul : others[Math.min(k - 1, Math.floor((i - cut) / Math.max(1, ps.length - cut) * k))]; });
   }
+  // bolsões de povos sem país
+  const caps = new Set(S.nations.map(n => WD.provs[n.capital >= 0 ? n.capital : 0].state)), minors = CULTURES.map((c, i) => i).filter(i => isMinorCul(i)).sort(() => r() - .5).slice(0, 9);
+  for (let i = 0, t = 0; i < minors.length && t < 300; t++) { const st = WD.states[r() * WD.states.length | 0]; if (caps.has(st.id) || WD.conts[st.cont].cold) continue; const c = minors[i++]; st.provs.forEach(p => { if (r() < .7) S.culg[p] = c; }); }
 }
 /* tecnologias da árvore normal até um ano (respeitando pré-requisitos; com vertente, as substituídas ficam de fora) */
 function grantUntil(n, maxY) {
@@ -169,12 +175,27 @@ function advanceStart(Y, r) {
   ownChanged(); S.nations.forEach(n => { if (n.alive) { n.relig = S.relg[n.capital]; calcMods(n); } });
   econAll(); S.nations.forEach(n => { if (n.alive) calcMods(n); });
 }
-function initRelig() {                                       // religião de cada província pela cultura (com variantes regionais)
+/* povos com continente (os outros são bolsões menores) */
+const culMajor = () => WD._cm || (WD._cm = new Set(WD.conts.flatMap(c => c.cul)));
+const isMinorCul = c => !culMajor().has(+c);
+const isMinorRel = r => !(S.relMajor || []).includes(+r);
+/* religião independente da cultura: cada país tem uma fé majoritária que cobre de 50% a 100% da população, mais 1–2 fés menores;
+   em 10% dos casos a fé oficial é a de uma minoria. Terra sem dono segue a fé sorteada da região. */
+function initRelig() {
   if (!S.culg) initCul();
-  S.relg = new Uint8Array(WD.provs.length); const r = mkRng(S.seed ^ 0x2e1);
-  WD.provs.forEach(p => { const c = S.culg[p.id], C = CULTURES[c]; S.relg[p.id] = REL_IDS.indexOf(C.minor ? (r() < .75 ? C.rel : (CUL_REL[p.cul] || 'roman')) : (p.region % 5 === 0 ? CUL_REL2 : CUL_REL)[c]); });
-  ['gnostic', 'manich', 'serpent', 'tengri'].forEach(rl => { for (let i = 0; i < 2; i++) { const st = WD.states[r() * WD.states.length | 0]; st.provs.forEach(p => { if (r() < .6) S.relg[p] = REL_IDS.indexOf(rl); }); } });
-  S.nations.forEach(n => { n.relig = S.relg[n.capital >= 0 ? n.capital : 0]; provsOf(n.id).forEach(p => { if (rnd() < .75 && !CULTURES[S.culg[p]].minor) S.relg[p] = n.relig; }); });   // a fé do Estado já domina quase tudo em 860 (menos nos bolsões menores)
+  S.relg = new Uint8Array(WD.provs.length); const r = mkRng(S.seed ^ 0x2e1), heresy = i => RELIGIONS[REL_IDS[i]].fict;
+  const pool = REL_IDS.map((k, i) => i).filter(i => !heresy(i)).sort(() => r() - .5), core = pool.slice(0, 14), any = () => core[r() * core.length | 0];
+  const regRel = WD.regions.map(() => any()); WD.provs.forEach(p => { S.relg[p.id] = regRel[p.region]; });
+  for (const n of S.nations) {
+    const nb = [...neighbors(n)].map(nat).filter(x => x.majRel != null), main = nb.length && r() < .4 ? nb[r() * nb.length | 0].majRel : any(); n.majRel = main;
+    const cap = WD.provs[n.capital], ps = provsOf(n.id).slice().sort((a, b) => Math.hypot(WD.provs[a].cx - cap.cx, WD.provs[a].cy - cap.cy) - Math.hypot(WD.provs[b].cx - cap.cx, WD.provs[b].cy - cap.cy));
+    const tot = ps.reduce((t, p) => t + S.pop[p], 0), cover = r() < .35 ? 1 : .5 + r() * .5, others = [any(), r() < .5 ? any() : null].filter(x => x != null && x !== main);
+    let acc = 0; ps.forEach((p, i) => { if (acc / tot < cover || !others.length) { S.relg[p] = main; acc += S.pop[p]; } else S.relg[p] = others[i % others.length]; });
+    n.relig = others.length && r() < .1 ? others[0] : main;      // fé oficial de uma minoria (incomum)
+  }
+  [...pool.slice(14, 17), REL_IDS.indexOf('serpent')].forEach(ri => { for (let i = 0; i < 2; i++) { const st = WD.states[r() * WD.states.length | 0]; st.provs.forEach(p => { if (r() < .6) S.relg[p] = ri; }); } });   // bolsões de fés menores
+  S.relMajor = [...new Set(S.nations.flatMap(n => [n.relig, n.majRel]))]; S.reserveRel = pool.filter(i => !S.relg.includes(i) && !S.relMajor.includes(i));
+  S.nations.forEach(n => { delete n.majRel; if (n.ruler) n.ruler.rel = n.relig; });
 }
 function initExplore(n) {
   WD.provs.forEach(p => { if (p.cont === n.home) { n.exP[p.id] = 1; p.seas.forEach(z => n.exZ[z] = 1); } });

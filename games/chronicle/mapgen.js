@@ -222,8 +222,11 @@ function generateWorld(seed) {
   provs.forEach(p => { p.region = states[p.state].region; });
 
   // 9. culturas por região (núcleos por continente), recursos e nomes
-  const culPool = c => c.cold ? [2] : c.main ? [0, 1, 3, 4, 9] : [4, 5, 6, 7, 8, 9, 1, 3];
-  conts.forEach(c => { const pool = culPool(c), k = Math.min(pool.length, 1 + Math.round(c.provs / 220)); c.cul = pool.sort(() => r() - .5).slice(0, Math.max(1, k)); c.culC = c.cul.map(() => null); });
+  // cada partida sorteia quais povos vivem em cada continente (o frio só com famílias do frio); povos que sobram viram bolsões menores
+  const ord = CULTURES.map((_, i) => i).sort(() => r() - .5), usedC = new Set();
+  const take = (ok, k) => { const out = []; for (const i of ord) { if (out.length >= k) break; if (!usedC.has(i) && ok(CULTURES[i])) { out.push(i); usedC.add(i); } } return out; };
+  conts.slice().sort((a, b) => (b.main - a.main) || (b.cold - a.cold)).forEach(c => { const k = Math.max(1, Math.min(c.main ? 6 : 4, 1 + Math.round(c.provs / 220)));
+    c.cul = c.cold ? take(C => COLD_FAMS.includes(C.fam), 1) : take(C => !c.main || C.fam !== 'gut', k); if (!c.cul.length) c.cul = take(() => true, 1); c.culC = c.cul.map(() => null); });
   regions.forEach(g => {
     const c = conts[g.cont], p0 = provs[states[g.states[0]].provs[0]];
     if (!c.culC.every(Boolean)) { const k = c.culC.findIndex(v => !v); c.culC[k] = [p0.cx, p0.cy]; g.cul = c.cul[k]; return; }
@@ -255,14 +258,14 @@ function generateWorld(seed) {
   });
   regions.forEach(g => { g.n = nameGen(CULTURES[g.cul], r, used); });
   conts.forEach(c => { c.n = nameGen(CULTURES[c.cul[0]], r, used).replace(/[aeiou]?$/, 'ia'); });
-  seas.forEach(z => { const cul = z.provs.length ? provs[z.provs[0]].cul : (r() * CUL_MAJOR | 0); z.n = (z.deep ? 'Oceano ' : pick(r, ['Mar de ', 'Mar de ', 'Golfo de ', 'Baía de '])) + nameGen(CULTURES[cul], r, used); });
+  seas.forEach(z => { const cul = z.provs.length ? provs[z.provs[0]].cul : conts[0].cul[0]; z.n = (z.deep ? 'Oceano ' : pick(r, ['Mar de ', 'Mar de ', 'Golfo de ', 'Baía de '])) + nameGen(CULTURES[cul], r, used); });
   // lagos com nome
   const lakeId = new Int16Array(N).fill(-1), lakes = [];
   for (let i = 0; i < N; i++) if (water[i] === 2 && lakeId[i] === -1) {
     const id = lakes.length, qq = [i]; lakeId[i] = id; let sx = 0, sy = 0;
     for (let h = 0; h < qq.length; h++) { const c = qq[h]; sx += c % W; sy += (c / W) | 0; for (const j of nb(c)) if (water[j] === 2 && lakeId[j] === -1) { lakeId[j] = id; qq.push(j); } }
     const a = qq[0], adjP = nb(a).map(j => prov[j]).find(p => p >= 0);
-    lakes.push({ id, n: 'Lago ' + nameGen(CULTURES[adjP != null ? provs[adjP].cul : 0], r, used), cx: Math.round(sx / qq.length), cy: Math.round(sy / qq.length), size: qq.length });
+    lakes.push({ id, n: 'Lago ' + nameGen(CULTURES[adjP != null ? provs[adjP].cul : conts[0].cul[0]], r, used), cx: Math.round(sx / qq.length), cy: Math.round(sy / qq.length), size: qq.length });
   }
 
   return { seed, W, H, height, land, water, terr, shade, prov, sea, odist, provs, states, regions, conts, seas, lakes, lakeId };

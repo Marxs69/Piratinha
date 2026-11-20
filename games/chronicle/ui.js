@@ -483,7 +483,10 @@ function winFaithW(b) { const n = me(), tab = tabs(b, 'faithTab', [['state', '�
 /* fé oficial: doutrina, fervor, chefe religioso e guerra santa */
 function winFaith(b, n) {
   const R0 = RELIGIONS[REL_IDS[n.relig]], F = faithOf(n.relig), h = headOf(n.relig), msg = el('div', 'msg'), c = el('div', 'cols');
-  const d = el('div', 'card'); d.append(el('h4', '', R0.e + ' ' + R0.n), el('div', 'dim', F.d || ''), modChips(F.doc)); c.append(d);
+  const d = el('div', 'card'); d.append(el('h4', '', R0.e + ' ' + R0.n), el('div', 'dim', (FAITH_GRP[F.grp] || '') + ' · ' + (F.d || '')), modChips(F.doc));
+  if (F.dc) { const ch = el('div', 'chips'); for (const k in DOCTRINES) { const o = DOCTRINES[k].o[F.dc[k]]; ch.append(tip(el('span', 'chip', DOCTRINES[k].n + ': ' + o.n), [o.m ? modLines(o.m).join(', ') : '', o.mw ? 'Minorias religiosas pesam ×' + o.mw : '', o.noHoly ? 'Não faz guerra santa' : '', o.fr ? 'Governantes mulheres ×' + o.fr : '', o.kids ? 'Herdeiros ×' + o.kids : ''].filter(Boolean).join('\n') || 'Sem efeito direto')); }
+    (F.tn || []).forEach(t => ch.append(tip(el('span', 'chip p', '✦ ' + TENETS[t].n), 'Princípio: ' + modLines(TENETS[t].m).join(', ')))); d.append(ch); }
+  c.append(d);
   const fv = el('div', 'card'), v = n.ferv ?? 50; fv.append(tip(el('h4', '', '🙏 Fervor · ' + Math.round(v) + '% (alvo ' + Math.round(n.fervT ?? v) + '%)'), 'Anda 1 ponto por mês até o alvo:\n' + fervParts(n).map(([k, x]) => k + ' ' + (x > 0 ? '+' : '') + x).join('\n')), bar(v / 100, '#e8c25a'));
   c.append(tip(fv, 'Alto: estabilidade e contingente, um pouco menos de pesquisa; a fé oficial converte mais rápido.\nBaixo: o contrário, e heresias e reformas se espalham.\nCada 10 pontos acima de 50: estabilidade +2%, contingente +1%, pesquisa −1%.'));
   b.append(c);
@@ -597,17 +600,24 @@ function winTech(b) {
   const fr = el('div', 'row'); fr.append(fl, lg); side.append(sb, fr);
   head.append(cur, side); stick.append(head); b.append(stick);
   const q = (UI.techQ || '').trim().toLowerCase();
-  const mineV = t => !t.v || t.entry || t.v === n.vert, hideRep = t => n.vert && !t.v && VERT[n.vert].rep.has(t.id) && !hasT(n, t.id);   // a versão da vertente aparece no lugar da comum
+  const mineV = t => !t.v || (t.entry && !n.vert) || t.v === n.vert,   // escolhida a vertente, as outras somem da árvore
+    hideRep = t => n.vert && !t.v && VERT[n.vert].rep.has(t.id) && !hasT(n, t.id);   // a versão da vertente aparece no lugar da comum
   let list = q ? TECHS.filter(t => mineV(t) && !hideRep(t) && (t.n.toLowerCase().includes(q) || fxLines(techFx(t)).join(' ').toLowerCase().includes(q)))
     : tab === 'vert' ? TECHS.filter(t => n.vert ? t.vt && t.v === n.vert : t.entry)
     : TECHS.filter(t => t.c === tab && !t.vt && mineV(t) && !hideRep(t) && !(t.vr && hasT(n, t.vr)));
   if (UI.techAv) list = list.filter(t => !techState(n, t));
   if (q) b.append(el('small', 'dim', list.length + ' resultado' + (list.length === 1 ? '' : 's') + ' em todas as áreas'));
+  if (tab === 'vert' && !n.vert && UI.vprev) { const V = VERT[UI.vprev], c = el('div', 'card vprev'); c.style.borderLeft = '4px solid ' + V.col;
+    c.append(el('h4', '', V.e + ' ' + V.n + ' · prévia'), el('div', 'dim', 'Recurso: ' + needName(V.id) + ' · prédio: ' + BUILDINGS[V.bld].n + ' · bem: ' + GOODS[V.good].n + ' · tropas: ' + V.unit.slice(0, 3).join(', ') + '…'),
+      el('div', 'dim', 'Técnicas comuns depois de ' + V.entry.y + ' viram versões "' + VERT_SUF[V.id] + '" (ex.: ' + TECHS.filter(t => t.vr && t.v === V.id).slice(0, 3).map(t => t.n).join(', ') + ').'));
+    const l = el('div', 'chips'); TECHS.filter(t => t.vt && t.v === V.id).forEach(t => l.append(tip(el('span', 'chip', t.y + ' · ' + t.n), CATS[t.area] + ' · ' + fxLines(t.fx).join(', ')))); c.append(el('small', 'gold', 'Melhorias próprias (' + V.len + ')'), l);
+    b.append(c); }
   const nowEra = eraOf(curYear()), groups = new Map(); list.slice().sort((a, c) => a.y - c.y).forEach(t => { const e = eraOf(t.y); if (!groups.has(e)) groups.set(e, []); groups.get(e).push(t); });
   groups.forEach((ts, e) => {
     const done = ts.filter(t => hasT(n, t.id)).length, sec0 = el('div', 'tera' + (e === nowEra ? ' now' : ''));
     const h = el('div', 'terah'); h.append(el('b', '', e + (e === nowEra ? ' · agora' : '')), el('small', 'dim', done + ' / ' + ts.length), bar(done / ts.length, '#8fd17f')); tip(h, e + ': ' + done + ' de ' + ts.length + ' tecnologias desta área pesquisadas');
-    const grid = el('div', 'tgrid'), ent = tab === 'vert' ? [] : ts.filter(t => t.entry); ts.filter(t => tab === 'vert' || !t.entry).forEach(t => grid.append(techBox(n, t)));
+    const grid = el('div', 'tgrid'), ent = tab === 'vert' ? [] : ts.filter(t => t.entry && (!n.vert || t.v === n.vert)); ts.filter(t => tab === 'vert' || !t.entry).forEach(t => { const bx = techBox(n, t);
+      if (tab === 'vert' && t.entry && !n.vert) { const w = el('div', 'tprevw'); w.append(bx, btn('👁', () => { UI.vprev = UI.vprev === t.v ? null : t.v; drawWin(); }, 'sm' + (UI.vprev === t.v ? ' on' : ''), '', 'Prévia: o que ' + VERT[t.v].n + ' traz')); grid.append(w); } else grid.append(bx); });
     if (ent.length) { const body = el('div', 'tbody2'), vc = el('div', 'tvert'); vc.append(tip(el('small', 'gold', '✨ Vertentes'), 'Pontos iniciais das vertentes, à parte da árvore comum.\nAo concluir um, você decide: ficar com a vertente (para sempre) ou seguir pela via comum levando ' + pct(VERT_DECLINE) + ' do bônus dela.'));
       ent.forEach(t => vc.append(techBox(n, t))); body.append(grid, vc); sec0.append(h, body); } else sec0.append(h, grid);
     b.append(sec0);
@@ -791,7 +801,7 @@ function winPop(b, forceTab) {
   // culturas e religiões: régua de autonomia de cada povo que não é o principal
   const cul = tab === 'cul', src = (cul ? n.culs : n.rels) || {}, law = cul ? LAWS.culture.o[n.laws.culture] : LAWS.relig.o[n.laws.relig], min = cul ? n.minC || 0 : n.minR || 0, pol = (cul ? n.cpol : n.rpol) || {};
   const slots = cul ? culSlots(n) : relSlots(n), used = Object.values(pol).filter(v => v === 2).length, main = cul ? n.cul : n.relig, msg = el('div', 'msg');
-  const nm = k => cul ? CULTURES[k].n + (CULTURES[k].minor ? ' · menor' : '') : RELIGIONS[REL_IDS[k]].e + ' ' + RELIGIONS[REL_IDS[k]].n + (RELIGIONS[REL_IDS[k]].fict ? ' · heresia' : RELIGIONS[REL_IDS[k]].minor ? ' · menor' : '');
+  const nm = k => cul ? CULTURES[k].n + (CULTURES[k].par != null ? ' (' + culHeritage(k) + ')' : '') + (isMinorCul(k) ? ' · menor' : '') : RELIGIONS[REL_IDS[k]].e + ' ' + RELIGIONS[REL_IDS[k]].n + (RELIGIONS[REL_IDS[k]].fict ? ' · heresia' : isMinorRel(k) ? ' · menor' : '');
   const col = k => cul ? 'rgb(' + hsl((k * .17) % 1, .45, .55).join(',') + ')' : RELIGIONS[REL_IDS[k]].col;
   b.append(kv([[cul ? 'Cultura principal' : 'Fé oficial', nm(main), cul ? 'Nomes, governantes e a cultura para onde as outras se assimilam.' : 'Províncias se convertem a ela aos poucos (templos e Igreja de Estado aceleram).'],
     ['Lei', law.n, law.d + '\nMude em Governo → Leis.'], [cul ? 'Culturas aceitas' : 'Fés reconhecidas', used + ' / ' + slots + ' vagas', cul ? 'Vagas de culturas secundárias: Só a principal 1, Culturas aceitas 3, Multiculturalismo 8; +1 com título de Império.' : 'Vagas de fés reconhecidas: Igreja de Estado 0, Tolerância 1, Liberdade de culto 3, Estado laico 8.'],
@@ -1097,6 +1107,7 @@ initRender(cv); menu(); requestAnimationFrame(loop);
   if (q.get('chron')) { UI.chron = true; drawChron(); drawTop(); }
   if (q.get('ctx')) { const p = provsOf(main.id).map(p => WD.provs[p].adj.find(o => S.own[o] >= 0 && S.own[o] !== main.id)).find(x => x != null); const [sx, sy] = toScreen(WD.provs[p].cx * K, WD.provs[p].cy * K); ctxMenu(sx, sy, p); }
   if (q.get('council')) councilPick('marshal', 'Marechal');
+  if (q.get('vprev')) UI.vprev = q.get('vprev');
   if (q.get('vpend')) { me().vpend = q.get('vpend'); pendingModals(); }
   if (q.get('ev')) { const n = me(), ev = EVENT[q.get('ev')]; if (ev) { n.evWait = ev.id; notify(n.id, ev.e + ' ' + ev.t, fillTxt(n, ev.m), { ev: ev.id }); pendingModals(); } }
   if (q.get('setup')) { S.player = -1; show('setup'); R.view = -1; S.mapDirty = true; fitCam(); setupCard(main.id); drawModes($('#s-modes')); }

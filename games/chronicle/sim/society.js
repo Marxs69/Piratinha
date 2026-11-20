@@ -133,8 +133,8 @@ function religTick() {                                         // uma vez por an
     if (!n.alive) return; const L = LAWS.relig.o[n.laws.relig], k = n.laws.relig === 'state' ? 1 : n.laws.relig === 'tolerant' ? .5 : n.laws.relig === 'free' ? .2 : 0; if (n.relig == null) n.relig = S.relg[n.capital];
     const edu = (n.cov || {}).edu || 0;
     for (const p of provsOf(n.id)) {
-      if (S.relg[p] !== n.relig && k) { const t = S.bld[WD.provs[p].state].temple || 0, lv = CPOL[(n.rpol || {})[S.relg[p]] || 0]; if (chance(.025 * k * lv.as * (1 + t * .4) * (n.ferv ?? 50) / 50 * (REFORMS.some(R0 => REL_IDS.indexOf(R0.to) === S.relg[p]) ? .3 : 1))) S.relg[p] = n.relig; }   // reformados resistem mais   // fé oficial converte mais com fervor alto
-      if (S.culg[p] !== n.cul) { const lv = CPOL[(n.cpol || {})[S.culg[p]] || 0]; if (chance(.008 * lv.as * (1 + edu))) S.culg[p] = n.cul; }
+      if (S.relg[p] !== n.relig && k) { const t = S.bld[WD.provs[p].state].temple || 0, lv = CPOL[(n.rpol || {})[S.relg[p]] || 0]; if (chance(.025 * k * lv.as * (1 + t * .4) * (n.ferv ?? 50) / 50 * (Object.values(S.reforms || {}).some(x => x.to === S.relg[p]) ? .3 : 1))) S.relg[p] = n.relig; }   // reformados resistem mais   // fé oficial converte mais com fervor alto
+      if (S.culg[p] !== n.cul) { const lv = CPOL[(n.cpol || {})[S.culg[p]] || 0]; if (chance(.008 * lv.as * (1 + edu) * (culKin(S.culg[p], n.cul) ? 2 : 1))) S.culg[p] = n.cul; }
     }
     const ps = provsOf(n.id); if (!ps.length) return;
     if (y > 1450 && chance(.003)) { const p = pickR(ps); S.relg[p] = REL_IDS.indexOf('aurora'); if (n.id === S.player) log('🌅 Uma heresia, o Culto da Aurora, surgiu em ' + WD.provs[p].n + '.', 'info', [n.id]); }

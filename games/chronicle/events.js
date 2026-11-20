@@ -53,9 +53,9 @@ const EVENTS = [
            { n: 'Expurgar o mais exigente', fx: { council: 'purge', press: -50, stab: -6, roll: [[.2, { stab: -8 }]] }, ai: 1 },
            { n: 'Comprar a calma', fx: { money: -60, press: -30 }, when: { money: [60, null] }, ai: 1 }] },
   // ---------- fé ----------
-  { id: 'reform_arrives', e: '📖', t: 'A Reforma chegou', p: .05, once: true, when: { faith: 'roman', faithShare: ['protestant', .08, null] },
-    m: 'Pregadores da Reforma enchem as praças de {pais}. Parte do povo já não reconhece o papa.',
-    opts: [{ n: 'Abraçar a Reforma', fx: { faith: 'protestant', stab: -10 }, ai: 1 },
+  { id: 'reform_arrives', e: '📖', t: 'A Reforma chegou', p: .05, once: true, when: { reform: .08 },
+    m: 'Pregadores da Reforma enchem as praças de {pais}. Parte do povo já não reconhece a velha fé.',
+    opts: [{ n: 'Abraçar a Reforma', fx: { faith: '@reform', stab: -10 }, ai: 1 },
            { n: 'Contrarreforma', fx: { ferv: 15, money: -60, fav: 15, mod: { l: 'Contrarreforma', m: { stab: -.05 }, mo: 60 } }, when: { money: [60, null] }, ai: 2 },
            { n: 'Tolerar as duas fés', fx: { law: { relig: 'tolerant' }, ferv: -5 }, when: { tech: 'soc_humanism' }, ai: 1 }] },
   { id: 'miracle', e: '✨', t: 'Um milagre', p: .003, cd: 25, when: { ferv: [60, null] },

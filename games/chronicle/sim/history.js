@@ -36,7 +36,11 @@ function invade(I) {
   }
   if (!provs.length) return;
   const victims = [...new Set(provs.map(p => S.own[p]))];
-  const n = spawnNation(provs, { cul: I.cul, gov: I.gov, ideo: 'warrior', relig: REL_IDS.indexOf(I.relig), name: I.n, money: 400, kind: I.from === 'cold' ? 'cold' : 'main' });
+  const used = new Set(S.nations.filter(x => x.alive).map(x => x.cul)), freeCul = CULTURES.map((c, i) => i).filter(i => isMinorCul(i) && !used.has(i)), famCul = freeCul.filter(i => CULTURES[i].fam === I.fam);
+  const cul = I.cul === 'local' ? S.culg[provs[0]] : pickR(famCul.length ? famCul : freeCul.length ? freeCul : [S.culg[provs[0]]]);
+  const freeRel = (S.reserveRel || []).filter(i => !S.nations.some(x => x.alive && x.relig === i)), relig = I.relig === 'local' ? S.relg[provs[0]] : freeRel.length ? pickR(freeRel) : S.relg[provs[0]];
+  provs.forEach(p => { if (chance(.7)) S.relg[p] = relig; });
+  const n = spawnNation(provs, { cul, gov: I.gov, ideo: 'warrior', relig, name: I.n, money: 400, kind: I.from === 'cold' ? 'cold' : 'main' });
   const best = victims.map(nat).filter(v => v.alive).sort((a, b) => strength(b) - strength(a))[0]; if (best) { n.techs = Object.assign({}, best.techs); calcMods(n); }
   n.horde = curYear() + I.years; n.ruler.tr = ['ambitious', I.cav > .5 ? 'strategist' : 'brave', 'cruel']; n.ruler.st.mar = 18;
   if (I.ships) { const c = provs.filter(p => WD.provs[p].coast).sort((a, b) => S.pop[b] - S.pop[a])[0]; if (c != null) n.capital = c; }   // invasores do mar: base no litoral

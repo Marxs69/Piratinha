@@ -98,7 +98,7 @@ function econAll() {
     // minorias: culturas não aceitas e outras religiões (a lei decide o quanto pesam)
     const lw = n.laws || LAW_DEF, cl = LAWS.culture.o[lw.culture], rl = LAWS.relig.o[lw.relig], pt = Math.max(1, popT);
     n.cpol = n.cpol || {}; n.rpol = n.rpol || {};
-    let cm = 0, rm = 0; for (const c in culs) if (+c !== n.cul && lw.culture !== 'multi') cm += culs[c] * CPOL[n.cpol[c] || 0].w; for (const r in rels) if (+r !== n.relig && lw.relig !== 'secular') rm += rels[r] * CPOL[n.rpol[r] || 0].w;
+    let cm = 0, rm = 0; for (const c in culs) if (+c !== n.cul && lw.culture !== 'multi') cm += culs[c] * CPOL[n.cpol[c] || 0].w * (culKin(+c, n.cul) ? .5 : 1); for (const r in rels) if (+r !== n.relig && lw.relig !== 'secular') rm += rels[r] * CPOL[n.rpol[r] || 0].w; rm *= docOpt(n.relig, 'plural').mw || 1;   // culturas aparentadas pesam metade; a fé pluralista tolera mais
     n.minC = cm / pt * cl.mp; n.minR = rm / pt * rl.mp;
     // satisfação de cada classe: o que ela consome (pesado pelo valor) e, na média e na alta, saúde e educação
     const cs = {}; CLASS_IDS.forEach(k => { const nd = CN[k]; let w = 0, v = 0;

@@ -1,5 +1,5 @@
 /* Grand Chronicle — simulação: fé com peso.
-   Fé oficial (n.relig) dá a doutrina (FAITH.doc). Fervor (n.ferv, 0–100) anda até um alvo (templos, governante, lei, minorias, heresias, era).
+   Fé oficial (n.relig) dá a doutrina (S.faith, sorteada por partida em rollFaiths). Fervor (n.ferv, 0–100) anda até um alvo (templos, governante, lei, minorias, heresias, era).
    Fés organizadas têm chefe religioso com sede numa província (S.heads[fé].seat) e favor de cada país (n.fav): doações, investidura,
    excomunhão, guerra santa e cruzada. Reformas (REFORMS) dividem uma fé numa janela de anos onde o fervor está baixo. */
 'use strict';
@@ -10,7 +10,7 @@ const headOf = r => faithOf(r).head || null;
 const holyName = r => faithOf(r).holy || 'Guerra santa';
 function initHeads() {                                         // sede de cada fé organizada: capital do maior país que a segue
   S.heads = S.heads || {};
-  for (const k in FAITH) { if (!FAITH[k].head || S.heads[k]) continue; const r = relId(k), ns = S.nations.filter(n => n.alive && n.relig === r);
+  for (const k in S.faith) { if (!S.faith[k].head || S.heads[k]) continue; const r = relId(k), ns = S.nations.filter(n => n.alive && n.relig === r);
     if (ns.length) { const big = ns.sort((a, b) => provsOf(b.id).length - provsOf(a.id).length)[0]; S.heads[k] = { seat: big.capital }; } }
 }
 const seatOf = r => (S.heads || {})[REL_IDS[r]] ? S.heads[REL_IDS[r]].seat : null;
@@ -49,7 +49,7 @@ function faithAct(n, k, t) {
 }
 /* guerra santa: contra país de outra família de fé, vizinho ou dono da sede da sua fé */
 function holyWhy(n, t) {
-  if (!t || !t.alive || t.id === n.id) return 'Inválido'; if (faithOf(t.relig).grp === faithOf(n.relig).grp) return 'Mesma família de fé';
+  if (!t || !t.alive || t.id === n.id) return 'Inválido'; if (docOpt(n.relig, 'plural').noHoly) return 'Fé pluralista não faz guerra santa'; if (faithOf(t.relig).grp === faithOf(n.relig).grp) return 'Mesma família de fé';
   if (n.truce[t.id] > S.t) return 'Trégua em vigor'; if (atWar(n.id, t.id)) return 'Já em guerra'; if (has(n, 'allies', t.id)) return 'São aliados';
   const s = seatOf(n.relig); if (!(neighbors(n).has(t.id) || (s != null && S.own[s] === t.id))) return 'Só contra vizinhos ou quem tem a sede da sua fé';
   return '';
@@ -73,19 +73,22 @@ function faithTick() {
 function reformTick(y) {
   S.reforms = S.reforms || {};
   for (const R0 of REFORMS) {
-    const st = S.reforms[R0.id], from = relId(R0.from), to = relId(R0.to);
-    if (y < R0.y[0]) continue;
+    const st = S.reforms[R0.id]; if (y < R0.y[0]) continue;
+    let from = st ? st.from : null, to = st ? st.to : null;
+    if (!st) {                                                  // a maior fé organizada do continente principal se divide; nasce uma fé que ainda não tem povo
+      const main = WD.conts.find(c => c.main).id, cnt = {}; S.nations.forEach(n => { if (n.alive && n.home === main && (n.ferv ?? 50) < R0.ferv && condOk(n, R0.when)) cnt[n.relig] = (cnt[n.relig] || 0) + provsOf(n.id).length * (headOf(n.relig) ? 2 : 1); });   // a fé com mais países prontos para romper (organizadas pesam mais)
+      from = +Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a])[0]; to = (S.reserveRel || []).find(i => !S.nations.some(n => n.alive && n.relig === i)); if (isNaN(from) || to == null) continue; }
     // focos: até 3 ao longo da janela, numa província populosa da fé antiga onde o país tem fervor baixo (o estado inteiro adere)
     if (y <= R0.y[1] && (!st || st.k < 3) && chance(st ? .06 : .15)) {
       const c = S.nations.filter(n => n.alive && n.relig === from && (n.ferv ?? 50) < R0.ferv && condOk(n, R0.when));
       if (c.length) { const n = c.sort((a, b) => (b.popT || 0) - (a.popT || 0))[rint(Math.min(3, c.length))], ps = provsOf(n.id).filter(p => S.relg[p] === from).sort((a, b) => S.pop[b] - S.pop[a]);
         if (ps.length) { const p0 = ps[rint(Math.min(5, ps.length))]; WD.states[WD.provs[p0].state].provs.forEach(p => { if (S.relg[p] === from) S.relg[p] = to; });
-          S.reforms[R0.id] = { t: S.t, n: n.id, k: (st ? st.k : 0) + 1 }; (n.evNext = n.evNext || []).push({ id: 'reform_arrives', t: S.t + 60 });
-          log(R0.n + ': um foco surgiu em ' + WD.provs[p0].n + ' (' + natName(n) + ').', 'world', [n.id]); S.mapDirty = true; } } }
+          S.reforms[R0.id] = { t: S.t, n: n.id, k: (st ? st.k : 0) + 1, from, to }; (n.evNext = n.evNext || []).push({ id: 'reform_arrives', t: S.t + 60 });
+          log(R0.n + ': ' + relName(to) + ' surgiu em ' + WD.provs[p0].n + ' (' + natName(n) + '), rompendo com ' + RELIGIONS[REL_IDS[from]].n + '.', 'world', [n.id]); S.mapDirty = true; } } }
     if (!S.reforms[R0.id]) continue;
     if (y > R0.y[1] + 60) continue;
     const add = [];                                             // cada província reformada contagia vizinhas da fé antiga (mais onde o fervor é baixo)
-    for (let p = 0; p < S.relg.length; p++) if (S.relg[p] === to) for (const q of WD.provs[p].adj) { const o = S.own[q]; if (S.relg[q] === from && chance(R0.sp * clamp((95 - (o >= 0 ? nat(o).ferv ?? 50 : 40)) / 40, 0, 1))) add.push(q); }
+    for (let p = 0; p < S.relg.length; p++) if (S.relg[p] === to) for (const q of WD.provs[p].adj) { const o = S.own[q]; if ((S.relg[q] === from || (o >= 0 && nat(o).relig === from && S.relg[q] !== to)) && chance(R0.sp * clamp((95 - (o >= 0 ? nat(o).ferv ?? 50 : 40)) / 40, 0, 1))) add.push(q); }
     add.forEach(q => S.relg[q] = to); if (add.length) S.mapDirty = true;
   }
 }
