@@ -76,7 +76,6 @@ function ai(n) {
   if (rebP.length && !atWarN) myArmies.filter(a => !a.exp && !a.path.length && !rebP.includes(a.p) && regs(a) >= 3).slice(0, 2).forEach(a => { const o = WD.provs[a.p < WD.provs.length ? a.p : n.capital]; orderArmy(a, rebP.slice().sort((x, y) => Math.hypot(WD.provs[x].cx - o.cx, WD.provs[x].cy - o.cy) - Math.hypot(WD.provs[y].cx - o.cx, WD.provs[y].cy - o.cy))[0]); });
   if (n.money < 0 && n.income < 0 && !atWarN && myArmies.length && !(n.horde && curYear() <= n.horde)) { const a = myArmies.filter(a => !a.exp).sort((x, y) => regs(y) - regs(x))[0]; if (a) { n.manpower += regs(a) * .15; UT.forEach(t => a[t] *= .85); a.max = regs(a); a.drill = false; } }   // em dívida: desmobiliza (os homens voltam à reserva e o exército não se refaz sozinho)
   aiRecruit(n, myArmies, myR, atWarN, P);
-  mergeIdle(n.id);
   // frotas: exploração e transporte
   const coastal = provsOf(n.id).filter(p => WD.provs[p].coast);
   if (coastal.length && n.fx.sea) {
@@ -146,30 +145,39 @@ function aiSupport(n, a, T) {
   if (regs(a) < T * .5 || a.exp) return;
   for (const k of ['med', 'recon', 'eng']) if (!(a.sup && a.sup[k]) && supOk(n, k) && n.money > supCost(n, k) * 5 && !addSupport(n, a, k)) return;
 }
-function aiArmy(n, P, rebP) {
-  const T = armyTarget(n), mine = S.armies.filter(a => a.o === n.id && !a.exp && !a.inv), fs = frontsOf(n.id), war = warsOf(n.id).length > 0;
-  const depot = aiDepot(n), slow = ((S.t / 30 | 0) + n.id) % 3 === 0;
-  for (const a of mine) if (slow && !armyBusy(a)) aiSupport(n, a, T);
-  // exércitos pequenos não lutam sozinhos: vão ao depósito e se juntam
-  const small = a => regs(a) < T * .35 && !armyBusy(a) && !(a.front != null && a.inBattle);
-  for (const a of mine) if (small(a) && !rebP.includes(a.p) && a.p !== depot && !(a.path.length && a.path[a.path.length - 1] === depot)) { a.front = null; orderArmy(a, depot, true); }
-  // exércitos grandes demais para o suprimento se dividem
-  for (const a of mine) if (!armyBusy(a) && !a.path.length && a.p < WD.provs.length && regs(a) > T * 1.8 && regs(a) > provSupply(a.p, n.id) * 1.3) {
-    splitArmy(a, .5); }
-  const field = S.armies.filter(a => a.o === n.id && !a.exp && !a.inv && !small(a));
+function aiArmy(n, P, rebP) { return aiArmyFront(n, P, rebP); }   // a IA joga como o jogador: exércitos em grupo pelos fronts
+/* modo de fronts: cada exército é um grupo; no front ele se espalha e avança sozinho (sim/groups.js e sim/fronts.js); a IA só decide
+   para qual front vai cada grupo, a ordem de cada front, a postura e o apoio. Grupos pequenos se juntam ao grupo mais próximo. */
+function aiArmyFront(n, P, rebP) {
+  for (const a of armiesOf(n.id)) if (a.g == null) a.g = a.id;
+  const T = armyTarget(n), fs = frontsOf(n.id), war = warsOf(n.id).length > 0, slow = ((S.t / 30 | 0) + n.id) % 3 === 0, depot = aiDepot(n);
+  const groups = groupsOf(n.id).filter(G => !G.some(a => a.exp || a.inv)), size = G => G.reduce((s, a) => s + regs(a), 0), powG = G => G.reduce((s, a) => s + armyPower(a), 0);
+  const lead = G => G.slice().sort((x, y) => regs(y) - regs(x))[0];
+  if (slow) for (const G of groups) { const h = lead(G); if (!armyBusy(h)) { const b = Object.keys(h.sup || {}).length; aiSupport(n, h, T); if (Object.keys(h.sup || {}).length > b) G.forEach(x => x.sup = Object.assign({}, h.sup)); } }
+  // grupos pequenos: juntam-se ao grupo maior (o caminho é feito pelos destacamentos ao se reagrupar)
+  const big = groups.filter(G => size(G) >= T * .35).sort((x, y) => size(y) - size(x));
+  for (const G of groups) if (size(G) < T * .35 && big.length && !G.some(armyBusy)) { joinGroups(lead(big[0]), G[0]); G.forEach(a => { a.front = big[0][0].front; if (!war && a.p !== lead(big[0]).p) orderArmy(a, lead(big[0]).p, true); }); }
+  const field = groupsOf(n.id).filter(G => !G.some(a => a.exp || a.inv));
   if (war) {
-    if (!fs.length) { aiOverseas(n, field); return; }
-    const need = new Map(fs.map(f => [f.id, f.foe.reduce((s, q) => s + foeNear(n.id, q), 0) / Math.max(1, Math.sqrt(f.foe.length)) + 2]));
-    const got = new Map(fs.map(f => [f.id, 0])); field.forEach(a => { if (got.has(a.front)) got.set(a.front, got.get(a.front) + armyPower(a)); else a.front = null; });
-    for (const a of field) if (a.front == null && !armyBusy(a)) { const f = fs.slice().sort((x, y) => (got.get(x.id) / need.get(x.id)) - (got.get(y.id) / need.get(y.id)))[0]; a.front = f.id; got.set(f.id, got.get(f.id) + armyPower(a)); }
+    if (!fs.length) { aiOverseas(n, field.map(lead)); return; }
+    const need = new Map(fs.map(f => [f.id, f.foe.reduce((s, q) => s + foeNear(n.id, q), 0) / Math.max(1, Math.sqrt(f.foe.length)) + 2])), got = new Map(fs.map(f => [f.id, 0]));
+    field.forEach(G => { const f = G[0].front; if (got.has(f)) got.set(f, got.get(f) + powG(G)); else G.forEach(a => a.front = null); });
+    for (const G of field) if (G[0].front == null) { const f = fs.slice().sort((x, y) => got.get(x.id) / need.get(x.id) - got.get(y.id) / need.get(y.id))[0]; G.forEach(a => { a.front = f.id; a.path = []; }); got.set(f.id, got.get(f.id) + powG(G)); }
+    // se um front ficou sem ninguém e outro tem sobra, o maior grupo se divide (nova unidade) para cobrir
+    for (const f of fs) if (!got.get(f.id) && need.get(f.id) > 2) { const G = field.filter(G => G[0].front != null && got.get(G[0].front) > need.get(G[0].front) * 1.5).sort((x, y) => size(y) - size(x))[0]; if (G && size(G) >= T) { const g = splitGroup(lead(G), f.id); if (g != null) got.set(f.id, 1); } }
     const bold = 1.3 / Math.max(.7, P.war);
-    for (const f of fs) { const adv = got.get(f.id) > need.get(f.id) * bold; setFord(n.id, f.id, adv ? 'adv' : 'hold'); field.filter(a => a.front === f.id).forEach(a => aiStance(n, a, adv)); }
+    for (const f of fs) { const adv = got.get(f.id) > need.get(f.id) * bold; setFord(n.id, f.id, adv ? 'adv' : 'hold'); field.filter(G => G[0].front === f.id).forEach(G => { const h = lead(G); aiStance(n, h, adv); G.forEach(x => x.st = h.st); }); }
     return;
   }
-  // paz: tropas na fronteira mais perigosa (sem estourar o suprimento) e treinando se o caixa permitir
+  // paz: sem front; os destacamentos se reúnem; os grupos ficam no depósito (fronteira perigosa), treinando se o caixa permitir; rebeldes primeiro
   const drill = n.money > 400 * eraScale() && n.income > 0;
-  for (const a of field) { a.front = null; a.drill = drill; if (armyBusy(a) || a.path.length || rebP.includes(a.p)) continue;
-    if (a.p !== depot && chance(.15)) orderArmy(a, depot, true); a.st = 'bal'; }
+  for (const G of field) { const h = lead(G); G.forEach(a => { a.front = null; a.drill = drill; a.st = 'bal'; });
+    if (G.some(armyBusy)) continue;
+    if (rebP.length) { const o = WD.provs[h.p < WD.provs.length ? h.p : n.capital], t = rebP.slice().sort((x, y) => Math.hypot(WD.provs[x].cx - o.cx, WD.provs[x].cy - o.cy) - Math.hypot(WD.provs[y].cx - o.cx, WD.provs[y].cy - o.cy))[0]; G.forEach(a => { if (!a.path.length && a.p !== t) orderArmy(a, t, true); }); continue; }
+    G.forEach(a => { if (a !== h && !a.path.length && a.p !== h.p) orderArmy(a, h.p, true); });
+    if (G.length === 1 && h.p !== depot && !h.path.length && chance(.15)) orderArmy(h, depot, true);
+  }
+  mergeGroupParts(n.id);
 }
 /* guerra sem front (inimigo do outro lado do mar ou longe): marcha até a província inimiga alcançável mais próxima, ou invade por mar */
 function aiOverseas(n, field) {

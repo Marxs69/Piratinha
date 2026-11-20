@@ -364,8 +364,19 @@ function sideArmies(sd, ids) {                                // vários exérci
   const gs = [...new Set(sel.map(gid))].map(k => groupOf(sel.find(a => gid(a) === k))), tot = gs.reduce((s, G) => s + G.reduce((t, a) => t + regs(a), 0), 0);
   sd.append(el('h2', '', gs.length + (gs.length === 1 ? ' exército · ' : ' exércitos · ') + fmtK(tot)));
   gs.forEach(G => { const h = G[0], r = el('div', 'orow'); r.append(el('span', '', '⚔️'), el('span', 'grow', G.length > 1 ? G.length + ' destacamentos' : h.p < P ? WD.provs[h.p].n : WD.seas[h.p - P].n), el('b', '', fmtK(G.reduce((t, a) => t + regs(a), 0)))); r.onclick = () => select('army', h.id); sd.append(r); });
-  const fs = frontsOf(me().id), rf = el('div', 'row'); fs.forEach(f => rf.append(btn('🚩 ' + frontName(f), () => { gs.forEach(G => setGroupFront(G[0], f.id)); refresh(); }, 'sm', '', 'Mandar todos para este front')));
-  if (fs.length) sd.append(sec('Front', rf));
+  const n = me(), fs = frontsOf(n.id), rf = el('div');
+  fs.forEach(f => { const w = S.wars.find(x => x.id === f.w), foe = nat(f.side === 'A' ? w.d : w.a), ord = fordOf(n.id, f.id), on = gs.filter(G => G[0].front === f.id).length, all = groupsOf(n.id).filter(G => G[0].front === f.id).length;
+    const sts = [...new Set(f.provs.map(p => WD.states[WD.provs[p].state].n))], ours = S.armies.filter(a => a.o === n.id && a.front === f.id).reduce((t, a) => t + armyPower(a), 0), theirs = f.foe.reduce((t, q) => t + foeNear(n.id, q), 0) / 2;
+    const c = el('div', 'card'); c.style.marginTop = '6px';
+    c.append(tip(el('b', '', '🚩 ' + frontName(f) + ' · ' + (ord === 'adv' ? '⚔️ avançando' : '🛡️ defendendo')), 'Contra ' + natName(foe) + '\nLinha: ' + sts.slice(0, 8).join(', ') + (sts.length > 8 ? '…' : '') + ' (' + f.provs.length + ' províncias)'),
+      el('div', 'dim', 'Contra ' + foe.name + ' · ' + sts.slice(0, 3).join(', ') + (sts.length > 3 ? '…' : '') + ' · ' + all + ' exército' + (all === 1 ? '' : 's') + (on ? ' (' + on + ' destes)' : '')),
+      tip(bar(ours / Math.max(1, ours + theirs), ours >= theirs ? '#8fd17f' : '#e5636b'), 'Força: ' + Math.round(ours) + ' × ' + Math.round(theirs)));
+    const r = el('div', 'row');
+    r.append(btn('➕ Mandar para cá', () => { gs.forEach(G => setGroupFront(G[0], f.id)); refresh(); }, 'sm', on === gs.length ? 'Já estão aqui' : '', 'Os exércitos selecionados vão para este front e se espalham pela linha'),
+      btn('🛡️ Defender', () => { setFord(n.id, f.id, 'hold'); frontOrders(n); refresh(); }, 'sm' + (ord === 'hold' ? ' on' : ''), '', 'Espalha as tropas pelos pontos mais ameaçados da linha'),
+      btn('⚔️ Avançar', () => { setFord(n.id, f.id, 'adv'); frontOrders(n); refresh(); }, 'sm' + (ord === 'adv' ? ' on' : ''), '', 'Reúne as tropas num ponto e ataca quando a força passa de 1,2× a defesa do alvo'));
+    c.append(r); rf.append(c); });
+  if (fs.length) sd.append(sec('Fronts', rf)); else sd.append(el('p', 'dim', warsOf(n.id).length ? 'Guerra sem fronts: o inimigo está além-mar (invasão pelo botão direito numa costa).' : 'Em paz: os exércitos combatem rebeldes e se reagrupam sozinhos.'));
   const r = el('div', 'row'); r.append(btn('Juntar num só exército', () => { gs.slice(1).forEach(G => joinGroups(gs[0][0], G[0])); select('army', gs[0][0].id); refresh(); }, 'sm', gs.length > 1 ? '' : 'Só um exército', 'Passam a ser um único exército (os destacamentos se reúnem sozinhos fora do front)'));
   sd.append(r);
 }
@@ -1113,6 +1124,7 @@ initRender(cv); menu(); requestAnimationFrame(loop);
   startPlay(false); if (q.get('mode')) { R.mode = q.get('mode'); drawModes($('#modes'), true); if (R.mode === 'res') select('res'); }
   if (q.get('z')) { R.cam.z = +q.get('z'); centerOn(WD.provs[main.capital].cx * K, WD.provs[main.capital].cy * K); }
   if (q.get('tab')) UI[q.get('win') + 'Tab'] = q.get('tab');
+  if (q.get('armies')) { const a = S.armies.find(a => a.o === main.id); if (a && groupsOf(main.id).length < 2) splitGroup(a, null); select('armies', S.armies.filter(a => a.o === main.id).map(a => a.id)); }
   if (q.get('army')) { const a = S.armies.find(a => a.o === main.id); if (a) { select('army', a.id); centerOn(...armyXY(a)); } }
   if (q.get('win')) openWin(q.get('win'), q.get('win') === 'peace' && warsOf(main.id)[0] ? warsOf(main.id)[0].id : undefined);
   if (q.get('prov')) { if (q.get('prod')) UI.prodOpen = WD.provs[main.capital].state; select('prov', main.capital); }
