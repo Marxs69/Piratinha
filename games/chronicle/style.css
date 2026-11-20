@@ -269,3 +269,4 @@ h4.bgrp { font: 700 11px var(--title); color: var(--dim); letter-spacing: 1px; m
 #armybar .acard { min-width: 120px; padding: 5px 8px; border-radius: 5px; background: rgba(0,0,0,.3); border: 1px solid rgba(232,194,90,.25); cursor: pointer; display: flex; flex-direction: column; gap: 2px; }
 #armybar .acard.sel { border-color: var(--gold); background: rgba(232,194,90,.12); }
 #armybar .acard b { font-size: 12px; white-space: nowrap; } #armybar .acard small { font-size: 11px; opacity: .85; }
+.rgrid2 { display: grid; gap: 6px; margin-bottom: 6px; }

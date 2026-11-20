@@ -211,10 +211,9 @@ function sideProv(sd, p) {
     return;
   }
   if (o === n.id && c === n.id) {
-    const r = el('div', 'rgrid'); UT.filter(t => t !== 'vrt' || n.vert).forEach(t => { const b0 = btn('', act(() => recruit(n, t, 1, p)), 'rbtn r-' + t, canRecruit(n, t, 1), unitTip(n, t)); b0.append(el('span', 'ue', unitE(n, t)), el('b', '', unitName(n, t)), el('small', '', '1k · 💰' + recCost(n, t))); r.append(b0); });
-    const r5 = el('div', 'row'); r5.append(btn('🗡️ 5× ' + unitName(n, 'inf') + ' (💰' + recCost(n, 'inf', 5) + ')', act(() => recruit(n, 'inf', 5, p)), 'sm', canRecruit(n, 'inf', 5)));
+    const r = trainGrid(n, p, null), r5 = el('div', 'row');   // cada treino aqui forma um exército novo
     if (pr.coast) r5.append(btn('⛵ ' + shipName(n) + ' ×2 (💰' + shipCost(n) * 2 + ')', act(() => buildShips(n, 2, p)), 'sm', !n.fx.sea ? 'Exige Barcos longos' : n.money < shipCost(n) * 2 ? 'Sem dinheiro' : '', 'Navios ficam prontos em 4 meses no mar ao lado.'));
-    sd.append(sec('Recrutar', r, r5, msg));
+    sd.append(sec('Treinar novo exército', r, r5, msg));
   } else if (o !== n.id) {
     const has0 = n.claims[st.id], fab = n.fab && n.fab.s === st.id;
     sd.append(sec('Reivindicação', has0 ? el('div', 'good', 'Você reivindica ' + st.n + '.') : fab ? el('div', 'dim', 'Fabricando… ' + n.fab.m + ' meses') : btn('Fabricar reivindicação em ' + st.n + ' (💰' + Math.round(40 * eraScale()) + ')', act(() => fabricate(n, st.id)), 'sm', n.fab ? 'Já fabricando' : '', 'Com reivindicação, declarar guerra custa só 3 de estabilidade (sem: 15).'), msg));
@@ -334,9 +333,8 @@ function sideArmy(sd, id) {
   if (mine) gc.append(btn(gen ? 'Trocar (💰' + genCost() + ')' : 'Nomear (💰' + genCost() + ')', () => genPick(H), 'sm', n.money < genCost() ? 'Sem dinheiro' : '', 'Escolha entre 3 candidatos; comanda todos os destacamentos.'));
   sd.append(sec('General', gc));
   if (!mine) return;
-  const at0 = G.find(x => x.p < P && S.own[x.p] === n.id && S.ctrl[x.p] === n.id), at = at0 ? at0.p : n.capital, rg = el('div', 'rgrid');
-  UT.filter(t => t !== 'vrt' || n.vert).forEach(t => [1, 5].forEach(k => { const b0 = btn('', () => { const e = recruit(n, t, k, at, gid(H)); if (e) say(e, 'bad'); refresh(); }, 'rbtn r-' + t, canRecruit(n, t, k), unitTip(n, t) + '\nPronta em ' + Math.round((t === 'vrt' ? 5 : 3) * BUILD_SLOW) + ' meses em ' + WD.provs[at].n + ' e entra neste exército'); b0.append(el('span', 'ue', unitE(n, t)), el('b', '', k + 'k ' + unitName(n, t)), el('small', '', '💰' + recCost(n, t, k))); rg.append(b0); }));
-  const pend = n.rec.filter(r => r.g === gid(H)); sd.append(sec('Comprar unidades', rg, pend.length ? el('small', 'dim', 'Em preparo: ' + pend.map(r => r.k + 'k ' + unitName(n, r.type) + ' (' + r.m + 'm)').join(', ')) : null));
+  const at0 = G.find(x => x.p < P && S.own[x.p] === n.id && S.ctrl[x.p] === n.id), at = at0 ? at0.p : n.capital, rg = trainGrid(n, at, gid(H));
+  const pend = n.rec.filter(r => r.g === gid(H)); sd.append(sec('Treinar unidades', rg, pend.length ? el('small', 'dim', 'Em preparo: ' + pend.map(r => r.k + 'k ' + unitName(n, r.type) + ' (' + r.m + 'm)').join(', ')) : null));
   const rs = el('div', 'row'); Object.keys(STANCES).forEach(k => { const d = STANCES[k]; rs.append(btn(d.e + ' ' + d.n, () => { forG(x => setStance(x, k)); drawSide(); }, 'sm' + ((H.st || 'bal') === k ? ' on' : ''), '', 'Postura: ' + d.n + '\n' + d.d + (d.beats ? '\nVence ' + STANCES[d.beats].n.toLowerCase() + ' (+15% de dano)' : ''))); });
   sd.append(sec('Postura', rs));
   const ap = el('div'), sp = Object.keys(H.sup || {}); if (sp.length) { const ch = el('div', 'chips'); sp.forEach(k => ch.append(tip(el('span', 'chip p', SUPPORT[k].e + ' ' + supName(n, k)), SUPPORT[k].d))); ap.append(ch); }
@@ -406,6 +404,13 @@ function drawOutl() {
   const fl = S.fleets.filter(f => f.o === n.id); if (fl.length) { o.append(el('h4', '', 'FROTAS')); fl.forEach(f => { const r = el('div', 'orow'); r.append(el('span', '', f.auto ? '🧭' : '⛵'), el('span', 'grow', WD.seas[f.z].n), el('b', '', Math.ceil(f.ships) + '')); r.onclick = () => { select('fleet', f.id); centerOn(...fleetXY(f)); }; o.append(r); }); }
   const work = n.cons.length + n.rec.length + S.cols.filter(c => c.o === n.id).length;
   if (work) { o.append(el('h4', '', 'EM ANDAMENTO')); n.cons.forEach(c => o.append(el('div', 'orow', BUILDINGS[c.b].e + ' ' + BUILDINGS[c.b].n + ' · ' + c.m + 'm'))); n.rec.forEach(r => o.append(el('div', 'orow', (r.type === 'ship' ? '⛵ ' + shipName(n) : unitName(n, r.type)) + ' ×' + r.k + ' · ' + r.m + 'm'))); S.cols.filter(c => c.o === n.id).forEach(c => o.append(el('div', 'orow', '🏕️ ' + WD.provs[c.p].n + ' · ' + c.m + 'm'))); }
+}
+/* grade de treino: primeira linha 1k de cada tipo, segunda linha 5k; g = exército que recebe (null = cada clique cria um exército novo) */
+function trainGrid(n, at, g, done) {
+  const ts = UT.filter(t => t !== 'vrt' || n.vert), wrap = el('div', 'rgrid2'); wrap.style.gridTemplateColumns = 'repeat(' + ts.length + ', 1fr)';
+  [1, 5].forEach(k => ts.forEach(t => { const b0 = btn('', () => { const e = recruit(n, t, k, at, g ?? S.id++); if (e) say(e, 'bad'); else if (done) done(); refresh(); }, 'rbtn r-' + t, canRecruit(n, t, k), unitTip(n, t) + '\nPronta em ' + Math.max(1, Math.round((t === 'vrt' ? 5 : 3) * BUILD_SLOW) - (S.bld[WD.provs[at].state].barracks ? 2 : 0)) + ' meses em ' + WD.provs[at].n + (g == null ? '\nForma um exército novo' : '\nEntra neste exército'));
+    b0.append(el('span', 'ue', unitE(n, t)), el('b', '', k + 'k ' + unitName(n, t)), el('small', '', '💰' + recCost(n, t, k))); wrap.append(b0); }));
+  return wrap;
 }
 /* barra de exércitos (embaixo, no centro): um cartão por exército, com o nome do general */
 function drawArmyBar() {
@@ -900,6 +905,15 @@ function milUnits(b, n) {
   b.append(c);
   b.append(tip(el('p', 'dim', 'Largura de combate ' + (WIDTH_BASE + n.fx.width) + ' (× terreno) · linha de suprimento ' + logiRange(n) + ' províncias · ' + shipCap(n) + ' regimento(s) por navio'), 'Largura e logística sobem com tecnologias militares e de transporte.'));
 }
+/* novo exército: tudo o que for treinado nesta janela forma o mesmo exército */
+function newArmyModal(n) {
+  const g = S.id++, own = provsOf(n.id).filter(p => S.ctrl[p] === n.id).sort((a, b) => (b === n.capital) - (a === n.capital) || S.pop[b] - S.pop[a]); let at = own[0];
+  modal(m => { const draw = () => { m.innerHTML = ''; m.append(el('h2', '', '➕ Novo exército'));
+      const sel = el('select'); own.slice(0, 80).forEach(p => sel.append(new Option(WD.provs[p].n + ' (' + WD.states[WD.provs[p].state].n + ')' + (p === n.capital ? ' ⭐' : ''), p))); sel.value = at; sel.onchange = () => { at = +sel.value; draw(); };
+      const pend = n.rec.filter(r => r.g === g);
+      m.append(el('small', 'dim', 'Onde treinar'), sel, trainGrid(n, at, g, draw), el('small', 'dim', pend.length ? 'Em treino: ' + pend.map(r => r.k + 'k ' + unitName(n, r.type)).join(', ') : 'Nada em treino ainda'), btn('Fechar', closeModal)); };
+    draw(); });
+}
 function winMil(b) {
   const n = me(), P = WD.provs.length, msg = el('div', 'msg'), tab = tabs(b, 'milTab', [['army', '⚔️ Exército'], ['fronts', '🚩 Fronts'], ['units', '📋 Tropas e doutrina']]);
   if (tab === 'fronts') { milFronts(b, n); return; }
@@ -908,7 +922,7 @@ function winMil(b) {
   const pw = el('div', 'card'); pw.append(el('h4', '', 'Exército'));
   const t = el('table', 't'); const h = t.insertRow(); ['Tipo', 'Unidade', 'Fogo / choque', 'Custo', ''].forEach(x => h.append(el('th', '', x)));
   ['inf', 'cav', 'art', 'vrt'].filter(ty => ty !== 'vrt' || n.vert).forEach(ty => { const r = t.insertRow(); r.insertCell().textContent = { inf: 'Infantaria', cav: 'Cavalaria', art: 'Artilharia', vrt: 'Vertente' }[ty]; const u = r.insertCell(); u.textContent = unitName(n, ty); tip(u, unitTip(n, ty)); const f = r.insertCell(); f.className = 'n'; f.textContent = (n.up[ty] * unitStat(n, ty, 'fire')).toFixed(1) + ' / ' + (n.up[ty] * unitStat(n, ty, 'shock')).toFixed(1); const co = r.insertCell(); co.className = 'n'; co.textContent = '💰' + recCost(n, ty); r.insertCell().append(btn('+1 na capital', () => { msg.textContent = recruit(n, ty, 1); refresh(); }, 'sm', canRecruit(n, ty, 1))); });
-  pw.append(t, msg); c.append(pw);
+  pw.append(t, msg, btn('➕ Criar novo exército', () => newArmyModal(n), 'grn', '', 'Escolha onde e quais unidades treinar; tudo forma um único exército novo')); c.append(pw);
   const st = el('div', 'card'); st.append(el('h4', '', 'Forças'), kv([['Regimentos', fmtK(S.armies.filter(a => a.o === n.id).reduce((s, a) => s + regs(a), 0))], ['Contingente', Math.floor(n.manpower) + 'k / ' + Math.floor(n.mpMax || 0) + 'k'], ['Navegação', n.fx.sea === 2 ? 'Oceânica' : n.fx.sea ? 'Costeira' : 'Nenhuma', 'Costeira: mares junto à terra. Oceânica (Caravela): mar aberto.'], ['Cerco', '×' + n.up.siege.toFixed(1)]]), modChips({ army: n.m.army, manpower: n.m.manpower, speed: n.m.speed })); c.append(st);
   const nv = el('div', 'card'); nv.append(el('h4', '', 'Marinha · ' + shipName(n)));
   const ports = provsOf(n.id).filter(p => WD.provs[p].coast && S.ctrl[p] === n.id).sort((a, b) => (S.bld[WD.provs[b].state].port || 0) - (S.bld[WD.provs[a].state].port || 0));
@@ -1138,6 +1152,7 @@ initRender(cv); menu(); requestAnimationFrame(loop);
   startPlay(false); if (q.get('mode')) { R.mode = q.get('mode'); drawModes($('#modes'), true); if (R.mode === 'res') select('res'); }
   if (q.get('z')) { R.cam.z = +q.get('z'); centerOn(WD.provs[main.capital].cx * K, WD.provs[main.capital].cy * K); }
   if (q.get('tab')) UI[q.get('win') + 'Tab'] = q.get('tab');
+  if (q.get('newarmy')) newArmyModal(main);
   if (q.get('armies')) { const a = S.armies.find(a => a.o === main.id); if (a && groupsOf(main.id).length < 2) splitGroup(a, null); select('armies', S.armies.filter(a => a.o === main.id).map(a => a.id)); }
   if (q.get('army')) { const a = S.armies.find(a => a.o === main.id); if (a) { select('army', a.id); centerOn(...armyXY(a)); } }
   if (q.get('win')) openWin(q.get('win'), q.get('win') === 'peace' && warsOf(main.id)[0] ? warsOf(main.id)[0].id : undefined);
