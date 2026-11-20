@@ -283,7 +283,7 @@ function vertNeedOk(n, v) {                                  // recurso ou terre
 const needName = v => { const k = VERT[v].need; return NEEDS[k] ? NEEDS[k].n : GOODS[k].n.toLowerCase(); };
 function techState(n, t) {                                  // '' = pode pesquisar
   if (n.techs[t.id]) return 'done';
-  if (t.vt && n.vert !== t.v) return 'Exige escolher ' + VERT[t.v].n;
+  if ((t.vt || t.vr) && n.vert !== t.v) return 'Exige escolher ' + VERT[t.v].n;
   if (t.entry && n.vpend) return 'Decida antes a vertente pendente';
   if (!t.v && n.vert && VERT[n.vert].rep.has(t.id)) return 'Substituída por ' + VERT[n.vert].n;
   if (!t.req.every(q => hasT(n, q))) return 'Exige tecnologias anteriores';
@@ -300,7 +300,7 @@ function vertOffer(n, v) {
 }
 function vertDecide(n, v, keep) {
   n.vpend = null; const V = VERT[v];
-  if (keep && !n.vert) { n.vert = v; if (n.res && TECH[n.res] && V.rep.has(n.res)) n.res = null; log(natName(n) + ' abraçou a vertente ' + V.n + '.', n.id === S.player ? 'good' : 'world', [n.id]); }
+  if (keep && !n.vert) { n.vert = v; V.rep.forEach(id => { if (n.techs[id]) n.techs['vr_' + v + '_' + id] = 1; }); if (n.res && TECH[n.res] && V.rep.has(n.res)) n.res = null; log(natName(n) + ' abraçou a vertente ' + V.n + '.', n.id === S.player ? 'good' : 'world', [n.id]); }
   else { (n.vdec = n.vdec || {})[v] = 1; if (n.id === S.player) log('Você seguiu pela via comum e ficou com parte das vantagens de ' + V.n + '.', 'info', [n.id]); }
   calcMods(n);
 }

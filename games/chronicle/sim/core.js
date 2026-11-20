@@ -45,7 +45,7 @@ function fortOf(p) {
   return f;
 }
 const hasT = (n, id) => n.eff ? n.eff.has(id) : !!n.techs[id];     // pesquisada direto ou trazida pela árvore da vertente
-const techCount = n => n.eff ? n.eff.size : Object.keys(n.techs).length;
+const techCount = n => n.eff ? n.tcount ?? n.eff.size : Object.keys(n.techs).length;
 const vertLen = v => VERT[v].len;
 
 /* ---------- modificadores ---------- */
@@ -53,7 +53,8 @@ const vertLen = v => VERT[v].len;
 function calcFx(n) {
   const fx = { sea: 0, col: 0, fort: 0, med: 0, cap: 0, logi: 0, width: 0, slots: 1, ship: 1, bo: {}, up: { inf: 1, cav: 1, art: 1, siege: 1 }, b: new Set(Object.keys(BUILDINGS).filter(b => !BUILDINGS[b].tech && !BUILDINGS[b].vert)), g: new Set(), i: new Set(['trad', 'warrior']) };
   const eff = new Set(Object.keys(n.techs)); let vl = 0;
-  for (const id in n.techs) { const t = TECH[id]; if (t && t.vt) { vl++; (t.src || []).forEach(x => eff.add(x)); } }
+  let vr = 0; for (const id in n.techs) { const t = TECH[id]; if (!t) continue; if (t.vt) vl++; if (t.vr) vr++; (t.src || []).forEach(x => eff.add(x)); }
+  n.tcount = eff.size - vr;                                      // versões da vertente não contam em dobro
   n.eff = eff; n.vlv = vl;
   if (n.vert && vl >= VERT[n.vert].len) fx.ship += 1.5;          // vertente completa: frota especial
   for (const id of eff) {

@@ -306,7 +306,7 @@ T('soc_ai_gov', 'soc', 2080, 'Governança algorítmica', ['soc_digital_dem', 'ec
 T('soc_posthuman', 'soc', 2120, 'Pós-humanismo', ['soc_ai_gov'], { i: ['posthuman'], m: { research: .2 }, g: ['hive'] });
 T('soc_galactic', 'soc', 2165, 'Hegemonia orbital', ['soc_posthuman', 'nav_orbit'], { g: ['hegemony', 'star_empire'], i: ['cosmism'] });
 const TECH = Object.fromEntries(TECHS.map(t => [t.id, t]));
-const CATS = { mil: 'Militar', nav: 'Naval', eco: 'Economia', soc: 'Sociedade' };
+const CATS = { mil: 'Militar', nav: 'Naval', eco: 'Economia', soc: 'Sociedade', vert: 'Vertente' };
 
 /* ---------- vertentes ----------
    Cada vertente entra na árvore normal por uma tecnologia de entrada (ex.: Clockpunk em Economia por volta de 1360, depois de Guildas).
@@ -373,26 +373,23 @@ const VUNITS = {
 };
 // necessidades que não são recurso: terreno ou posição
 const NEEDS = { wild: { n: 'selva ou pântano (biodiversidade)', ok: p => p.terr === 'jungle' || p.terr === 'marsh' }, sun: { n: 'deserto ou savana (sol forte)', ok: p => p.terr === 'desert' || p.terr === 'savanna' }, launch: { n: 'litoral perto do equador (base de lançamento)', ok: p => p.coast && Math.abs(p.cy / MAP_H - .5) < .12 } };
-/* vertentes na árvore comum: o ponto inicial fica na sua área (mostrado à parte); escolher a vertente bloqueia só a área do ponto inicial
-   (as técnicas normais dali em diante viram as da vertente) e, nas outras áreas, cada técnica da vertente substitui uma técnica normal de ano próximo.
-   v.rep = técnicas normais substituídas; v.len = pontos próprios (completar todos libera a tropa e a frota especiais) */
+/* vertentes: o ponto inicial (v_x) fica na área dele. Escolhida a vertente, TODA técnica comum posterior ao ponto inicial (em todas as áreas)
+   é trocada por uma versão da vertente (vr_x_id: mesmos requisitos e efeitos, nome do tema); a área do ponto inicial fica "trancada" nessa versão.
+   As melhorias próprias (v.tree → v_x_k, área 'vert') ficam na aba da vertente; completar todas libera a tropa e a frota especiais.
+   v.rep = técnicas comuns substituídas; v.len = melhorias próprias */
+const VERT_SUF = { clock: 'de relojoaria', steam: 'a vapor', tesla: 'de bobina', diesel: 'a diesel', atom: 'nuclear', bio: 'de bioengenharia', cyber: 'em rede', solar: 'solar', nano: 'de nanomáquinas', space: 'orbital' };
+const VERT_UPFX = { mil: { u: { inf: .1, cav: .1, art: .1 } }, nav: { ship: .3 }, eco: { m: { prod: .03 } }, soc: { m: { stab: .02 } } };
 VERTS.forEach(v => {
   const add = t => { TECHS.push(t); TECH[t.id] = t; };
   add({ id: 'v_' + v.id, c: v.entry.c, v: v.id, entry: true, y: v.entry.y, n: v.entry.n, req: v.entry.req, fx: {}, src: [] });
-  const last = {}, used = new Set(); v.len = v.tree.length;
-  v.tree.forEach(([y, c, n], k) => {
-    const t = { id: 'v_' + v.id + '_' + k, c, v: v.id, vt: true, y, n, req: [last[c] || 'v_' + v.id], fx: {}, src: [] };
-    if (c !== v.entry.c) {                                      // outra área: substitui a técnica normal mais próxima no tempo e herda os requisitos dela
-      const cand = TECHS.filter(x => !x.v && x.c === c && x.y >= v.entry.y && !used.has(x.id)).sort((a, b) => Math.abs(a.y - y) - Math.abs(b.y - y))[0];
-      if (cand) { used.add(cand.id); t.src.push(cand.id); t.req = cand.req.slice(); t.rep = cand.id; }
-    }
-    add(t); last[c] = t.id;
-  });
-  // área do ponto inicial: tudo depois dele vai para a técnica da vertente da mesma área com ano igual ou maior
-  const own = TECHS.filter(x => x.v === v.id && x.vt && x.c === v.entry.c);
-  if (own.length) TECHS.filter(t => !t.v && t.c === v.entry.c && t.y > v.entry.y && !used.has(t.id)).forEach(t => { (own.find(x => x.y >= t.y) || own[own.length - 1]).src.push(t.id); });
-  v.rep = new Set(TECHS.filter(x => x.v === v.id).flatMap(x => x.src));
+  const base = TECHS.filter(t => !t.v && t.y > v.entry.y), cid = id => 'vr_' + v.id + '_' + id;
+  base.forEach(t => add({ id: cid(t.id), c: t.c, v: v.id, vr: t.id, y: t.y, n: t.n + ' ' + VERT_SUF[v.id], req: t.req.map(q => TECH[q] && !TECH[q].v && TECH[q].y > v.entry.y ? cid(q) : q), fx: {}, src: [t.id] }));
+  v.rep = new Set(base.map(t => t.id)); v.len = v.tree.length;
+  let last = 'v_' + v.id;
+  v.tree.forEach(([y, c, n], k) => { const id = 'v_' + v.id + '_' + k; add({ id, c: 'vert', area: c, v: v.id, vt: true, y, n, req: [last], fx: VERT_UPFX[c] || {}, src: [] }); last = id; });
 });
+/* efeitos de uma técnica (a versão da vertente usa os da técnica comum que substitui) */
+const techFx = t => t.vr ? TECH[t.vr].fx : t.fx;
 
 /* ---------- governos ----------
    cat: grupo · succ: sucessão (hered herança · elect eleito vitalício · term eleições a cada `term` anos · party partido · junta · council · theo · ai)

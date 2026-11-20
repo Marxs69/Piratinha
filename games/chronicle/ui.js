@@ -50,10 +50,11 @@ function fxLines(fx) {
   return o;
 }
 function techTip(n, t, st) {
-  const o = [t.n + ' · ' + t.y + ' · ' + (CATS[t.c] || '')];
-  if (t.entry) { const v = VERT[t.v]; o.push('Entrada da vertente ' + v.e + ' ' + v.n + '.', 'Escolhê-la troca as tecnologias militares, navais e econômicas posteriores a ' + v.entry.y + ' pela árvore ' + v.n + ' (até 2200).', 'Bônus da árvore completa: ' + modLines(v.m).join(', '), 'Exige ' + needName(t.v) + ' no território ou numa província vizinha' + (S && S.player >= 0 ? (vertNeedOk(n, t.v) ? ' ✓' : ' ✗') : '')); if (VUNITS[t.v]) { const U = VUNITS[t.v]; o.push('Tropas próprias (evoluem com a árvore):', ...['inf', 'cav', 'art', 'ship'].map(k => '· ' + U[k].map(x => x[1]).join(' → '))); } }
-  o.push(...fxLines(t.fx));
-  if (t.vt) { const v = VERT[t.v]; if (t.src.length) o.push('Traz o equivalente a: ' + t.src.map(x => TECH[x].n).join(', ')); o.push('Parte da árvore ' + v.n + ': ' + modLines(Object.fromEntries(Object.entries(v.m).map(([k, x]) => [k, x / v.len]))).join(', ')); }
+  const o = [t.n + ' · ' + t.y + ' · ' + (t.c === 'vert' ? VERT[t.v].n + ' (' + CATS[t.area] + ')' : CATS[t.c] || '')];
+  if (t.entry) { const v = VERT[t.v], dm = {}; for (const k in v.m) dm[k] = v.m[k] * VERT_DECLINE; o.push('Ponto inicial de ' + v.e + ' ' + v.n + '. Ao concluir, você decide:', '· Manter: as técnicas comuns depois de ' + v.entry.y + ' viram versões ' + v.n + ' (a área ' + CATS[v.entry.c] + ' fica trancada nelas) e abre a aba de melhorias próprias.', '· Bônus: segue a via comum e leva ' + modLines(dm).join(', '), 'Exige ' + needName(t.v) + ' no território ou numa província vizinha'); }
+  if (t.vr) o.push('Versão ' + VERT[t.v].n + ' de ' + TECH[t.vr].n);
+  o.push(...fxLines(techFx(t)));
+  if (t.vt) o.push('Melhoria própria de ' + VERT[t.v].n + ' · ' + n.vlv + '/' + VERT[t.v].len + ' (todas liberam ' + VERT[t.v].unit[0] + ' e a frota especial)');
   if (t.req.length) o.push('Exige: ' + t.req.map(q => TECH[q].n).join(', '));
   if (st && st !== 'done') o.push('⛔ ' + st);
   return o.join('\n');
@@ -582,7 +583,8 @@ function winEco(b) {
   sum.append(sv); b.append(sum);
 }
 function winTech(b) {
-  const n = me(), areas = [['mil', '⚔️ Militar'], ['nav', '⚓ Naval'], ['eco', '💰 Economia'], ['soc', '🏛️ Sociedade']], tab = tabs(b, 'techTab', areas), stick = el('div', 'tstick'); stick.append(b.lastChild);   // abas e cabeçalho fixos no topo
+  const n = me(), areas = [['mil', '⚔️ Militar'], ['nav', '⚓ Naval'], ['eco', '💰 Economia'], ['soc', '🏛️ Sociedade']], tab = tabs(b, 'techTab', [...areas, ['vert', n.vert ? VERT[n.vert].e + ' ' + VERT[n.vert].n : '✨ Vertentes']]), stick = el('div', 'tstick'); stick.append(b.lastChild);
+  const tbar = stick.lastChild; tbar.classList.add('ttabs'); tip(tbar.lastChild, n.vert ? 'Melhorias próprias de ' + VERT[n.vert].n + ' (' + n.vlv + '/' + VERT[n.vert].len + '); todas liberam ' + VERT[n.vert].unit[0] + ' e a frota especial' : 'Pontos iniciais de cada vertente');   // abas e cabeçalho fixos no topo
   const head = el('div', 'thead'), tr = n.res ? TECH[n.res] : null, cur = el('div', 'card tcur');
   const left = tr ? Math.max(0, techCost(n, tr) - n.rp) : 0, mon = tr ? Math.ceil(left / Math.max(.1, researchRate(n))) : 0;
   cur.append(el('h4', '', '🔬 Pesquisando agora'), el('b', tr ? '' : 'bad', tr ? tr.n + ' · ' + tr.y : 'Nada — clique numa tecnologia ▶ abaixo'), bar(tr ? n.rp / techCost(n, tr) : 0),
@@ -593,17 +595,19 @@ function winTech(b) {
   const sb = el('input', 'tsearch'); sb.placeholder = '🔍 Buscar tecnologia (nome ou efeito)'; sb.value = UI.techQ || ''; sb.oninput = () => { UI.techQ = sb.value; const keep = sb.selectionStart; drawWin(); const nb = $('.tsearch'); if (nb) { nb.focus(); nb.setSelectionRange(keep, keep); } };
   const fl = btn(UI.techAv ? '▶ Só disponíveis' : '☰ Todas', () => { UI.techAv = !UI.techAv; drawWin(); }, 'sm' + (UI.techAv ? ' on' : ''), '', 'Alterna entre mostrar tudo ou só o que dá para pesquisar agora');
   const fr = el('div', 'row'); fr.append(fl, lg); side.append(sb, fr);
-  if (n.vert) side.append(tip(el('div', 'gold', VERT[n.vert].e + ' ' + VERT[n.vert].n + ' · ' + n.vlv + '/' + VERT[n.vert].len + ' pontos'), 'Área bloqueada: ' + CATS[VERT[n.vert].entry.c] + ' (as técnicas normais dali em diante são as da vertente).\nNas outras áreas, algumas técnicas foram trocadas pelas da vertente.\nCompletar todos os pontos libera ' + VERT[n.vert].unit[0] + ' no exército e a frota especial.'));
   head.append(cur, side); stick.append(head); b.append(stick);
   const q = (UI.techQ || '').trim().toLowerCase();
-  let list = q ? TECHS.filter(t => (!t.vt || t.v === n.vert) && (t.n.toLowerCase().includes(q) || fxLines(t.fx).join(' ').toLowerCase().includes(q))) : TECHS.filter(t => t.c === tab && (!t.vt || t.v === n.vert) && !(n.vert && !t.v && VERT[n.vert].rep.has(t.id) && !hasT(n, t.id)));   // as da vertente escolhida aparecem no lugar das que substituem
+  const mineV = t => !t.v || t.entry || t.v === n.vert, hideRep = t => n.vert && !t.v && VERT[n.vert].rep.has(t.id) && !hasT(n, t.id);   // a versão da vertente aparece no lugar da comum
+  let list = q ? TECHS.filter(t => mineV(t) && !hideRep(t) && (t.n.toLowerCase().includes(q) || fxLines(techFx(t)).join(' ').toLowerCase().includes(q)))
+    : tab === 'vert' ? TECHS.filter(t => n.vert ? t.vt && t.v === n.vert : t.entry)
+    : TECHS.filter(t => t.c === tab && !t.vt && mineV(t) && !hideRep(t) && !(t.vr && hasT(n, t.vr)));
   if (UI.techAv) list = list.filter(t => !techState(n, t));
   if (q) b.append(el('small', 'dim', list.length + ' resultado' + (list.length === 1 ? '' : 's') + ' em todas as áreas'));
   const nowEra = eraOf(curYear()), groups = new Map(); list.slice().sort((a, c) => a.y - c.y).forEach(t => { const e = eraOf(t.y); if (!groups.has(e)) groups.set(e, []); groups.get(e).push(t); });
   groups.forEach((ts, e) => {
     const done = ts.filter(t => hasT(n, t.id)).length, sec0 = el('div', 'tera' + (e === nowEra ? ' now' : ''));
     const h = el('div', 'terah'); h.append(el('b', '', e + (e === nowEra ? ' · agora' : '')), el('small', 'dim', done + ' / ' + ts.length), bar(done / ts.length, '#8fd17f')); tip(h, e + ': ' + done + ' de ' + ts.length + ' tecnologias desta área pesquisadas');
-    const grid = el('div', 'tgrid'), ent = ts.filter(t => t.entry); ts.filter(t => !t.entry).forEach(t => grid.append(techBox(n, t)));
+    const grid = el('div', 'tgrid'), ent = tab === 'vert' ? [] : ts.filter(t => t.entry); ts.filter(t => tab === 'vert' || !t.entry).forEach(t => grid.append(techBox(n, t)));
     if (ent.length) { const body = el('div', 'tbody2'), vc = el('div', 'tvert'); vc.append(tip(el('small', 'gold', '✨ Vertentes'), 'Pontos iniciais das vertentes, à parte da árvore comum.\nAo concluir um, você decide: ficar com a vertente (para sempre) ou seguir pela via comum levando ' + pct(VERT_DECLINE) + ' do bônus dela.'));
       ent.forEach(t => vc.append(techBox(n, t))); body.append(grid, vc); sec0.append(h, body); } else sec0.append(h, grid);
     b.append(sec0);
@@ -810,7 +814,7 @@ function winPop(b, forceTab) {
 function techBox(n, t) {
   const s = techState(n, t), cls = s === 'done' || hasT(n, t.id) ? 'done' : s ? 'lock' : 'av', d = el('div', 'tech ' + cls + (n.res === t.id ? ' cur' : '') + (t.v ? ' vt' : ''));
   if (t.v) d.style.borderLeft = '4px solid ' + VERT[t.v].col;
-  d.append(el('b', '', (cls === 'done' ? '✓ ' : cls === 'av' ? '▶ ' : '🔒 ') + (t.entry ? VERT[t.v].e + ' ' : '') + t.n)); d.append(el('small', '', t.y + (cls === 'done' ? '' : ' · 🔬' + techCost(n, t)) + (t.entry ? ' · ' + VERT[t.v].n : '') + (fxLines(t.fx)[0] ? ' · ' + fxLines(t.fx)[0].slice(0, 38) : '')));
+  d.append(el('b', '', (cls === 'done' ? '✓ ' : cls === 'av' ? '▶ ' : '🔒 ') + (t.entry ? VERT[t.v].e + ' ' : '') + t.n)); d.append(el('small', '', t.y + (cls === 'done' ? '' : ' · 🔬' + techCost(n, t)) + (t.entry ? ' · ' + VERT[t.v].n : '') + (fxLines(techFx(t))[0] ? ' · ' + fxLines(techFx(t))[0].slice(0, 38) : '')));
   if (n.res === t.id) d.append(bar(n.rp / techCost(n, t)));
   const am = aheadMul(t); if (am > 2.8 && cls !== 'done') { d.classList.add('early'); d.append(el('small', 'warn', '⚠ Fora de época: custo ×' + am.toFixed(1))); }
   tip(d, techTip(n, t, s) + (am > 2.8 && cls !== 'done' ? '\n⚠ Fora de época: ' + (t.y - curYear()) + ' anos adiantada, custo ×' + am.toFixed(1) : ''));
@@ -933,35 +937,37 @@ function winFlag(b) {
 
 /* ---------- modais: paz, chamado às armas, propostas da IA, fim ---------- */
 function modal(fill, wide) { const m = $('#modal-b'); m.innerHTML = ''; m.classList.toggle('wide', !!wide); fill(m); $('#modal').hidden = false; }
-function closeModal() { $('#modal').hidden = true; }
+function closeModal() { $('#modal').hidden = true; if (UI.resume) { setSpeed(UI.resume); UI.resume = 0; } }   // avisos e escolhas: o tempo volta à velocidade de antes
+/* pausa para um aviso, lembrando a velocidade para voltar a ela ao fechar */
+function autoPause() { if (UI.speed) UI.resume = UI.speed; UI.speed = 0; drawTop(); }
 function pendingModals() {
   if (!$('#modal').hidden) return;
   if (S.offer) { peaceOffer(); return; }
-  if (S.conf) { const w = S.wars.find(x => x.id === S.conf.w); UI.peaceL = S.conf.L; UI.peacePick = null; S.conf = null; if (w) { UI.speed = 0; drawTop(); (S.evq = S.evq || []).push({ t: '🏳️ O inimigo capitulou', m: 'Escolha os termos: estados, vassalagem ou reparações, com os pontos da rendição deles.' }); openWin('peace', w.id); } }
-  { const n = me(); if (n && n.vpend) { const V = VERT[n.vpend]; UI.speed = 0; drawTop();
-    const kept = TECHS.filter(t => t.v === V.id && t.vt), area = CATS[V.entry.c], dm = {}; for (const k in V.m) dm[k] = V.m[k] * VERT_DECLINE;
+  if (S.conf) { const w = S.wars.find(x => x.id === S.conf.w); UI.peaceL = S.conf.L; UI.peacePick = null; S.conf = null; if (w) { UI.resume = 0; UI.speed = 0; drawTop(); (S.evq = S.evq || []).push({ t: '🏳️ O inimigo capitulou', m: 'Escolha os termos: estados, vassalagem ou reparações, com os pontos da rendição deles.' }); openWin('peace', w.id); } }
+  { const n = me(); if (n && n.vpend) { const V = VERT[n.vpend]; autoPause();
+    const area = CATS[V.entry.c], dm = {}; for (const k in V.m) dm[k] = V.m[k] * VERT_DECLINE;
     modal(m => { m.append(el('h2', '', V.e + ' ' + TECH['v_' + V.id].n), el('p', '', 'O caminho de ' + V.n + ' está aberto. A escolha é para sempre.'));
       const r = el('div', 'col evopts');
-      r.append(btn('Manter: seguir ' + V.n, () => { vertDecide(n, V.id, true); closeModal(); refresh(); }, 'grn', '', 'Bloqueia a área ' + area + ' (as técnicas comuns dali em diante viram as da vertente) e troca ' + kept.filter(t => t.rep).length + ' técnicas de outras áreas.\nLibera ' + BUILDINGS[V.bld].n + ' e o bem ' + GOODS[V.good].n + '.\nCompletar os ' + V.len + ' pontos libera ' + V.unit[0] + ' no exército e a frota especial.\nAs outras vertentes ficam só como bônus.'));
+      r.append(btn('Manter: seguir ' + V.n, () => { vertDecide(n, V.id, true); closeModal(); refresh(); }, 'grn', '', 'As técnicas comuns depois de ' + V.entry.y + ' viram versões ' + V.n + ' em todas as áreas; a área ' + area + ' fica trancada nelas.\nAbre a aba de melhorias próprias (' + V.len + ').\nLibera ' + BUILDINGS[V.bld].n + ' e o bem ' + GOODS[V.good].n + '.\nCompletar os ' + V.len + ' pontos libera ' + V.unit[0] + ' no exército e a frota especial.\nAs outras vertentes ficam só como bônus.'));
       r.append(btn('Continuar por bônus', () => { vertDecide(n, V.id, false); closeModal(); refresh(); }, '', '', 'Segue pela árvore comum e leva ' + pct(VERT_DECLINE) + ' do bônus de ' + V.n + ':\n' + (modLines(dm).join('\n') || '—')));
       m.append(r); }); return; } }
-  if (S.evq && S.evq.length && S.evq[0].ev) { const ev = S.evq[0], n = me(), d = EVENT[ev.ev]; if (UI.speed) UI.resume = UI.speed; UI.speed = 0; drawTop();   // pausa e, depois da escolha, volta à velocidade de antes   // evento com escolhas: fica na fila até escolher
+  if (S.evq && S.evq.length && S.evq[0].ev) { const ev = S.evq[0], n = me(), d = EVENT[ev.ev]; autoPause();   // pausa e, depois da escolha, volta à velocidade de antes   // evento com escolhas: fica na fila até escolher
     if (!d || n.evWait !== ev.ev) { S.evq.shift(); return; }
     modal(m => { m.append(el('h2', '', ev.t), el('p', '', ev.m)); const r = el('div', 'col evopts'), ok = evOpts(n, d);
       d.opts.forEach(o => { const k = ok.indexOf(o), t = fxTxt(o.fx).join('\n') || 'Sem efeito';
-        r.append(btn(o.n, () => { chooseEvent(n, ev.ev, k); closeModal(); refresh(); if (UI.resume) { setSpeed(UI.resume); UI.resume = 0; } }, '', k < 0 ? condFail(n, o.when).join(', ') : '', t)); });
+        r.append(btn(o.n, () => { chooseEvent(n, ev.ev, k); closeModal(); refresh(); }, '', k < 0 ? condFail(n, o.when).join(', ') : '', t)); });
       m.append(r); }); return; }
-  if (S.evq && S.evq.length) { const ev = S.evq.shift(); UI.speed = 0; drawTop();
+  if (S.evq && S.evq.length) { const ev = S.evq.shift(); autoPause();
     modal(m => { m.append(el('h2', '', ev.t), el('p', '', ev.m)); const r = el('div', 'row'); if (ev.quar) r.append(btn('🚧 Decretar quarentena (💰' + quarCost(me()) + ')', () => { const e = quarantine(me()); if (e) say(e, 'bad'); else log('Quarentena decretada por dois anos.', 'info', [S.player]); closeModal(); refresh(); }, 'red', '', 'Contágio nas suas províncias cai 70% por 2 anos; comércio −30%')); r.append(btn('Que assim seja', closeModal)); m.append(r); }); return; }
-  if (S.calls && S.calls.length) { const c = S.calls.shift(), w = S.wars.find(x => x.id === c.w); if (!w) return; const lead = nat(c.from), foe = nat(c.side === 'A' ? w.d : w.a); UI.speed = 0; drawTop();
+  if (S.calls && S.calls.length) { const c = S.calls.shift(), w = S.wars.find(x => x.id === c.w); if (!w) return; const lead = nat(c.from), foe = nat(c.side === 'A' ? w.d : w.a); autoPause();
     modal(m => { m.append(el('h2', '', 'Chamado às armas'), el('p', '', natName(lead) + ' pede sua ajuda na guerra contra ' + natName(foe) + '.'), el('p', 'dim', 'Recusar acaba com a aliança.')); const r = el('div', 'row'); r.append(btn('Entrar na guerra', () => { answerCall(c, true); closeModal(); refresh(); S.mapDirty = true; }, 'red'), btn('Recusar', () => { answerCall(c, false); closeModal(); refresh(); })); m.append(r); }); return; }
-  if (S.dipOffers && S.dipOffers.length) { const o = S.dipOffers.shift(), from = nat(o.from); if (!from.alive) return; UI.speed = 0; drawTop();
+  if (S.dipOffers && S.dipOffers.length) { const o = S.dipOffers.shift(), from = nat(o.from); if (!from.alive) return; autoPause();
     const txt = { ally: 'propõe uma aliança.', marr: 'propõe um casamento real.', trade: 'propõe um acordo comercial.' }[o.kind];
     modal(m => { m.append(flagEl(from.flag, 'mflag'), el('h2', '', natName(from)), el('p', '', txt)); const r = el('div', 'row'); r.append(btn('Aceitar', () => { const e = dipAct(from, me(), o.kind); if (e) say(e, 'bad'); closeModal(); refresh(); }, 'grn'), btn('Recusar', () => { from.rel[S.player] = (from.rel[S.player] || 0) - 10; closeModal(); })); m.append(r); }); }
 }
 function peaceOffer() {
   const o = S.offer; S.offer = null; const w = S.wars.find(x => x.id === o.w); if (!w) return;
-  const n = me(), e = nat(sideOf(w, n.id) === 'A' ? w.d : w.a); UI.speed = 0; drawTop();
+  const n = me(), e = nat(sideOf(w, n.id) === 'A' ? w.d : w.a); autoPause();
   modal(m => {
     m.append(el('h2', '', 'Proposta de paz'), el('p', '', natName(o.winner != null ? nat(o.winner) : e) + (o.winner == null ? ' propõe paz branca.' : ' exige: ' + termsTxt(n.id, o.t) + '.')));
     m.append(el('p', 'dim', 'Recusar mantém a guerra; se sua rendição chegar a 100%, eles tomam o que quiserem.'));

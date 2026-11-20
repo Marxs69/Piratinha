@@ -114,7 +114,7 @@ function setVertStart(n, v) {
     const V = VERT[v]; n.vert = v; n.techs['v_' + v] = 1;
     if (n.vdec) delete n.vdec[v];
     for (const id in n.techs) if (V.rep.has(id)) delete n.techs[id];
-    for (let ch = true; ch;) { ch = false; calcMods(n); for (const t of TECHS) if (t.v === v && t.vt && !n.techs[t.id] && t.y <= (n.techY || curYear()) && t.req.every(q => n.techs[q] || n.eff.has(q))) { n.techs[t.id] = 1; ch = true; } }
+    for (let ch = true; ch;) { ch = false; calcMods(n); for (const t of TECHS) if (t.v === v && (t.vt || t.vr) && !n.techs[t.id] && t.y <= (n.techY || curYear()) && t.req.every(q => n.techs[q] || n.eff.has(q))) { n.techs[t.id] = 1; ch = true; } }
     grantUntil(n, n.techY || curYear());
     calcMods(n);
     const cs = WD.states[WD.provs[n.capital].state]; if (!S.bld[cs.id][V.bld]) S.bld[cs.id][V.bld] = 1;

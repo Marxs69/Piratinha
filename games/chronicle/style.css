@@ -261,3 +261,4 @@ h4.bgrp { font: 700 11px var(--title); color: var(--dim); letter-spacing: 1px; m
 .tbody2 { display: flex; gap: 10px; align-items: flex-start; }
 .tbody2 .tgrid { flex: 1; min-width: 0; }
 .tvert { width: 200px; flex: none; display: flex; flex-direction: column; gap: 6px; padding-left: 10px; border-left: 2px dashed rgba(232,194,90,.45); }
+.ttabs .btn:last-child { margin-left: auto; }
