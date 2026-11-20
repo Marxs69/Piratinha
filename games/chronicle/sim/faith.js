@@ -19,7 +19,7 @@ const seatLost = r => { const s = seatOf(r); return s != null && S.own[s] >= 0 &
 function fervParts(n) {
   const out = [['Base', 50]], rels = n.rels || {}, pt = Math.max(1, n.popT || 0); let minor = 0, here = 0;
   for (const r in rels) { if (+r === n.relig) continue; if (RELIGIONS[REL_IDS[r]].fict) here += rels[r]; else minor += rels[r]; }
-  out.push(['Templos', Math.min(15, (n.temples || 0) * 1.5)]);
+  out.push(['Templos', (n.bsum || {}).ferv || 0]);
   if (n.ruler && n.ruler.tr.includes('zealous')) out.push(['Governante zeloso', 10]); if (n.ruler && n.ruler.tr.includes('cynical')) out.push(['Governante cínico', -10]);
   out.push(['Lei religiosa', { state: 10, tolerant: 0, free: -5, secular: -20 }[n.laws.relig] || 0]);
   out.push(['Outras fés', -Math.round(minor / pt * 40)]); out.push(['Heresias', -Math.round(here / pt * 60)]);
@@ -33,6 +33,9 @@ function faithMods(n) {
   if (n.relig == null) return []; const f = faithOf(n.relig), out = [['Doutrina: ' + RELIGIONS[REL_IDS[n.relig]].n, f.doc]], v = (n.ferv ?? 50) - 50;
   if (Math.abs(v) >= 1) out.push(['Fervor ' + Math.round(n.ferv ?? 50) + '%', { stab: v / 500, manpower: v / 1000, research: -v / 1000 }]);
   if (n.excom) out.push(['Excomungado', { stab: -.1 }]);
+  const rels = n.rels || {}, pt = Math.max(1, n.popT || 0), sh = (rels[n.relig] || 0) / pt;   // unidade da fé oficial e fés reconhecidas (FAITH_RULES)
+  if (n.popT && Math.abs(sh - .5) > .02) out.push(['Fé oficial seguida por ' + Math.round(sh * 100) + '%', { stab: (sh - .5) * FAITH_RULES.unity }]);
+  for (const r in n.rpol || {}) if (n.rpol[r] === 2 && +r !== n.relig) { const k = Math.min(FAITH_RULES.recogCap, (rels[r] || 0) / pt * FAITH_RULES.recog), F = faithOf(+r), m = {}; for (const x in F.doc || {}) m[x] = F.doc[x] * k; if (k > .005) out.push(['Fé reconhecida: ' + RELIGIONS[REL_IDS[r]].n, m]); }
   return out;
 }
 /* ---------- ações ---------- */
@@ -42,8 +45,8 @@ function faithAct(n, k, t) {
   if (k !== 'holy' && !h) return 'Esta fé não tem chefe religioso';
   if (k === 'donate') { const c = donateCost(); if (n.money < c) return 'Sem dinheiro'; n.money -= c; n.fav = Math.min(100, n.fav + 10); return ''; }
   if (k === 'invest') { if (n.fav < FERV.invest) return 'Favor insuficiente (' + FERV.invest + ')'; if (n.investCd > S.t) return 'Investidura recente'; n.fav -= FERV.invest; n.investCd = S.t + 360 * 10; applyFx(n, { mod: { l: 'Investidura do ' + h[1].toLowerCase(), m: { stab: .05 }, mo: 120 } }); n.pres = Math.min(100, (n.pres ?? 50) + 5); return ''; }
-  if (k === 'crusade') { if (n.fav < FERV.crusade) return 'Favor insuficiente (' + FERV.crusade + ')'; const e = holyWhy(n, t); if (e) return e; n.fav -= FERV.crusade; declareWar(n, t, null, 'holy');
-    const w = S.wars[S.wars.length - 1]; S.nations.forEach(o => { if (o.alive && o.id !== n.id && o.relig === n.relig && (o.fav ?? 50) >= 50 && !sideOf(w, o.id) && !(o.truce[t.id] > S.t) && (o.rel[n.id] || 0) >= 0 && o.id !== S.player && chance(.5)) joinWar(w, o.id, 'A'); });
+  if (k === 'crusade') { if (n.fav < FERV.crusade) return 'Favor insuficiente (' + FERV.crusade + ')'; const e = holyWhy(n, t); if (e) return e; const de = declareWar(n, t, null, 'holy'); if (de) return de; n.fav -= FERV.crusade;
+    const w = S.wars.find(x => sideOf(x, n.id) && sideOf(x, t.id)); if (w) S.nations.forEach(o => { if (o.alive && o.id !== n.id && o.relig === n.relig && (o.fav ?? 50) >= 50 && !sideOf(w, o.id) && !(o.truce[t.id] > S.t) && (o.rel[n.id] || 0) >= 0 && o.id !== S.player && chance(.5)) joinWar(w, o.id, 'A'); });
     log(holyName(n.relig) + ' convocada por ' + natName(n) + ' contra ' + natName(t) + '!', 'world', [n.id, t.id]); return ''; }
   return 'Inválido';
 }

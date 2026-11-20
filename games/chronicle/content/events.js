@@ -1,8 +1,9 @@
-/* Grand Chronicle — eventos (dados). Condições e efeitos: ver COND e EFF em engine.js.
+/* Grand Chronicle — conteúdo: eventos.
+   Arquivo de dados editável: o bloco "CONTENT.EVENTS = ...;" é JSON5. Só dados: nada de código. O jogo lê ao abrir a página.
+   Condições e efeitos: ver COND e EFF em engine.js.
    p = chance por mês quando as condições valem; cd = anos até poder repetir (padrão 10); once = só uma vez. */
-'use strict';
 
-const EVENTS = [
+CONTENT.EVENTS = [
   { id: 'harvest_good', e: '🌾', t: 'Colheita farta', p: .004, cd: 15,
     m: 'Os celeiros de {pais} transbordam.',
     opts: [{ n: 'Guardar nos celeiros', fx: { mod: { l: 'Colheita farta', m: { food: .1, growth: .03 }, mo: 24 } }, ai: 2 },
@@ -147,5 +148,77 @@ const EVENTS = [
   { id: 'info_age', e: '🌐', t: 'Era da informação', p: .01, once: true, when: { tech: 'eco_internet' },
     m: 'A internet muda como {pais} trabalha, vota e se informa.',
     opts: [{ n: 'Governo digital', fx: { money: -80, mod: { l: 'Governo digital', m: { admin: .1 }, mo: 120 } }, when: { money: [80, null] }, ai: 1 }, { n: 'Vigilância em massa', fx: { stab: -3, mod: { l: 'Vigilância', m: { coup: -.3 }, mo: 120 } }, ai: 1 }] },
+
+  // ---------- votações: só com proposta em andamento ({lei} = a proposta, {fase} = a fase) ----------
+  { id: 'vote_speech', e: '🎙️', t: 'Discurso decisivo', p: .05, cd: 2, when: { enacting: true },
+    m: '{governante} pode defender pessoalmente {lei} durante {fase}. Um bom discurso convence os indecisos; um ruim vira piada.',
+    opts: [{ n: 'Defender a proposta em pessoa', fx: { roll: [[.7, { enact: 25 }], [.3, { enact: -10, pres: -3 }]] }, ai: 2 }, { n: 'Deixar o debate seguir', fx: {}, ai: 1 }] },
+  { id: 'vote_scandal', e: '📰', t: 'Escândalo na votação', p: .035, cd: 3, when: { enacting: true },
+    m: 'Um dos defensores de {lei} foi pego numa troca de favores. A oposição exige que tudo recomece.',
+    opts: [{ n: 'Abafar o caso', fx: { money: -60, enact: -5 }, when: { money: [60, null] }, ai: 2 }, { n: 'Deixar vir à tona', fx: { enact: -30, pres: 2 }, ai: 1 }] },
+  { id: 'vote_street', e: '✊', t: 'Multidões nas ruas', p: .035, cd: 3, when: { enacting: true, year: [1600, null] },
+    m: 'Manifestantes tomam as praças por causa de {lei}. Uns pedem pressa; outros, que a proposta morra.',
+    opts: [{ n: 'Ouvir quem pede pressa', fx: { enact: 25, stab: -3 }, ai: 1 }, { n: 'Dispersar as multidões', fx: { enact: -15, stab: 2 }, ai: 1 }] },
+  { id: 'vote_deal', e: '🤝', t: 'Acordo de bastidores', p: .04, cd: 2, when: { enacting: true },
+    m: 'Alguns indecisos sobre {lei} aceitariam votar a favor... por um preço.',
+    opts: [{ n: 'Comprar os votos', fx: { money: -80, enact: 30 }, when: { money: [80, null] }, ai: 1 }, { n: 'Recusar o negócio', fx: { pres: 2 }, ai: 1 }] },
+  { id: 'vote_obstruct', e: '🧱', t: 'Obstrução', p: .04, cd: 2, when: { enacting: true },
+    m: 'A oposição trava {fase} com discursos sem fim contra {lei}.',
+    opts: [{ n: 'Negociar emendas', fx: { enact: -10, stab: 1 }, ai: 1 }, { n: 'Forçar a votação', fx: { enact: 15, stab: -4 }, ai: 1 }] },
+  { id: 'vote_clergy', e: '⛪', t: 'Os púlpitos se dividem', p: .03, cd: 4, when: { enacting: true, ferv: [40, null] },
+    m: 'Os sacerdotes pregam sobre {lei}. Com o apoio deles, a proposta anda mais rápido.',
+    opts: [{ n: 'Pedir a bênção do clero', fx: { fav: -10, enact: 20 }, ai: 1 }, { n: 'Manter o clero fora disso', fx: { roll: [[.5, { enact: -15 }]] }, ai: 1 }] },
+  { id: 'vote_press', e: '🗞️', t: 'A imprensa toma partido', p: .035, cd: 3, when: { enacting: true, year: [1700, null] },
+    m: 'Os jornais de {pais} só falam de {lei}. Quem pagar as manchetes pode virar o jogo.',
+    opts: [{ n: 'Financiar os jornais', fx: { money: -50, enact: 20 }, when: { money: [50, null] }, ai: 1 }, { n: 'Deixar a imprensa livre', fx: { roll: [[.5, { enact: 10 }], [.5, { enact: -15 }]] }, ai: 1 }] },
+
+  // ---------- transições de regime: disparadas quando uma reforma aprovada muda o tipo de governo (GOV_TR); p: 0 ----------
+  { id: 'gov_tr_republic', e: '🏛️', t: 'Da coroa à república', p: 0,
+    m: 'A reforma passou e {pais} não tem mais coroa. Falta decidir quem será o primeiro {titulo}.',
+    opts: [{ n: '{governante} troca a coroa pelo novo cargo', fx: { leader: 'keep', stab: -3 }, ai: 2 }, { n: 'Um ministro do conselho assume', fx: { leader: 'council', stab: -6 }, ai: 2 },
+           { n: 'O exército não aceita: o chefe militar toma o poder', fx: { leader: 'marshal', govCoup: 1, council: 'form', stab: -12 }, ai: .5 }] },
+  { id: 'gov_tr_crown', e: '👑', t: 'A coroa restaurada', p: 0,
+    m: '{pais} volta a ter um trono. Resta saber quem vai sentar nele.',
+    opts: [{ n: '{governante} é coroado', fx: { leader: 'keep', pres: 5 }, ai: 2 }, { n: 'Um nobre do conselho recebe a coroa', fx: { leader: 'council', stab: -5 }, ai: 1 },
+           { n: 'Uma nova casa real é chamada ao trono', fx: { leader: 'new', stab: -8, pres: 3 }, ai: 1 }] },
+  { id: 'gov_tr_regime', e: '⚙️', t: 'Um novo regime', p: 0,
+    m: 'O antigo governo de {pais} acabou. O novo regime precisa de um chefe e de um gabinete fiel.',
+    opts: [{ n: '{governante} comanda o novo regime', fx: { leader: 'keep', council: 'form', stab: -4 }, ai: 2 }, { n: 'O partido põe um dos seus no comando', fx: { leader: 'council', council: 'form', stab: -6 }, ai: 2 },
+           { n: 'Os militares assumem', fx: { leader: 'marshal', govCoup: 1, council: 'form', stab: -12 }, ai: .5 }] },
+  { id: 'gov_tr_clergy', e: '🕯️', t: 'O clero assume', p: 0,
+    m: 'O poder de {pais} passa às mãos da fé. Quem vai guiar os fiéis?',
+    opts: [{ n: 'O clero escolhe um sumo-sacerdote', fx: { leader: 'clergy', council: 'form', ferv: 10 }, ai: 2 }, { n: '{governante} assume o manto sagrado', fx: { leader: 'keep', stab: -5 }, ai: 1 }] },
+  { id: 'gov_tr_opening', e: '🗳️', t: 'A abertura', p: 0,
+    m: 'O regime de {pais} se abre. As primeiras eleições vão dizer quem governa.',
+    opts: [{ n: '{governante} disputa e vence', fx: { leader: 'keep', stab: -3 }, ai: 2 }, { n: 'Um moderado do conselho assume', fx: { leader: 'council', council: 'form', stab: -5 }, ai: 2 },
+           { n: 'Eleições livres escolhem alguém de fora', fx: { leader: 'new', council: 'form', stab: -6, pres: 4 }, ai: 1 },
+           { n: 'Os militares cancelam a abertura', fx: { leader: 'marshal', govCoup: 1, council: 'form', stab: -15 }, ai: .3 }] },
+
+  // ---------- governante contra a proposta e reação ----------
+  { id: 'vote_ruler_balks', e: '🤨', t: 'O governante resiste', p: .07, cd: 2, when: { enacting: true, rulerOpp: true },
+    m: '{governante} não gosta de {lei} e trava {fase} com a autoridade do cargo.',
+    opts: [{ n: 'Ceder: a proposta recua', fx: { enact: -25 }, ai: 2 }, { n: 'Convencer em audiência', fx: { roll: [[.5, { enact: 10 }], [.5, { enact: -15, stab: -2 }]] }, ai: 1 }, { n: 'Seguir sem o apoio dele', fx: { stab: -4, pres: -3 }, ai: 1 }] },
+  { id: 'vote_reaction', e: '⚜️', t: 'Levante contra a reforma', p: .04, cd: 5, when: { enacting: 'gov', enactSup: [null, -2] },
+    m: 'Quem perde com {lei} pegou em armas. Os conspiradores juram derrubar a reforma.',
+    opts: [{ n: 'Retirar a proposta', fx: { enact: 'stop', stab: 2 }, ai: 2 }, { n: 'Enfrentar os revoltosos', fx: { revolt: 'react' }, ai: 1 }] },
+
+  // ---------- plano de eliminação em andamento ({alvo}) ----------
+  { id: 'plot_servant', e: '🤫', t: 'Um criado fala demais', p: .12, cd: 1, when: { plotting: true },
+    m: 'Um dos criados de {alvo} anda comentando coisas estranhas nas cozinhas.',
+    opts: [{ n: 'Comprar o silêncio dele', fx: { money: -40, plot: [0, -15] }, when: { money: [40, null] }, ai: 2 }, { n: 'Deixar para lá', fx: { plot: [0, 20] }, ai: 1 }] },
+  { id: 'plot_poison', e: '🧪', t: 'O veneno chegou', p: .1, cd: 1, when: { plotting: true },
+    m: 'O frasco está pronto. Usar agora é arriscado; esperar dá tempo a {alvo}.',
+    opts: [{ n: 'Usar agora', fx: { roll: [[.55, { plot: [45, 0] }], [.45, { plot: [0, 40] }]] }, ai: 1 }, { n: 'Esperar a hora certa', fx: { plot: [12, 5] }, ai: 2 }] },
+  { id: 'plot_ally', e: '🗝️', t: 'Um cúmplice se oferece', p: .1, cd: 1, when: { plotting: true },
+    m: 'Alguém próximo de {alvo} quer ajudar — por ódio ou por ouro.',
+    opts: [{ n: 'Aceitar a ajuda', fx: { plot: [22, 10] }, ai: 2 }, { n: 'Não confiar', fx: {}, ai: 1 }] },
+  { id: 'plot_guard', e: '🛡️', t: 'O alvo desconfia', p: .1, cd: 1, when: { plotting: true },
+    m: '{alvo} dobrou a guarda e prova a comida antes de comer.',
+    opts: [{ n: 'Recuar por um tempo', fx: { plot: [-10, -12] }, ai: 1 }, { n: 'Insistir', fx: { plot: [8, 20] }, ai: 1 }] },
+
+  // ---------- operação de inteligência concluída ({rival}); p: 0, disparado pela operação ----------
+  { id: 'intel_haul', e: '🕵️', t: 'Os agentes voltaram', p: 0,
+    m: 'Nossos agentes em {rival} conseguiram entrar onde queríamos. Dá para trazer uma coisa só.',
+    opts: [{ n: 'Os planos de uma técnica em que estão à frente', fx: { spy: 'tech' }, when: { spyTech: true }, ai: 2 }, { n: 'As táticas do exército deles', fx: { spy: 'mil' }, ai: 1.5 },
+           { n: 'Um desvio do tesouro deles', fx: { spy: 'gold' }, ai: 1 }, { n: 'Os mapas e as rotas deles', fx: { spy: 'map' }, ai: .5 }, { n: 'Os podres do governante', fx: { spy: 'secret' }, ai: .7 }] },
 ];
-const EVENT = Object.fromEntries(EVENTS.map(e => [e.id, e]));

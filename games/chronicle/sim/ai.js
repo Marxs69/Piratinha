@@ -20,7 +20,7 @@ function ai(n) {
   }
   // governo e ideologia (raro)
   if (chance(.0012) && !(n.govCd > S.t)) {
-    const opts = [...n.fx.g, ...BASE_GOVS].filter(g => g !== n.gov && GOVS[g] && govOk(n, g));
+    const opts = govReach(n);   // só caminhos da árvore de governos
     const same = opts.filter(g => GOVS[g].cat === GOVS[n.gov].cat), g = same.length && chance(.85) ? pickR(same) : opts.length && chance(.5) ? pickR(opts) : null;
     if (g && GOVS[g].m && Object.values(GOVS[g].m).reduce((a, b) => a + b, 0) >= Object.values(GOVS[n.gov].m).reduce((a, b) => a + b, 0) + .05) setGov(n, g);
   }
@@ -29,6 +29,12 @@ function ai(n) {
   if (slow && govAge(n) > 15 && !(n.govCd > S.t) && chance(.1)) { const nx = govNextOf(n); if (nx) setGov(n, nx); }   // a IA reforma por conta própria só depois de anos de crise
   if (slow && chance(.05)) { const L = n.laws; if (n.money < 0 && L.tax === 'normal') setLaw(n, 'tax', 'high'); else if (n.stab < 25 && (L.tax === 'high' || L.tax === 'extort')) setLaw(n, 'tax', 'normal'); else if (atWarNow(n) && L.draft === 'limited') setLaw(n, 'draft', 'wide'); else if (!atWarNow(n) && L.draft === 'wide') setLaw(n, 'draft', 'limited'); else if (n.money > 3000 && L.spend === 'normal' && hasT(n, 'soc_welfare')) setLaw(n, 'spend', 'welfare'); }
   if (slow && isElective(n) && n.sup && (n.sup[n.ideo] || 0) < .3 && n.money > campaignCost() * 4) campaign(n);
+  if (slow && !n.enact && chance(.2)) { const k = Object.keys(LAWS).find(k => lawOld(n, k)); if (k) { const os = Object.keys(LAWS[k].o).filter(o => lawOk(n, k, o)); if (os.length) setLaw(n, k, os[0]); } }   // troca a lei que ficou ultrapassada
+  // agenda do governo: o que governante (peso 3) e conselho (1 cada) mais querem pela ideologia vira proposta (um conselho inteiro socialista empurra o país para a república popular)
+  if (slow && !n.enact && chance(.3)) { const want = new Map(), add = (key, w) => want.set(key, (want.get(key) || 0) + w);
+    [[n.ruler, 3], ...COUNCIL.map(([k]) => [n.council[k], 1])].forEach(([c, w]) => { if (!c || c.disc > S.t) return; if (c.lg && govEdgeOk(n, c.lg) && !(n.govCd > S.t)) add('g:' + c.lg, w * 1.2); if (c.ll && lawOk(n, c.ll.k, c.ll.o) && !((n.lawCd || {})[c.ll.k] > S.t)) add('l:' + c.ll.k + ':' + c.ll.o, w); });
+    const top = [...want].sort((a, b) => b[1] - a[1])[0];
+    if (top && top[1] >= 2) { const [ty, a, b] = top[0].split(':'); if (ty === 'g') setGov(n, a); else setLaw(n, a, b); } }
   // exigências do conselho e do governante: atende uma ou troca o conselheiro mais exigente
   if (slow && ((n.press || 0) > 45 || chance(.04))) {
     const d = demandsOf(n).sort((a, b) => b.w - a.w)[0];
@@ -45,14 +51,16 @@ function ai(n) {
   if (slow && launchOk(n) && !n.sproj) { for (const k of ['probe', 'land', 'base', 'sat']) if (!canSpace(n, k) && n.money > spaceCost(k) * 2 && (k !== 'sat' || (n.sats || 0) < 8)) { spaceGo(n, k); break; } }
   if (slow && (n.rank || 0) < 4 && n.money > rankCost(n) * 1.5 && (statesOf(n) > domCap(n) * .7 || (n.rank === 3 && contShare(n) >= RANK_EMP))) rankUp(n);
   // obras (ganancioso guarda mais ouro; diligente e construtor tentam mais)
-  const mine = slow || n.money > 2000 ? S._mine[n.id] : [];
+  const rich = n.money > hoardCap(n) * .6, reserve = Math.max(100 * P.gold, govCost() * 1.2);   // guarda o bastante para propor reformas e leis
+  if (n.money > hoardCap(n) * .9 && n.income > 0 && n.cons.length >= consSlots(n) && n.money - slotCost(n) > reserve) buySlot(n);   // perto do teto: compra canteiro
+  const mine = (slow || rich ? S._mine[n.id] : null) || [];
   const slotsN = consSlots(n), tries = Math.round(clamp(slotsN / 3, 3, 40) * P.build), stGdp = (n.gdp || 0) / Math.max(1, mine.length);
-  if (mine.length && n.cons.length < consSlots(n) && n.money > 100 * P.gold) {
+  if (mine.length && n.cons.length < consSlots(n) && n.money > reserve) {
     const atW = warsOf(n.id).length > 0, avail = Object.keys(BUILDINGS).filter(b => BUILDINGS[b].vert ? n.vert === BUILDINGS[b].vert : n.fx.b.has(b)), vals = [];
     for (const b of avail) {                                    // valor de cada prédio para o país (não depende do estado)
       const d = BUILDINGS[b];
       let v = 0; if (d.out) for (const g in d.out) v += d.out[g] * S.wp[g] * (n.mk.sat[g] < 1 ? 1.6 : 1); if (d.in) for (const g in d.in) v -= d.in[g] * S.wp[g] * (n.mk.sat[g] < .8 ? 2 : 1);
-      if (d.fx) v += (d.fx.svc ? (1 - ((n.cov || {})[d.fx.svc] || 0)) * 50 : 0) + (d.fx.speed || 0) * 8 + (d.fx.army ? (atW ? 30 : 8) : 0) + (d.fx.mp ? 10 : 0) + (d.fx.launch && hasT(n, 'spc_rockets') && !launchOk(n) ? 300 : 0) + (d.fx.pipe ? 15 : 0) + (d.fx.mill ? (n.foodSat < 1.05 ? 80 : 10) : 0) + (d.fx.yard ? 4 : 0) + (d.fx.research || 0) * 4 + (d.fx.tax || 0) * (n.gdp || 0) * .15 + (d.fx.prod || 0) * Math.max(60, stGdp) + (d.fx.fort ? (atW ? 25 : 4) : 0) + (d.fx.port ? 8 : 0) + (d.fx.stab ? (n.stab < 45 ? 20 : 3) : 0);
+      if (d.fx) v += (d.fx.svc ? (1 - ((n.cov || {})[d.fx.svc] || 0)) * 50 : 0) + (d.fx.speed || 0) * 8 + (d.fx.army ? (atW ? 30 : 8) : 0) + (d.fx.mp ? 10 : 0) + (d.fx.launch && hasT(n, 'spc_rockets') && !launchOk(n) ? 300 : 0) + (d.fx.pipe ? 15 : 0) + (d.fx.boost && Object.keys(d.fx.boost).some(x => BUILDINGS[x] && BUILDINGS[x].food) ? (n.foodSat < 1.05 ? 80 : 10) : 0) + (d.fx.yard ? 4 : 0) + (d.fx.research || 0) * 4 + (d.fx.tax || 0) * (n.gdp || 0) * .6 + (d.fx.prod || 0) * Math.max(60, stGdp) + (d.fx.fort ? (atW ? 25 : 4) : 0) + (d.fx.port ? 8 : 0) + (d.fx.stab ? (n.stab < 45 ? 20 : 3) : 0);
       if (d.out) for (const g of ['goods', 'cloth', 'clothes', 'pfood', 'lux', 'tools', 'arms']) if (d.out[g] && (n.mk.sat[g] == null ? 1 : n.mk.sat[g]) < .85) v += d.out[g] * S.wp[g] * 1.2 + 20;
       if ((b === 'farm' || b === 'fishery') && n.foodSat < 1.05) v += 120; else if (n.foodSat < .95 && d.w > 1) v -= 40;
       if (b === 'university' && tr.includes('scholar')) v += 40; if (b === 'temple' && tr.includes('zealous')) v += 40; if (b === 'temple' && tr.includes('cynical')) v -= 30; if (b === 'market' && tr.includes('greedy')) v += 40;
@@ -63,7 +71,7 @@ function ai(n) {
     // modernização: sem mão de obra, desmonta artesanato antigo onde já dá para ter fábricas
     if (hasT(n, 'eco_factory') && chance(.3)) { const s = sts[0], B = S.bld[s.id]; if (freeLabor(n, s.id) < 2) { const old = ['workshop', 'weaver', 'manufactory', 'bakery', 'tailor', ...(hasT(n, 'eco_mechanization') ? ['smithy'] : [])].filter(b => B[b] > 0).sort((a, b) => B[b] - B[a])[0]; if (old) B[old] = Math.max(0, B[old] - Math.max(1, Math.ceil(B[old] * .25))); } }
     let done = 0;
-    for (const [, b] of vals.slice(0, 18)) { for (const st of sts) { if (done >= tries || n.cons.length >= slotsN || n.money <= 100 * P.gold) break; if (!build(n, st.id, b)) done++; } if (done >= tries) break; }
+    for (const [, b] of vals.slice(0, 18)) { for (const st of sts) { if (done >= tries || n.cons.length >= slotsN || n.money <= reserve) break; if (!build(n, st.id, b)) done++; } if (done >= tries) break; }
   }
   // exército: generais, exploradores, rebeldes, dívida, recrutamento e organização (aiArmy)
   const myArmies = S.armies.filter(a => a.o === n.id), myR = myArmies.reduce((a, x) => a + regs(x), 0), atWarN = warsOf(n.id).length;

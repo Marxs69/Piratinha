@@ -14,7 +14,13 @@ const pickR = a => a[rnd() * a.length | 0];
 const rint = k => rnd() * k | 0;
 const yearOf = t => START_YEAR + Math.floor(t / 360);
 const curYear = () => yearOf(S.t);
-const eraScale = () => 1 + (curYear() - 860) / 300;
+/* nível de preços: todo custo e valor em ducados (obras, leis, tropas, eventos, teto do tesouro) é × isto. Vem da economia do mundo (priceTick); antes do primeiro mês, do ano */
+const yearScale = () => 1 + (curYear() - 860) / 300;            // custos mensais (manutenção) andam com a era
+const eraScale = () => (S && S.plv) || yearScale();
+function priceTick(init) {
+  let tax = 0, st = 0; for (const n of S.nations) if (n.alive && n.inc) { tax += Math.max(0, n.inc.tax || 0); st += statesOf(n); } if (!st || !tax) return;
+  const target = Math.max(.5, Math.pow(tax / st / PRICE_BASE, PRICE_EXP)); S.plv = init || !S.plv ? target : S.plv + (target - S.plv) * PRICE_LAG;
+}
 const MONTHS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 const dateStr = (t = S.t) => (t % 30 + 1) + ' ' + MONTHS[Math.floor(t % 360 / 30)] + ' ' + yearOf(t);
 const nat = id => S.nations[id];
@@ -29,6 +35,8 @@ const log = (m, k = 'info', who = []) => { S.log.unshift({ d: dateStr(), m, k })
 /* ---------- consultas ---------- */
 let ownCache = null;                                         // listas de províncias por dono (refeitas quando muda dono)
 function provsOf(id) { if (!ownCache) { ownCache = S.nations.map(() => []); for (let p = 0; p < S.own.length; p++) if (S.own[p] >= 0) ownCache[S.own[p]].push(p); } return ownCache[id] || []; }
+/* zera todos os caches da simulação (mundo novo ou save carregado): nada do mundo anterior pode vazar */
+function resetCaches() { ownCache = null; warSet = null; strC = null; nbC.clear(); epC = null; abC = null; frC = null; supC = null; enterC = null; cnC = null; BI = null; }
 function ownChanged() { ownCache = null; S.mapDirty = true; enterC = null; }
 const hasTech = (n, id) => !!n.techs[id];
 let warSet = null;                                          // pares em guerra (refeito quando guerras começam ou acabam)
@@ -50,8 +58,9 @@ const vertLen = v => VERT[v].len;
 
 /* ---------- modificadores ---------- */
 /* efeitos de tecnologia que não são modificadores (prédios, governos, mares...) e normalização das leis */
+let BASE_BLD = null;                                          // prédios liberados sem técnica
 function calcFx(n) {
-  const fx = { sea: 0, col: 0, fort: 0, med: 0, cap: 0, logi: 0, width: 0, slots: 1, ship: 1, bo: {}, up: { inf: 1, cav: 1, art: 1, siege: 1 }, b: new Set(Object.keys(BUILDINGS).filter(b => !BUILDINGS[b].tech && !BUILDINGS[b].vert)), g: new Set(), i: new Set(['trad', 'warrior']) };
+  const fx = { sea: 0, col: 0, fort: 0, med: 0, cap: 0, logi: 0, width: 0, slots: 1, ship: 1, bo: {}, up: { inf: 1, cav: 1, art: 1, siege: 1 }, b: new Set(BASE_BLD || (BASE_BLD = Object.keys(BUILDINGS).filter(b => !BUILDINGS[b].tech && !BUILDINGS[b].vert))), g: new Set(), i: new Set(['trad', 'warrior']) };
   const eff = new Set(Object.keys(n.techs)); let vl = 0;
   let vr = 0; for (const id in n.techs) { const t = TECH[id]; if (!t) continue; if (t.vt) vl++; if (t.vr) vr++; (t.src || []).forEach(x => eff.add(x)); }
   n.tcount = eff.size - vr;                                      // versões da vertente não contam em dobro
@@ -61,26 +70,29 @@ function calcFx(n) {
     const t = TECH[id]; if (!t) continue; const f = t.fx;
     if (f.sea) fx.sea = Math.max(fx.sea, f.sea); if (f.col) fx.col += f.col; if (f.fort) fx.fort += f.fort; if (f.slots) fx.slots += f.slots; if (f.ship) fx.ship += f.ship; if (f.med) fx.med += f.med; if (f.cap) fx.cap += f.cap; if (f.logi) fx.logi += f.logi; if (f.width) fx.width += f.width;
     if (f.bo) for (const k in f.bo) fx.bo[k] = (fx.bo[k] || 0) + f.bo[k]; if (f.u) for (const k in f.u) fx.up[k] = (fx.up[k] || 0) + f.u[k];
-    (f.b || []).forEach(b => fx.b.add(b)); (f.g || []).forEach(g => fx.g.add(g)); (f.i || []).forEach(i => fx.i.add(i));
+    (f.b || []).forEach(b => { if (BUILDINGS[b]) fx.b.add(b); }); (f.g || []).forEach(g => fx.g.add(g)); (f.i || []).forEach(i => fx.i.add(i));   // prédio que sumiu do conteúdo não entra
   }
   n.laws = Object.assign({}, LAW_DEF, n.laws || {}); for (const k in LAWS) if (!LAWS[k].o[n.laws[k]]) n.laws[k] = LAW_DEF[k];
   return fx;
 }
 /* fontes de modificadores: TODO bônus do país passa por aqui, com rótulo — a soma (calcMods) e o detalhamento (modBreak) saem da mesma lista.
    Cada fonte devolve pares [rótulo, {mod: valor}]; a ordem é fixa (somas em ponto flutuante dependem dela). */
-const STAT_MOD = [['adm', 'tax', .008, .006], ['lea', 'research', .008, .006], ['mar', 'army', .008, .006], ['dip', 'stab', .004, .003]];
-const COUNCIL_STAT = { steward: 'adm', scholar: 'lea', marshal: 'mar', chancellor: 'dip' };
+/* o que um personagem rende ao país: atributos (STATS: r no governante, c em qualquer conselheiro, s a mais no atributo do assento) e traços
+   (governante inteiro; conselheiro COUNCIL_TRAIT_W, ou inteiro se o traço combina com o assento em TUTOR_TR). seat = assento do conselho ou null (governante). */
+function charMods(n, c, seat) {
+  if (!c) return []; const o = {}, out = [], who = seat ? 'Conselho: ' + roleName(n, seat) : 'Governante';
+  const ss = seat ? COUNCIL.find(x => x[0] === seat)[2] : null;
+  for (const k in STATS) { const S0 = STATS[k], d = c.st[k] - 8, v = seat ? d * S0.c + (k === ss ? d * S0.s : 0) : d * S0.r; if (v) o[S0.mod] = (o[S0.mod] || 0) + v; }
+  out.push([who + ' · atributos', o]);
+  for (const t of c.tr) { const T = TRAITS[t]; if (!T) continue; const w = !seat || (TUTOR_TR[seat] || []).includes(t) ? 1 : COUNCIL_TRAIT_W, m = {}; for (const k in T.m) m[k] = T.m[k] * w;
+    out.push(['Traço ' + T.n + ' (' + charName(c) + (w < 1 ? ', fora do cargo' : '') + ')', m]); }
+  return out;
+}
 const MOD_SOURCES = [
   n => [['Governo: ' + GOVS[n.gov].n, GOVS[n.gov].m], ['Ideologia: ' + IDEOS[n.ideo].n, IDEOS[n.ideo].m]],
   n => [...n.eff].filter(id => TECH[id] && TECH[id].fx.m).map(id => ['Tecnologia: ' + TECH[id].n, TECH[id].fx.m]),
   n => Object.keys(n.vdec || {}).map(k => { const v = VERT[k], o = {}; for (const m in v.m) o[m] = v.m[m] * VERT_DECLINE; return ['Vertente recusada: ' + v.n, o]; }),   // quem não escolhe leva 10% do bônus
-  n => [n.ruler, ...Object.values(n.council || {})].flatMap(c => c ? c.tr.filter(t => TRAITS[t]).map(t => ['Traço ' + TRAITS[t].n + ' (' + charName(c) + ')', TRAITS[t].m]) : []),
-  n => { const R = n.regent || n.ruler, C = n.council || {}, out = [];   // na regência valem os atributos do regente
-    if (R) { const o = {}; STAT_MOD.forEach(([s, k, w]) => o[k] = (R.st[s] - 8) * w); out.push(['Atributos do governante', o]); }
-    STAT_MOD.forEach(([s, k, , w]) => { const role = Object.keys(COUNCIL_STAT).find(r => COUNCIL_STAT[r] === s), c = C[role]; if (c) out.push(['Conselho: ' + roleName(n, role), { [k]: (c.st[s] - 8) * w }]); });
-    if (C.spymaster) out.push(['Conselho: ' + roleName(n, 'spymaster'), { coup: -(C.spymaster.st.int - 8) * .04 }]);
-    if (R) out.push(['Atributos do governante', { coup: -(R.st.int - 8) * .02 }]);
-    return out; },
+  n => [...charMods(n, n.regent || n.ruler, null), ...COUNCIL.flatMap(([k]) => charMods(n, (n.council || {})[k], k))],   // na regência valem os atributos e traços do regente
   n => { const gd = GOVS[n.gov], out = [], age = govAge(n);       // instituições velhas perdem legitimidade com o tempo; título pequeno demais soa como pretensão
     if (age > 0) out.push(['Governo ultrapassado há ' + age + ' anos', { stab: -Math.min(.25, .05 + age / 250), coup: Math.min(.5, age / 100) }]);
     if (gd.minRank && (n.rank || 0) < gd.minRank) out.push(['Título pequeno para o governo', { stab: -.1 }]); return out; },
@@ -93,6 +105,7 @@ const MOD_SOURCES = [
   n => { const cs = n.csat, cl = n.cls; if (!(cs && cl && n.popT)) return []; const mid = cl.mid / n.popT;   // a média pesquisa e paga impostos; a alta insatisfeita conspira
     return [['Classes sociais', { research: mid * .8 * cs.mid, tax: mid * .5 * cs.mid + (cs.high - .7) * .1, coup: Math.max(0, 1 - cs.high) * 1.2 }]]; },
   n => (n.tmods || []).filter(x => x.u > S.t).map(x => ['Evento: ' + x.l, x.m]),
+  n => n.laws ? Object.keys(LAWS).filter(k => lawOld(n, k)).map(k => ['Lei ultrapassada: ' + LAWS[k].o[n.laws[k]].n, { stab: -.03 }]) : [],   // opção de lei passada da era (until)
   n => faithMods(n),
   n => courtMods(n),
   n => coldMods(n),
@@ -116,7 +129,7 @@ function vRoster(n, type) {                                  // nome da tropa pr
   let nm = V[type][0][1]; for (const [x, t] of V[type]) if (pr >= x) nm = t; return nm;
 }
 function unitName(n, type) {
-  if (type === 'vrt') { if (!n.vert) return '—'; const v = VERT[n.vert]; return v.unit[Math.min(v.unit.length - 1, Math.floor((n.vlv - 1) / v.len * v.unit.length))]; }
+  if (type === 'vrt') { if (!n.vert) return '—'; const v = VERT[n.vert]; return v.unit[clamp(Math.floor((n.vlv - 1) / v.len * v.unit.length), 0, v.unit.length - 1)]; }   // sem melhorias ainda: o primeiro nome
   const v = vRoster(n, type); if (v) return v;
   let nm = UNITS[type][0][1]; for (const [t, x] of UNITS[type]) if (hasT(n, t)) nm = x; return nm;
 }

@@ -43,6 +43,12 @@ const COND = {
   drilling:{ ok: (n, v) => S.armies.some(a => a.o === n.id && a.drill && a.cav > 1) === v, txt: v => v ? 'Exército com cavalaria em treino' : 'Sem treino' },
   govOld:  { ok: (n, v) => (govAge(n) > 0) === v, txt: v => v ? 'Governo ultrapassado' : 'Governo atual' },
   press:   { ok: (n, v) => inR(n.press || 0, v), txt: v => rTxt('Pressão do conselho', v) },
+  enacting:{ ok: (n, v) => v === true ? !!n.enact : v === false ? !n.enact : !!n.enact && n.enact.ty === v, txt: v => v === false ? 'Sem votação em andamento' : v === 'gov' ? 'Reforma de governo em votação' : v === 'law' ? 'Lei em votação' : 'Proposta em votação' },
+  rulerOpp:{ ok: (n, v) => !!n.enact && !!n.ruler && (enactStance(n, n.ruler, n.enact, true)[0] < 0) === v, txt: v => v ? 'O governante é contra a proposta' : 'O governante não se opõe' },
+  enactSup:{ ok: (n, v) => !!n.enact && inR(enactSupport(n, n.enact).tot, v), txt: v => rTxt('Apoio à proposta', v) },
+  spyTech: { ok: n => !!spyTechOf(n), txt: () => 'Eles estão à frente em alguma técnica que você pode pesquisar' },
+  plotting:{ ok: (n, v) => !!n.plot === v, txt: v => v ? 'Plano em andamento' : 'Sem plano' },
+  clsShare:{ ok: (n, v) => !!n.cls && inR((n.cls[v[0]] || 0) / Math.max(1, n.popT || 0), v.slice(1)), txt: v => rTxt('Classe ' + (CLASSES[v[0]] || { n: v[0] }).n.toLowerCase(), v.slice(1), x => Math.round(x * 100) + '% da população') },
   any:     { ok: (n, v) => v.some(c => condOk(n, c)), txt: v => 'Uma destas: ' + v.map(c => condTxt(c).join(', ')).join(' | '), sub: v => v },
   not:     { ok: (n, v) => !condOk(n, v), txt: v => 'Não: ' + condTxt(v).join(', '), sub: v => [v] },
 };
@@ -81,14 +87,23 @@ const EFF = {
   /* cadeia: agenda outro evento para este país daqui a 'mo' meses */
   chain:    { do: (n, v) => { (n.evNext = n.evNext || []).push({ id: v.id, t: S.t + (v.mo || 1) * 30 }); }, txt: () => '', ids: v => [['EVENT', v.id]] },
   revolt:   { do: (n, v) => revolt(n, v), txt: v => '✊ ' + REVOLT[v][0] },
+  /* votação em andamento: v pontos de progresso (100 = uma fase); 'stop' arquiva a proposta */
+  enact:    { do: (n, v) => { const E = n.enact; if (!E) return; if (v === 'stop') { n.enact = null; return; } E.prog = clamp(E.prog + v, E.ph * 100, 299); },
+              txt: v => v === 'stop' ? 'A proposta é arquivada' : '🗳️ Votação ' + (v >= 0 ? '+' : '−') + Math.abs(v) + '% de uma fase' },
+  /* quem governa depois de uma reforma: keep (o atual fica), council (o melhor conselheiro), marshal (o militar), new (gente nova), clergy (o clero escolhe) */
+  /* operação de inteligência concluída: tech, mil, gold, map ou secret (contra o país em n.spyT) */
+  spy:      { do: (n, v) => spyDo(n, v), txt: v => ({ tech: '🔬 Uma técnica deles ' + Math.round(SPY.tech * 100) + '% mais barata', mil: '⚔️ +' + Math.round(SPY.mil * 100) + '% de dano contra eles por 2–3 anos', gold: '💰 Parte do tesouro deles', map: '🗺️ Os mapas deles', secret: '🕵️ Os podres do governante deles' })[v] },
+  plot:     { do: (n, v) => { const P = n.plot; if (!P) return; P.ok = clamp(P.ok + v[0], 0, 99); P.bad = clamp(P.bad + v[1], 0, 99); }, txt: v => '🗡️ Plano: ' + (v[0] ? 'sucesso ' + (v[0] > 0 ? '+' : '−') + Math.abs(v[0]) + '% ' : '') + (v[1] ? 'fracasso ' + (v[1] > 0 ? '+' : '−') + Math.abs(v[1]) + '%' : '') },
+  leader:   { do: (n, v) => newLeader(n, v), txt: v => ({ keep: 'O governante atual continua', council: 'Um conselheiro assume o governo', marshal: 'O chefe militar assume', new: 'Um novo governante assume', clergy: 'O clero escolhe o governante' })[v] },
+  govCoup:  { do: n => govCoupTo(n), txt: () => 'O país vira um regime militar' },
   /* perseguição: o maior exército em treino ganha o bônus de perseguição por v meses */
   pursuit:  { do: (n, v) => { const a = S.armies.filter(x => x.o === n.id && x.drill && x.cav > 1).sort((x, y) => y.cav - x.cav)[0]; if (a) (a.g != null ? groupOf(a) : [a]).forEach(x => x.pur = S.t + v * 30); }, txt: v => '🐎 Perseguição na cavalaria por ' + durTxt(v) + ' (perseguição ×' + PURSUIT.mul + ', choque +' + Math.round(PURSUIT.cav * 100) + '%)' },
   govNext:  { do: n => { const g = govNextOf(n); if (g && g !== n.gov) { applyGov(n, g); if (GOVS[g].succ !== 'hered') succeed(n, false); } }, txt: () => 'Reforma o governo para a forma seguinte' },
   /* conselho: concede = atende a exigência mais pesada; purge = troca o conselheiro mais exigente */
   council:  { do: (n, v) => { const d = demandsOf(n).filter(x => x.slot !== 'ruler').sort((a, b) => b.w - a.w);
                 if (v === 'concede' && d[0]) { const x = d[0]; if (x.ty === 'gov') applyGov(n, x.v); else if (x.ty === 'law') n.laws[x.k] = x.v; else n.ideo = x.v; calcMods(n); }
-                if (v === 'purge' && d[0]) n.council[d[0].slot] = mkChar(n, { boost: COUNCIL.find(c => c[0] === d[0].slot)[2], dyn: newDynasty(n) }); },
-              txt: v => v === 'concede' ? 'Atende a exigência mais forte do conselho' : 'Troca o conselheiro mais exigente' },
+                if (v === 'purge' && d[0]) n.council[d[0].slot] = councilChar(n, d[0].slot); if (v === 'form') formCouncil(n); },
+              txt: v => v === 'concede' ? 'Atende a exigência mais forte do conselho' : v === 'form' ? 'Um conselho novo, escolhido pelo novo regime' : 'Troca o conselheiro mais exigente' },
   /* sorteio: [[chance, efeitos], ...]; o que sobrar da chance não faz nada */
   roll:     { do: (n, v) => { let x = rnd(); for (const [p, fx] of v) { if (x < p) { applyFx(n, fx); return; } x -= p; } },
               txt: v => v.map(([p, fx]) => Math.round(p * 100) + '%: ' + (fxTxt(fx).join(', ') || 'nada')).join(' · '), sub: v => v.map(x => x[1]) },
@@ -97,7 +112,7 @@ function applyFx(n, fx) { for (const k in fx || {}) EFF[k].do(n, fx[k]); }
 const fxTxt = fx => Object.keys(fx || {}).map(k => EFF[k].txt(fx[k])).filter(Boolean);
 
 /* textos com {pais}, {titulo} e {governante} */
-const fillTxt = (n, s) => s.replace(/\{pais\}/g, natName(n)).replace(/\{titulo\}/g, titleOf(n).toLowerCase()).replace(/\{governante\}/g, n.ruler ? charName(n.ruler) : '');
+const fillTxt = (n, s) => s.replace(/\{lei\}/g, n.enact ? enactName(n.enact) : 'a proposta').replace(/\{fase\}/g, n.enact ? enactPhases(n)[n.enact.ph].toLowerCase() : '').replace(/\{rival\}/g, n.spyT != null && nat(n.spyT) ? natName(nat(n.spyT)) : 'o rival').replace(/\{alvo\}/g, n.plot && courtFind(n, n.plot.cid) ? charName(courtFind(n, n.plot.cid)) : 'o alvo').replace(/\{pais\}/g, natName(n)).replace(/\{titulo\}/g, titleOf(n).toLowerCase()).replace(/\{governante\}/g, n.ruler ? charName(n.ruler) : '');
 
 /* ---------- avisos e eventos ---------- */
 /* aviso ao jogador (janela sem escolha); só chega se n for o jogador */
@@ -150,6 +165,30 @@ function validateData() {
   TECHS.forEach(t => { const w = 'tecnologia ' + t.id; modOk(t.fx.m, w); t.req.forEach(r => { if (!TECH[r]) err.push(w + ': requisito ' + r + ' não existe'); });
     (t.fx.b || []).forEach(b => { if (!BUILDINGS[b]) err.push(w + ': prédio ' + b + ' não existe'); }); (t.fx.g || []).forEach(g => { if (!GOVS[g]) err.push(w + ': governo ' + g + ' não existe'); });
     (t.fx.i || []).forEach(i => { if (!IDEOS[i]) err.push(w + ': ideologia ' + i + ' não existe'); }); });
+  // prédios, bens e diplomacia: campos que apontam para outras tabelas
+  for (const b in BUILDINGS) { const d = BUILDINGS[b], w = 'prédio ' + b;
+    for (const k of ['in', 'out']) for (const g in d[k] || {}) if (!GOODS[g]) err.push(w + ': bem ' + g + ' não existe');
+    if (d.req && !(REQS[d.req] || (d.req.startsWith('res:') && GOODS[d.req.slice(4)] && GOODS[d.req.slice(4)].rm))) err.push(w + ': condição ' + d.req + ' não existe (REQS ou res:<bem com rm>)');
+    if (d.job && !JOBS[d.job]) err.push(w + ': grupo de empregos ' + d.job + ' não existe'); if (d.vert && !VERT[d.vert]) err.push(w + ': vertente ' + d.vert + ' não existe');
+    for (const x in (d.fx || {}).boost || {}) if (!BUILDINGS[x]) err.push(w + ': fx.boost aponta para ' + x + ', que não existe'); }
+  for (const g in GOODS) { const G = GOODS[g]; if (G.pros && !TECH[G.pros]) err.push('bem ' + g + ': técnica de prospecção ' + G.pros + ' não existe'); (G.terr || []).forEach(t => { if (!TERRAIN[t]) err.push('bem ' + g + ': terreno ' + t + ' não existe'); }); }
+  for (const g in SUBSIST) if (!GOODS[g]) err.push('subsistência: bem ' + g + ' não existe');
+  for (const k in REQS) if (REQS[k].terr && !Object.values(TERRAIN).some(t => t[REQS[k].terr])) err.push('condição ' + k + ': nenhum terreno tem a marca ' + REQS[k].terr);
+  for (const k in NEEDS) (NEEDS[k].terr || []).forEach(t => { if (!TERRAIN[t]) err.push('necessidade ' + k + ': terreno ' + t + ' não existe'); });
+  const dipT = typeof DIP_TEST === 'object' ? DIP_TEST : null;
+  if (dipT) { for (const k in DIPLO) { const D = DIPLO[k], w = 'ação diplomática ' + k; [...(D.acc || []), ...(D.deny || [])].forEach(T => { if (!dipT[T[0]]) err.push(w + ': teste ' + T[0] + ' não existe'); }); }
+    [...DIP_ACC, ...DIP_DRIFT].forEach(T => { if (!dipT[T[0]]) err.push('diplomacia: teste ' + T[0] + ' não existe'); }); }
+  for (const t in TRAITS) for (const k in TRAITS[t].pm || {}) if (!['war', 'build', 'army', 'colon', 'claim', 'ally', 'gold'].includes(k)) err.push('traço ' + t + ': personalidade ' + k + ' não existe');
+  // ideologias: governos e leis que querem precisam existir
+  for (const i in IDEOS) { const I = IDEOS[i]; (I.govs || []).forEach(g => { if (!GOVS[g]) err.push('ideologia ' + i + ': governo ' + g + ' não existe'); });
+    for (const k in I.laws || {}) if (!LAWS[k] || !LAWS[k].o[I.laws[k]]) err.push('ideologia ' + i + ': lei ' + k + '.' + I.laws[k] + ' não existe'); if (I.y0 == null) err.push('ideologia ' + i + ': falta y0'); }
+  for (const k in INTERACT) if (!['friend', 'hostile'].includes(INTERACT[k].kind)) err.push('interação ' + k + ': kind deve ser friend ou hostile');
+  // governos: árvore, golpes, transições e modo do conselho
+  for (const g in GOVS) (GOVS[g].to || []).concat(GOVS[g].ev || []).forEach(x => { const id = Array.isArray(x) ? x[0] : x; if (!GOVS[id]) err.push('governo ' + g + ': caminho para ' + id + ', que não existe'); if (Array.isArray(x)) chkC(x[1], 'governo ' + g + ' → ' + id); });
+  for (const g in GOVS) if (GOVS[g].next && !(GOVS[g].to || []).some(x => (Array.isArray(x) ? x[0] : x) === GOVS[g].next)) err.push('governo ' + g + ': a reforma natural ' + GOVS[g].next + ' não está em to');
+  for (const c in COUP_GOVS) if (c !== 'chance') COUP_GOVS[c].forEach(g => { if (!GOVS[g]) err.push('golpe (' + c + '): governo ' + g + ' não existe'); });
+  GOV_TR.forEach(x => { if (!EVENT[x.ev]) err.push('transição ' + x.from + '→' + x.to + ': evento ' + x.ev + ' não existe'); });
+  for (const k in STATS) if (!MODS[STATS[k].mod] && STATS[k].mod !== 'coup') err.push('atributo ' + k + ': modificador ' + STATS[k].mod + ' não existe');
   for (const b in BUILDINGS) { const t = BUILDINGS[b].tech; if (t && !(TECH[t] && (TECH[t].fx.b || []).includes(b))) err.push('prédio ' + b + ': a tecnologia ' + t + ' não o lista em fx.b (nunca é liberado)'); }
   return err;
 }

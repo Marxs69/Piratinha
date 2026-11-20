@@ -278,3 +278,36 @@ h4.bgrp { font: 700 11px var(--title); color: var(--dim); letter-spacing: 1px; m
 .alist { display: flex; flex-direction: column; gap: 3px; margin-bottom: 8px; }
 .arow { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 4px; background: rgba(0,0,0,.2); cursor: pointer; }
 .arow:hover { background: rgba(232,194,90,.12); } .arow .grow, .arow > b { flex: 1; }
+
+/* abas das janelas acompanham a rolagem */
+#win-b > .tabs:first-child { position: sticky; top: -12px; z-index: 5; background: #1c1711; margin: -12px -14px 12px; padding: 10px 14px 8px; }
+/* votação em andamento (acima das Crônicas) e na janela */
+#enact { padding: 6px 8px; border: 1px solid var(--line); border-radius: 5px; background: rgba(0,0,0,.35); cursor: pointer; }
+#enact:hover { border-color: var(--gold); }
+#enact .eh { display: flex; align-items: baseline; gap: 6px; margin-bottom: 4px; } #enact .eh b { flex: 1; font-size: 12px; color: var(--gold-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } #enact .eh small { font-size: 11px; opacity: .8; white-space: nowrap; }
+.ebar { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; margin: 4px 0; }
+.ebar i { display: block; height: 7px; background: rgba(0,0,0,.5); border: 1px solid rgba(255,255,255,.12); border-radius: 3px; overflow: hidden; }
+.ebar b { display: block; height: 100%; background: linear-gradient(90deg, #c9a24a, #e8c25a); }
+.enact-card { margin-bottom: 12px; border-color: var(--gold); } .enact-card .btn { margin-top: 4px; }
+.opt.vote { border-color: #e8c25a; box-shadow: 0 0 0 1px rgba(232,194,90,.4) inset; }
+/* conselho: cor do atributo de cada assento, ideologia em destaque */
+.ccard.seat { border-top: 3px solid; } .ccard .cname { margin-bottom: 4px; }
+.chip.main { font-weight: 700; background: rgba(255,255,255,.1); } .chip.half { opacity: .6; border-style: dashed; }
+.cideo { margin: 6px 0 4px; padding: 4px 0 4px 8px; border-left: 3px solid var(--line); } .cideo > b { font: 700 14px var(--title); letter-spacing: .5px; } .cideo .chips { margin-top: 4px; }
+.chips.rende { margin-top: 4px; } .ccard .opbar { margin: 6px 0 2px; } .ccard .row { margin-top: 4px; }
+.gnow { margin-bottom: 10px; cursor: default; } .tree-next { font-style: italic; } .tree-other { margin-bottom: 10px; }
+
+.govcat { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 10px; }
+.ctxable { cursor: context-menu; } .row.wrap { flex-wrap: wrap; } .plot-card .pbar { height: 9px; margin: 2px 0 6px; }
+
+.lawrow .opt.law { min-width: 0; } .lawrow .opt.law b { font-size: 13px; overflow-wrap: anywhere; } .lawrow .opt.law .chips { flex-wrap: wrap; }
+
+.agenda .arow { display: grid; grid-template-columns: minmax(180px, 1.2fr) 1.5fr auto auto; gap: 8px; align-items: center; padding: 6px 0; border-top: 1px solid rgba(90,74,50,.4); } .agenda .atitle { display: flex; flex-direction: column; } .agenda .pbar { margin: 4px 0 6px; }
+
+#ctx .intel { border-top: 1px solid var(--line); padding-top: 6px; display: flex; flex-direction: column; gap: 4px; } #ctx .intel select { margin: 0; flex: 1; min-width: 0; }
+
+.vprev .vhead { display: flex; align-items: center; justify-content: space-between; gap: 8px; } .vprev .vhead h4 { margin: 0; } .vprev > .btn { margin-top: 8px; } .tprevw.vok { outline: 1px solid rgba(143,209,127,.5); border-radius: 5px; }
+
+.tabs .tab-div { flex: 1; } .tabs .tab-right { border-left: 2px solid var(--line); margin-left: 8px; }
+.milcols { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); } table.t.compact td, table.t.compact th { padding: 4px 6px; } table.t.compact td small { display: block; font-size: 10px; }
+table.t select { margin: 0; max-width: 150px; } .docrow { display: flex; flex-direction: column; gap: 2px; padding: 6px 0; border-top: 1px solid rgba(90,74,50,.35); } .docrow:first-of-type { border-top: 0; }

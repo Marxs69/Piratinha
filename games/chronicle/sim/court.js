@@ -27,7 +27,7 @@ function spawnNation(provs, o = {}) {
   provs.forEach(p => { S.own[p] = id; S.ctrl[p] = id; delete S.sieges[p]; });
   n.capital = provs.reduce((a, b) => S.pop[a] >= S.pop[b] ? a : b);
   n.dyn = o.dyn || newDynasty(n); calcMods(n);
-  n.ruler = o.ruler || mkChar(n, { ruler: true }); n.council = {}; COUNCIL.forEach(([k, , st]) => n.council[k] = mkChar(n, { boost: st, dyn: newDynasty(n) }));
+  n.ruler = o.ruler || mkChar(n, { ruler: true }); n.council = {}; COUNCIL.forEach(([k]) => n.council[k] = councilChar(n, k));
   if (GOVS[n.gov].succ === 'hered') { n.spouse = mkChar(n, { f: !n.ruler.f, dyn: newDynasty(n), age: Math.max(16, ageOf(n.ruler) - 3) }); n.kids = []; }
   if (src) for (let p = 0; p < P; p++) n.exP[p] = src.exP[p]; initExplore(n);
   if (S._mine) S._mine[id] = []; ownChanged(); warsChanged(); strC = null; enterC = null; checkDead();   // quem perdeu a capital para o país novo muda de capital (ou some)
@@ -79,7 +79,8 @@ function courtTick(n) {
       if (n.id === S.player) log(charName(k) + ' terminou a educação com ' + roleName(n, k.tut).toLowerCase() + ' ' + charName(n.council[k.tut] || k) + '.', 'good', [n.id]); } }
   // regência
   if (n.regent && ageOf(n.ruler) >= 16) { n.regent = null; addPres(n, 5); if (n.id === S.player) log(charName(n.ruler) + ' atingiu a maioridade e governa sozinho.', 'good', [n.id]); calcMods(n); }
-  n._dem = null; councilPolitics(n); schemeTick(n);
+  n._dem = null; councilPolitics(n); schemeTick(n); plotTick(n);
+  if (S.t % 360 === (n.id * 12) % 360) for (const c of [n.ruler, ...courtOf(n)]) { ideoDrift(n, c); if (c) leanOf(n, c); }   // uma vez por ano: ideologias mudam aos poucos e as vontades se refazem
 }
 /* renúncias e expurgos: conselheiro furioso pede demissão; regimes de partido/ideologia afastam quem pensa diferente */
 const PURGE_CATS = ['Socialista', 'Ditadura', 'Teocracia'];
@@ -93,40 +94,106 @@ function councilPolitics(n) {
 function useSecret(n, c, k) {
   if (!c.secK) return 'Segredo desconhecido';
   if (k === 'blackmail') { c.fear = S.t + 360 * 10; c.secK = 2; return ''; }
-  if (k === 'expose') { const slot = COUNCIL.find(([s]) => n.council[s] === c); if (!slot) return 'Só conselheiros podem ser expostos'; n.council[slot[0]] = mkChar(n, { boost: slot[2], dyn: newDynasty(n) }); addPres(n, 3); log(charName(c) + ' caiu em desgraça: ' + SECRETS[c.sec].n.toLowerCase() + '.', 'info', [n.id]); calcMods(n); return ''; }
+  if (k === 'expose') { const slot = COUNCIL.find(([s]) => n.council[s] === c); if (!slot) return 'Só conselheiros podem ser expostos'; n.council[slot[0]] = councilChar(n, slot[0]); addPres(n, 3); log(charName(c) + ' caiu em desgraça: ' + SECRETS[c.sec].n.toLowerCase() + '.', 'info', [n.id]); calcMods(n); return ''; }
   return 'Inválido';
+}
+
+/* ---------- interações com membros (INTERACT): amigáveis sobem a opinião; cooptar, investigar, difamar e eliminar são as intrigas internas ---------- */
+const courtFind = (n, id) => [n.ruler, ...courtOf(n)].find(c => c && c.id === id) || null;
+const seatOfC = (n, c) => (COUNCIL.find(([k]) => n.council[k] === c) || [])[0] || null;
+/* intriga do plano: governante + 30% da de quem gosta muito dele (opinião ≥ 50) + o assento de intriga (se não for o alvo) */
+function plotPower(n, tgt) { let p = n.ruler ? n.ruler.st.int + (n.ruler.tr.includes('schemer') ? 4 : 0) : 4; const sp = n.council.spymaster;
+  for (const c of courtOf(n)) if (c !== tgt && c !== sp && (c.op ?? 0) >= 50) p += c.st.int * PLOT.friend; if (sp && sp !== tgt) p += sp.st.int; return p; }
+const plotDefense = (n, tgt) => tgt.st.int + (tgt.tr.includes('paranoid') ? 5 : 0) + (tgt.tr.includes('schemer') ? 3 : 0) + 4;
+const interactCost = (n, c, k) => Math.round((INTERACT[k].money || 0) * eraScale() * (k === 'coopt' && c && c.secK ? .5 : 1));
+function interactWhy(n, c, k) {
+  const d = INTERACT[k]; if (!d || !c || c === n.ruler) return 'Inválido';
+  if ((c.icd || {})[k] > S.t) return 'Feito há pouco (de novo em ' + yearOf(c.icd[k]) + ')';
+  const m = interactCost(n, c, k); if (m && n.money < m) return 'Sem dinheiro'; if (d.pres && (n.pres ?? 50) < d.pres) return 'Prestígio insuficiente';
+  if (d.plot && n.plot) return 'Já há um plano em andamento'; if (k === 'intel' && c.secK) return 'Os podres já são conhecidos'; if (k === 'intel' && c.inv) return 'Investigação em andamento';
+  if (k === 'coopt' && c.coopt > S.t) return 'Já está cooptado';
+  return '';
+}
+const interactChance = (n, c, k) => { const d = INTERACT[k], x = (plotPower(n, c) - plotDefense(n, c)) * .02; return k === 'coopt' ? clamp(d.base + x + (c.secK ? d.dirt : 0) + (c.op ?? 0) / 300, .05, .97) : k === 'slander' ? clamp(d.base + x, .1, .92) : 1; };
+function interact(n, c, k) {
+  const e = interactWhy(n, c, k); if (e) return e; const d = INTERACT[k], me = n.id === S.player;
+  n.money -= interactCost(n, c, k); if (d.pres) addPres(n, -d.pres); c.id = c.id ?? S.id++; (c.icd = c.icd || {})[k] = S.t + (d.cd || 12) * 30;
+  if (d.op) { c.op = clamp((c.op ?? 0) + d.op, -100, 100); return ''; }
+  if (k === 'coopt') { if (chance(interactChance(n, c, k))) { c.coopt = S.t + d.mo * 30; c.op = clamp((c.op ?? 0) + 10, -100, 100); if (c.secK === 1) c.secK = 2; if (me) log(charName(c) + ' foi cooptado: vai apoiar o governo.', 'good', [n.id]); }
+    else { c.op = clamp((c.op ?? 0) - 20, -100, 100); if (me) log(charName(c) + ' recusou ser cooptado.', 'bad', [n.id]); } return ''; }
+  if (k === 'intel') { c.inv = S.t + d.mo * 30; return ''; }
+  if (k === 'slander') { if (chance(interactChance(n, c, k))) { c.disc = S.t + d.mo * 30; c.op = clamp((c.op ?? 0) - 15, -100, 100); if (me) log(charName(c) + ' foi desacreditado.', 'good', [n.id]); }
+    else { addPres(n, -5); c.op = clamp((c.op ?? 0) - 30, -100, 100); if (me) log('A difamação contra ' + charName(c) + ' foi descoberta.', 'bad', [n.id]); } return ''; }
+  if (k === 'kill') { n.plot = { cid: c.id, ok: 0, bad: 0, t: S.t }; return ''; }
+  return 'Inválido';
+}
+/* tira alguém da corte (morte): o assento é preenchido conforme o governo */
+function removeCourt(n, c) { const k = seatOfC(n, c); if (k) { n.council[k] = councilChar(n, k); apptSet(n, k, true); } else if (n.spouse === c) n.spouse = null; else if (n.kids) n.kids = n.kids.filter(x => x !== c); calcMods(n); }
+function plotTick(n) {
+  for (const c of courtOf(n)) if (c.inv && c.inv <= S.t) { c.inv = null;   // investigação terminou
+    if (chance(clamp(.35 + (plotPower(n, c) - plotDefense(n, c)) * .03, .1, .95))) { c.sec = c.sec || pickR(SEC_IDS); c.secK = 1; if (n.id === S.player) log('A investigação achou os podres de ' + charName(c) + ': ' + SECRETS[c.sec].n.toLowerCase() + '.', 'good', [n.id]); }
+    else if (n.id === S.player) log('A investigação sobre ' + charName(c) + ' não achou nada.', 'info', [n.id]); }
+  const P = n.plot; if (!P) return; const t = courtFind(n, P.cid); if (!t) { n.plot = null; return; }
+  P.ok = Math.min(100, P.ok + PLOT.ok + plotPower(n, t) * PLOT.ok_k + rnd() * PLOT.rnd); P.bad = Math.min(100, P.bad + PLOT.bad + plotDefense(n, t) * PLOT.bad_k + rnd() * PLOT.rnd);
+  if (P.ok >= 100 && P.ok - P.bad >= 0) { n.plot = null; if (n.id === S.player) log(charName(t) + ' morreu de repente. Ninguém sabe dizer do quê.', 'good', [n.id]); removeCourt(n, t); return; }
+  if (P.bad >= 100) { n.plot = null; const disc = chance(clamp(PLOT.disc + (plotDefense(n, t) - plotPower(n, t)) * .02, .05, .95));
+    if (disc) { addPres(n, PLOT.pres); for (const c of courtOf(n)) c.op = clamp((c.op ?? 0) + PLOT.opAll, -100, 100); t.op = clamp((t.op ?? 0) - 60, -100, 100);
+      if (n.id === S.player) { log('O plano contra ' + charName(t) + ' foi descoberto!', 'bad', [n.id]); notify(n.id, '🗡️ Plano descoberto', 'Todos sabem que tentamos eliminar ' + charName(t) + '. A corte desconfia de nós.'); } }
+    else if (n.id === S.player) log('O plano contra ' + charName(t) + ' fracassou, mas ninguém descobriu.', 'info', [n.id]); }
 }
 
 /* ---------- esquemas ---------- */
 const schemeCost = k => Math.round(SCHEMES[k].c * eraScale());
 const schemePower = n => { const sp = n.council.spymaster; return (sp ? sp.st.int : 4) + (n.ruler ? n.ruler.st.int / 2 : 0) + (n.ruler && n.ruler.tr.includes('schemer') ? 5 : 0); };
+/* tgt = { nat: id, who: 'ruler' | cargo | 'gen:<id do exército>', topic: { ty: 'ideo'|'law'|'gov', k, v } } */
 function startScheme(n, k, tgt) {
-  const d = SCHEMES[k]; if (!d) return 'Inválido'; if (n.scheme) return 'Já há um esquema em andamento';
-  if (d.tgt === 'own' && !(tgt && tgt.own)) return 'Escolha um conselheiro seu'; if (d.tgt === 'foreign' && !(tgt && tgt.nat != null)) return 'Escolha outro país';
+  const d = SCHEMES[k]; if (!d) return 'Inválido'; if (n.scheme) return 'Já há uma operação em andamento';
+  if (!(tgt && tgt.nat != null && nat(tgt.nat) && nat(tgt.nat).alive && tgt.nat !== n.id)) return 'Escolha outro país';
+  if (k === 'slander' && !(tgt.topic && tgt.topic.v)) return 'Escolha o que espalhar'; if (k === 'murder' && !tgt.who) return 'Escolha o alvo';
   const c = schemeCost(k); if (n.money < c) return 'Sem dinheiro'; n.money -= c;
   n.scheme = { k, tgt, prog: 0, t: S.t }; return '';
 }
-const schemeTarget = (n, s) => s.tgt.own ? n.council[s.tgt.own] : s.tgt.nat != null && nat(s.tgt.nat).alive ? nat(s.tgt.nat).ruler : null;
-const schemeTxt = (n, s) => schemeName(s.k) + ': ' + (s.tgt.own ? roleName(n, s.tgt.own).toLowerCase() + ' ' + charName(n.council[s.tgt.own]) : natName(nat(s.tgt.nat)));
+const schemeTarget = (n, s) => { const t = nat(s.tgt.nat); if (!t || !t.alive) return null; const w = s.tgt.who;
+  if (!w || w === 'ruler') return t.ruler; if (w.startsWith('gen:')) { const a = S.armies.find(x => x.id === +w.slice(4) && x.o === t.id); return a && a.gen ? a.gen : null; } return t.council[w] || null; };
+const topicTxt = T => T.ty === 'ideo' ? 'ideologia ' + IDEOS[T.v].n : T.ty === 'law' ? LAWS[T.k].n + ': ' + LAWS[T.k].o[T.v].n : GOVS[T.v].n;
+const schemeTxt = (n, s) => { const t = nat(s.tgt.nat), who = schemeTarget(n, s); return schemeName(s.k) + ' · ' + (t ? natName(t) : '?') + (s.k === 'murder' && who ? ' · ' + charName(who) : '') + (s.k === 'slander' && s.tgt.topic ? ' · ' + topicTxt(s.tgt.topic) : ''); };
 function schemeTick(n) {
-  const s = n.scheme; if (!s) return; const d = SCHEMES[s.k], who = schemeTarget(n, s);
-  if (!who) { n.scheme = null; return; }
-  const foreign = s.tgt.nat != null, def = foreign ? schemePower(nat(s.tgt.nat)) : 0;
+  const s = n.scheme; if (!s) return; const d = SCHEMES[s.k], t = s.tgt && s.tgt.nat != null ? nat(s.tgt.nat) : null;
+  if (!d || !t || !t.alive || (s.k === 'murder' && !schemeTarget(n, s))) { n.scheme = null; return; }   // alvo sumiu (ou save antigo)
+  const def = schemePower(t);
   s.prog = Math.min(1, s.prog + Math.max(.2, schemePower(n) / Math.max(4, 10 + def)) / d.m);
-  if (chance(d.risk * (foreign ? 1 + def / 15 : 1))) {          // descoberto
-    n.scheme = null; addPres(n, -10);
-    if (foreign) { const t = nat(s.tgt.nat); t.rel[n.id] = (t.rel[n.id] || 0) - 50; log('Descoberto: ' + natName(n) + ' tentou ' + schemeName(s.k).toLowerCase() + ' ' + natName(t) + '.', [n.id, t.id].includes(S.player) ? 'bad' : 'world', [n.id, t.id]); notify(t.id, '🕵️ Esquema descoberto', natName(n) + ' tramava contra nós (' + schemeName(s.k).toLowerCase() + '). Relação −50.'); }
-    else { who.op = (who.op ?? 0) - 40; if (n.id === S.player) log('O esquema contra ' + charName(who) + ' foi descoberto.', 'bad', [n.id]); }
-    return;
+  if (chance(d.risk * (1 + def / 15))) {                          // descoberta
+    n.scheme = null; addPres(n, -10); t.rel[n.id] = (t.rel[n.id] || 0) - 50;
+    log('Descoberto: ' + natName(n) + ' tentou ' + schemeName(s.k).toLowerCase() + ' em ' + natName(t) + '.', [n.id, t.id].includes(S.player) ? 'bad' : 'world', [n.id, t.id]);
+    notify(t.id, '🕵️ Operação descoberta', natName(n) + ' agia contra nós (' + schemeName(s.k).toLowerCase() + ').'); return;
   }
   if (s.prog < 1) return;
-  n.scheme = null; const t = foreign ? nat(s.tgt.nat) : null;
-  if (s.k === 'bribe') { who.bribe = S.t + 360 * 5; who.op = Math.min(100, (who.op ?? 0) + 40); }
-  if (s.k === 'spy') { t.ruler.sec = t.ruler.sec || pickR(SEC_IDS); (n.intel = n.intel || {})[t.id] = { sec: t.ruler.sec, cid: t.ruler.id ?? (t.ruler.id = S.id++), t: S.t }; }
-  if (s.k === 'slander') { addPres(t, -15); t.stab = Math.max(0, t.stab - 5); }
-  if (s.k === 'murder') { if (foreign) { log(titleOf(t) + ' ' + charName(t.ruler) + ' de ' + natName(t) + ' morreu de repente.', 'world', [t.id]); succeed(t, true); }
-    else { const slot = s.tgt.own; n.council[slot] = mkChar(n, { boost: COUNCIL.find(c => c[0] === slot)[2], dyn: newDynasty(n) }); } }
-  if (n.id === S.player) log('Esquema concluído — ' + schemeTxt(n, s) + '.', 'good', [n.id]);
+  n.scheme = null;
+  if (s.k === 'spy') { n.spyT = t.id; const ev = EVENT.intel_haul; if (ev && evOpts(n, ev).length) { if (n.id === S.player && n.evWait) (n.evNext = n.evNext || []).push({ id: ev.id, t: S.t }); else fireEvent(n, ev); } }
+  if (s.k === 'slander') spreadTopic(t, s.tgt.topic, n);
+  if (s.k === 'murder') { const w = s.tgt.who, who = schemeTarget(n, s);
+    if (!w || w === 'ruler') { log(titleOf(t) + ' ' + charName(t.ruler) + ' de ' + natName(t) + ' morreu de repente.', 'world', [t.id]); succeed(t, true); }
+    else if (w.startsWith('gen:')) { const a = S.armies.find(x => x.id === +w.slice(4)); if (a) { a.gen = null; a.genCd = Math.max(a.genCd || 0, S.t + APPOINT_CD_DEATH * 30); } log('O general ' + charName(who) + ', de ' + natName(t) + ', morreu de repente.', [n.id, t.id].includes(S.player) ? 'info' : 'none', [t.id]); }
+    else { t.council[w] = councilChar(t, w); apptSet(t, w, true); log(roleName(t, w) + ' ' + charName(who) + ', de ' + natName(t) + ', morreu de repente.', [n.id, t.id].includes(S.player) ? 'info' : 'none', [t.id]); } }
+  if (n.id === S.player && s.k !== 'spy') log('Operação concluída — ' + schemeTxt(n, s) + '.', 'good', [n.id]);
+}
+/* panfletos: governante e conselheiros do alvo podem passar a querer a ideia; a pressão do conselho deles sobe */
+function spreadTopic(t, T, by) {
+  let k = 0; for (const c of [t.ruler, ...COUNCIL.map(([s]) => t.council[s])]) { if (!c || !chance(.5)) continue;
+    if (T.ty === 'ideo' && IDEOS[T.v]) { c.ld = T.v; leanOf(t, c); k++; } else if (T.ty === 'law' && lawOk(t, T.k, T.v) && t.laws[T.k] !== T.v) { c.ll = { k: T.k, o: T.v }; k++; } else if (T.ty === 'gov' && govEdgeOk(t, T.v)) { c.lg = T.v; k++; } }
+  t.press = clamp((t.press || 0) + 10, 0, 100); t.stab = Math.max(0, t.stab - 2);
+  if ([t.id, by.id].includes(S.player)) log('As ideias de ' + topicTxt(T) + ' se espalham em ' + natName(t) + ' (' + k + ' do governo convencidos).', 'info', [t.id, by.id]);
+}
+/* operação de inteligência: o que levar (efeitos do evento intel_haul) */
+const spyTechOf = n => { const t = n.spyT != null ? nat(n.spyT) : null; if (!t) return null; return Object.keys(t.techs).map(id => TECH[id]).filter(x => x && !x.v && !n.techs[x.id] && techState(n, x) === '' && !(n.tdisc || {})[x.id]).sort((a, b) => a.y - b.y)[0] || null; };
+function spyDo(n, what) {
+  const t = n.spyT != null ? nat(n.spyT) : null; if (!t || !t.alive) return; const me = n.id === S.player;
+  if (what === 'tech') { const x = spyTechOf(n); if (x) { (n.tdisc = n.tdisc || {})[x.id] = SPY.tech; if (me) log('Planos roubados de ' + natName(t) + ': ' + x.n + ' fica ' + Math.round(SPY.tech * 100) + '% mais barata.', 'good', [n.id]); } }
+  if (what === 'mil') { (n.milAdv = n.milAdv || {})[t.id] = S.t + rand(SPY.milMo[0], SPY.milMo[1]) * 30; if (me) log('Conhecemos as táticas de ' + natName(t) + ': +' + Math.round(SPY.mil * 100) + '% de dano contra eles até ' + yearOf(n.milAdv[t.id]) + '.', 'good', [n.id]); }
+  if (what === 'gold') { const x = Math.min(Math.max(0, t.money) * SPY.gold, Math.max(0, (n.inc || {}).tax || 0) * SPY.goldCap); t.money -= x; n.money += x; if (me) log('Desviamos ' + Math.round(x) + ' do tesouro de ' + natName(t) + '.', 'good', [n.id]); }
+  if (what === 'map') { provsOf(t.id).forEach(p => explore(n, p)); for (let p = 0; p < t.exP.length; p++) if (t.exP[p] && chance(.3)) n.exP[p] = 1; WD.seas.forEach(z => { if (z.provs.some(p => n.exP[p])) n.exZ[z.id] = 1; }); if (me) { S.mapDirty = true; log('Copiamos os mapas de ' + natName(t) + '.', 'good', [n.id]); } }
+  if (what === 'secret') { t.ruler.sec = t.ruler.sec || pickR(SEC_IDS); (n.intel = n.intel || {})[t.id] = { sec: t.ruler.sec, cid: t.ruler.id ?? (t.ruler.id = S.id++), t: S.t }; if (me) log('Descobrimos os podres de ' + charName(t.ruler) + ', de ' + natName(t) + '.', 'good', [n.id]); }
+  n.spyT = null;
 }
 /* expor o segredo descoberto do governante de outro país */
 function exposeForeign(n, tid) { const I = (n.intel || {})[tid], t = nat(tid); if (!I || !t.alive || !t.ruler || t.ruler.id !== I.cid) return 'Sem segredo válido'; delete n.intel[tid]; addPres(t, -15); t.stab = Math.max(0, t.stab - 8); addPres(n, 3); log(natName(n) + ' expôs o segredo de ' + charName(t.ruler) + ' (' + SECRETS[I.sec].n.toLowerCase() + ').', 'world', [n.id, t.id]); return ''; }
@@ -139,7 +206,7 @@ function lawSuccession(n) {
     const pool = [...adults, ...COUNCIL.map(([k]) => n.council[k]).filter(Boolean)], sc = c => c.st.adm + c.st.dip + c.st.mar + c.st.lea + c.st.int;
     if (!pool.length) return false; const h = pool.sort((a, b) => sc(b) - sc(a))[0];
     n.ruler = h; n.kids = kids.filter(k => k !== h); if (h.dyn !== n.dyn) { n.dyn = h.dyn; n.kids = []; n.stab -= 3; }
-    COUNCIL.forEach(([k, , st]) => { if (n.council[k] === h) n.council[k] = mkChar(n, { boost: st, dyn: newDynasty(n) }); });
+    COUNCIL.forEach(([k]) => { if (n.council[k] === h) n.council[k] = councilChar(n, k); });
     n.spouse = mkChar(n, { f: !h.f, dyn: newDynasty(n), age: ageOf(h) }); return true;
   }
   if (!kids.length) return false;
@@ -165,11 +232,12 @@ function partition(n, heir) {
   notify(n.id, '👑 Partilha', 'Pela lei de partilha, ' + charName(heir) + ' levou ' + take.length + ' províncias e fundou ' + natName(m) + ', aliado da dinastia.');
 }
 /* IA: suborna conselheiro hostil; difama ou espiona rivais; os cruéis e conspiradores matam */
-function aiCourt(n) {
+function aiCourt(n) {                                         // IA: agrada ou coopta quem é hostil; os cruéis e conspiradores eliminam; difama ou espiona rivais lá fora
   const L = n.laws; if (GOVS[n.gov].succ === 'hered' && L.succ === 'partition' && lawOk(n, 'succ', 'primo') && chance(.1)) setLaw(n, 'succ', 'primo');   // reinos que podem abandonam a partilha
-  if (n.scheme || n.money < schemeCost('slander') * 4 || schemePower(n) < 9 || !chance(.08)) return; const tr = n.ruler.tr;
-  const hostile = COUNCIL.map(([k]) => [k, n.council[k]]).filter(([, c]) => c && (c.op ?? 0) < -40)[0];
-  if (hostile) { startScheme(n, chance(tr.includes('cruel') || tr.includes('schemer') ? .3 : 0) ? 'murder' : 'bribe', { own: hostile[0] }); return; }
+  if (!chance(.1)) return; const tr = n.ruler.tr;
+  const hostile = courtOf(n).filter(c => (c.op ?? 0) < -40).sort((a, b) => (a.op ?? 0) - (b.op ?? 0))[0];
+  if (hostile) { const k = (tr.includes('cruel') || tr.includes('schemer')) && seatOfC(n, hostile) && chance(.3) ? 'kill' : n.money > interactCost(n, hostile, 'coopt') * 3 ? 'coopt' : 'gift'; if (!interactWhy(n, hostile, k)) interact(n, hostile, k); return; }
+  if (n.scheme || n.money < schemeCost('slander') * 4 || schemePower(n) < 9) return;
   const rival = [...neighbors(n)].map(nat).filter(t => t.alive && (n.rel[t.id] || 0) < -40)[0];
-  if (rival) startScheme(n, (tr.includes('cruel') || tr.includes('schemer')) && chance(.15) ? 'murder' : chance(.5) ? 'slander' : 'spy', { nat: rival.id });
+  if (rival) { const k = (tr.includes('cruel') || tr.includes('schemer')) && chance(.15) ? 'murder' : chance(.5) ? 'slander' : 'spy'; startScheme(n, k, { nat: rival.id, who: 'ruler', topic: { ty: 'ideo', v: n.ideo } }); }
 }

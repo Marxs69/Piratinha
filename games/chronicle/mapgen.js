@@ -248,8 +248,8 @@ function generateWorld(seed) {
     const cap = s.provs.reduce((a, b) => provs[a].size >= provs[b].size ? a : b); s.cap = cap; s.n = provs[cap].n;
     const ps = s.provs.map(i => provs[i]), fert = ps.reduce((a, p) => a + TERRAIN[p.terr].food, 0);
     s.caps = {
-      farm: Math.max(0, Math.round(fert * 1.6)), fishery: ps.filter(p => p.coast).length * 2, lumber: ps.filter(p => ['forest', 'taiga', 'jungle'].includes(p.terr)).length * 2,
-      quarry: ps.filter(p => ['hills', 'mountain', 'desert'].includes(p.terr)).length + 1, iron_mine: ps.filter(p => p.res === 'iron').length * 3, coal_mine: ps.filter(p => p.res === 'coal').length * 3,
+      farm: Math.max(0, Math.round(fert * 1.6)), fishery: ps.filter(p => p.coast).length * 2, lumber: ps.filter(p => TERRAIN[p.terr].wood).length * 2,
+      quarry: ps.filter(p => TERRAIN[p.terr].stone).length + 1, iron_mine: ps.filter(p => p.res === 'iron').length * 3, coal_mine: ps.filter(p => p.res === 'coal').length * 3,
       gold_mine: ps.filter(p => p.res === 'gold').length * 2, oil_well: ps.filter(p => p.res === 'oil').length * 3,
       copper_mine: ps.filter(p => p.res === 'copper').length * 3, uranium_mine: ps.filter(p => p.res === 'uranium').length * 2, rare_mine: ps.filter(p => p.res === 'rare').length * 2,
       plantation: ps.filter(p => p.temp > .55 && TERRAIN[p.terr].food >= .7).length * 2,

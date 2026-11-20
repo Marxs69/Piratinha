@@ -9,42 +9,44 @@ const strength = n => { if (!strC) { strC = new Float64Array(S.nations.length); 
 const nbC = new Map();
 function neighbors(n) { const k = n.id + ':' + (S.t / 30 | 0); if (nbC.has(k)) return nbC.get(k); if (nbC.size > 400) nbC.clear(); const r = neighbors0(n); nbC.set(k, r); return r; }
 function neighbors0(n) { const s = new Set(); for (const p of provsOf(n.id)) for (const o of WD.provs[p].adj) { const t = S.own[o]; if (t >= 0 && t !== n.id) s.add(t); } return s; }
+/* testes usados pelas tabelas DIPLO, DIP_ACC e DIP_DRIFT (data.js): t = quem avalia, n = o outro, a = argumento */
+const DIP_TEST = {
+  one: () => 1, rel: (t, n) => t.rel[n.id] || 0, sameIdeo: (t, n) => t.ideo === n.ideo, sameGovCat: (t, n) => GOVS[t.gov].cat === GOVS[n.gov].cat,
+  dipSkill: (t, n) => n.ruler.st.dip - 8, trait: (t, n, a) => t.ruler.tr.includes(a), trait2: (t, n, a) => a.some(x => t.ruler.tr.includes(x)),
+  count: (t, n, a) => (t[a] || []).length, linked: (t, n, a) => has(t, a, n.id), stronger: (t, n) => strength(n) > strength(t) * 1.5,
+  common: (t, n) => enemiesOf(t.id).some(e => atWar(n.id, e)) || [...neighbors(t)].some(x => atWar(x, n.id)),
+  embargo: (t, n) => has(t, 'emb', n.id) || has(n, 'emb', t.id), notHered: (t, n) => GOVS[t.gov].succ !== 'hered' || GOVS[n.gov].succ !== 'hered',
+  neighbor: (t, n) => neighbors(t).has(n.id), war: (t, n) => atWar(t.id, n.id), overlord: (t, n) => n.senior === t.id || t.senior === n.id,
+};
+const dipTerm = (k, v, t, n, a) => +DIP_TEST[k](t, n, a) * v;
 function accept(t, n, kind) {                                 // quanto t topa a proposta de n (≥ 0 aceita); devolve [valor, motivos]
   const why = []; let v = 0; const add = (x, txt) => { if (x) { v += x; why.push((x > 0 ? '+' : '') + Math.round(x) + ' ' + txt); } };
-  add((t.rel[n.id] || 0) * .5, 'relação');
-  add(t.ideo === n.ideo ? 12 : 0, 'mesma ideologia'); add(GOVS[t.gov].cat === GOVS[n.gov].cat ? 8 : 0, 'governos parecidos');
-  add((n.ruler.st.dip - 8) * 2, 'diplomacia do seu governante');
-  const tr = t.ruler.tr;
-  add(tr.includes('charismatic') || tr.includes('generous') ? 10 : 0, 'temperamento'); add(tr.includes('paranoid') && kind === 'ally' ? -20 : 0, 'governante paranoico');
-  if (kind === 'ally') {
-    add(-15, 'base'); add(-(t.allies || []).length * 6, 'já tem aliados');
-    const common = enemiesOf(t.id).some(e => atWar(n.id, e)) || [...neighbors(t)].some(x => (n.claims && Object.keys(n.claims).length && false) || atWar(x, n.id)); add(common ? 20 : 0, 'inimigo em comum');
-    add(strength(n) > strength(t) * 1.5 ? 10 : 0, 'você é forte'); add(has(t, 'marr', n.id) ? 15 : 0, 'casamento real');
-  } else if (kind === 'marr') { add(-10, 'base'); add(has(t, 'allies', n.id) ? 10 : 0, 'aliados'); }
-  else if (kind === 'trade') { add(-5, 'base'); add(tr.includes('greedy') ? 10 : 0, 'governante ganancioso'); add((t.trade || []).length * -4, 'já tem acordos'); }
+  for (const T of DIP_ACC.concat((DIPLO[kind] || {}).acc || [])) add(dipTerm(T[0], T[1], t, n, T[3]), T[2]);   // [teste, valor, texto, arg]
   if (atWar(t.id, n.id)) add(-1000, 'em guerra');
   return [Math.round(v), why];
 }
-const dipCost = k => Math.round({ improve: 15, gift: 40, ally: 0, marr: 20, trade: 10, integrate: 200 }[k] * eraScale());
+const dipCost = k => Math.round((DIPLO[k].cost || 0) * eraScale());
+const relAdd = (a, b, x) => { if (x) a.rel[b.id] = clamp((a.rel[b.id] || 0) + x, -100, 100); };
+const unlink = (a, b, k) => { a[k] = (a[k] || []).filter(x => x !== b.id); b[k] = (b[k] || []).filter(x => x !== a.id); };
 function dipAct(n, t, kind) {                                 // '' = feito/aceito; texto = motivo da recusa
   if (!t.alive || t === n) return 'Inválido';
-  const c = dipCost(kind) || 0; if (n.money < c) return 'Sem dinheiro';
-  if (kind === 'improve') { if ((n.cd || {})[t.id] > S.t) return 'Já tentado este ano'; n.money -= c; n.cd = n.cd || {}; n.cd[t.id] = S.t + 360; t.rel[n.id] = clamp((t.rel[n.id] || 0) + 15, -100, 100); n.rel[t.id] = clamp((n.rel[t.id] || 0) + 8, -100, 100); return ''; }
-  if (kind === 'gift') { n.money -= c; t.money += c; t.rel[n.id] = clamp((t.rel[n.id] || 0) + 20, -100, 100); return ''; }
-  if (kind === 'insult') { t.rel[n.id] = clamp((t.rel[n.id] || 0) - 40, -100, 100); n.rel[t.id] = clamp((n.rel[t.id] || 0) - 20, -100, 100); return ''; }
-  if (kind === 'break') { breakTies(n, t); ['allies'].forEach(() => 0); t.rel[n.id] = clamp((t.rel[n.id] || 0) - 40, -100, 100); n.stab = Math.max(0, n.stab - 5); return ''; }
-  if (kind === 'unally') { n.allies = (n.allies || []).filter(x => x !== t.id); t.allies = (t.allies || []).filter(x => x !== n.id); t.rel[n.id] = clamp((t.rel[n.id] || 0) - 40, -100, 100); n.stab = Math.max(0, n.stab - 5); return ''; }
-  if (kind === 'untrade') { n.trade = (n.trade || []).filter(x => x !== t.id); t.trade = (t.trade || []).filter(x => x !== n.id); t.rel[n.id] = clamp((t.rel[n.id] || 0) - 10, -100, 100); return ''; }
-  if (kind === 'embargo') { n.emb = n.emb || []; if (n.emb.includes(t.id)) n.emb = n.emb.filter(x => x !== t.id); else { n.emb.push(t.id); n.trade = (n.trade || []).filter(x => x !== t.id); t.trade = (t.trade || []).filter(x => x !== n.id); t.rel[n.id] = clamp((t.rel[n.id] || 0) - 25, -100, 100); } return ''; }
-  if (kind === 'integrate') return 'Use a aba Súditos na diplomacia';
-  if (kind === 'ally' && has(n, 'allies', t.id)) return 'Já são aliados';
-  if (kind === 'marr') { if (GOVS[n.gov].succ !== 'hered' || GOVS[t.gov].succ !== 'hered') return 'Exige duas monarquias hereditárias'; if (has(n, 'marr', t.id)) return 'Já há casamento'; }
-  if (kind === 'trade') { if (has(n, 'trade', t.id)) return 'Já há acordo'; if (has(n, 'emb', t.id) || has(t, 'emb', n.id)) return 'Há embargo'; }
+  const D = DIPLO[kind], c = dipCost(kind) || 0; if (n.money < c) return 'Sem dinheiro';
+  if (D.block) return D.block;
+  if (!D.link) {                                              // ações de mão única: valem na hora
+    if (D.cd && (n.cd || {})[t.id] > S.t) return 'Já tentado este ano';
+    if (D.toggle && has(n, D.toggle, t.id)) { n[D.toggle] = n[D.toggle].filter(x => x !== t.id); return ''; }
+    if (c) n.money -= c; if (D.cd) { n.cd = n.cd || {}; n.cd[t.id] = S.t + D.cd; } if (D.pay) t.money += c;
+    if (D.toggle) (n[D.toggle] = n[D.toggle] || []).push(t.id);
+    if (D.ties) breakTies(n, t); if (D.unlink) unlink(n, t, D.unlink);
+    relAdd(t, n, D.rel[0]); relAdd(n, t, D.rel[1]); if (D.stab) n.stab = Math.max(0, n.stab + D.stab);
+    return '';
+  }
+  for (const [k, why] of D.deny || []) if (DIP_TEST[k](n, t, D.link)) return why;
   if (atWar(n.id, t.id)) return 'Em guerra';
   if (t.id !== S.player) { const [v] = accept(t, n, kind); if (v < 0) return 'Recusado'; }
-  n.money -= c; link(n, t, kind === 'ally' ? 'allies' : kind === 'marr' ? 'marr' : 'trade');
-  const bonus = { ally: 25, marr: 25, trade: 10 }[kind]; t.rel[n.id] = clamp((t.rel[n.id] || 0) + bonus, -100, 100); n.rel[t.id] = clamp((n.rel[t.id] || 0) + bonus, -100, 100);
-  log({ ally: 'Aliança', marr: 'Casamento real', trade: 'Acordo comercial' }[kind] + ' entre ' + natName(n) + ' e ' + natName(t) + '.', n.id === S.player || t.id === S.player ? 'good' : 'none', [n.id, t.id]);
+  n.money -= c; link(n, t, D.link);
+  relAdd(t, n, D.bonus); relAdd(n, t, D.bonus);
+  log(D.log + ' entre ' + natName(n) + ' e ' + natName(t) + '.', n.id === S.player || t.id === S.player ? 'good' : 'none', [n.id, t.id]);
   return '';
 }
 function aiPropose(n, t, kind) {                              // IA propõe; para o jogador vira uma janela
@@ -53,20 +55,17 @@ function aiPropose(n, t, kind) {                              // IA propõe; par
 }
 function relDrift() {                                         // uma vez por ano: relações vão na direção do que as nações têm em comum
   S.nations.forEach(n => {
-    if (!n.alive) return; const nb = neighbors(n);
+    if (!n.alive) return; neighbors(n);                 // aquece o cache do mês
     for (const k in n.rel) {
       const id = +k, t = nat(id); if (!t || !t.alive) continue;
-      const target = (has(n, 'allies', id) ? 50 : 0) + (has(n, 'marr', id) ? 30 : 0) + (has(n, 'trade', id) ? 15 : 0) + (n.ideo === t.ideo ? 10 : 0) - (nb.has(id) ? 10 : 0) - (has(n, 'emb', id) || has(t, 'emb', n.id) ? 40 : 0) - (atWar(n.id, id) ? 100 : 0) + (t.senior === n.id || n.senior === id ? 40 : 0);
+      let target = 0; for (const T of DIP_DRIFT) target += dipTerm(T[0], T[1], n, t, T[2]);   // [teste, valor, arg]
       n.rel[k] = clamp(n.rel[k] + (target - n.rel[k]) * .12, -100, 100);
     }
   });
 }
-function personality(n) {                                     // traços do governante mudam a IA
-  const P = { war: 1, build: 1, army: 1, colon: 1, claim: 1, ally: 1, gold: 1 }, t = n.ruler.tr, mul = (k, v) => { P[k] *= v; };
-  if (t.includes('brave')) mul('war', 1.3); if (t.includes('craven')) mul('war', .5); if (t.includes('ambitious')) { mul('war', 1.4); mul('claim', 1.5); } if (t.includes('content')) mul('war', .6);
-  if (t.includes('just')) mul('claim', .1); if (t.includes('cruel')) mul('war', 1.3); if (t.includes('greedy')) mul('gold', 2); if (t.includes('generous')) mul('ally', 1.3);
-  if (t.includes('diligent')) mul('build', 1.4); if (t.includes('lazy')) mul('build', .6); if (t.includes('schemer')) mul('claim', 1.8); if (t.includes('strategist')) mul('army', 1.25);
-  if (t.includes('builder')) mul('build', 1.5); if (t.includes('navigator')) mul('colon', 1.6); if (t.includes('paranoid')) { mul('army', 1.3); mul('ally', .5); } if (t.includes('charismatic')) mul('ally', 1.4);
+function personality(n) {                                     // traços do governante mudam a IA (TRAITS[].pm)
+  const P = { war: 1, build: 1, army: 1, colon: 1, claim: 1, ally: 1, gold: 1 }, t = n.ruler.tr;
+  for (const k in TRAITS) if (TRAITS[k].pm && t.includes(k)) for (const x in TRAITS[k].pm) P[x] *= TRAITS[k].pm[x];
   return P;
 }
 function aiDiplomacy(n) {

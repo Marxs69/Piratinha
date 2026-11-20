@@ -71,7 +71,7 @@ function slaveTick(n) {                                        // o estoque de e
   if (n.slv < target) n.slv += (target - n.slv) * .015; else n.slv -= (n.slv - target) * (L.sl ? .02 : .05);
   if (n.slv < .05) n.slv = 0;
 }
-const REVOLT = { slave: ['Revolta de escravos', '⛓️'], low: ['Revolta popular', '✊'], cul: ['Levante separatista', '🏴'], rev: ['Revolução liberal', '🗽'] };
+const REVOLT = { slave: ['Revolta de escravos', '⛓️'], low: ['Revolta popular', '✊'], cul: ['Levante separatista', '🏴'], rev: ['Revolução liberal', '🗽'], react: ['Levante reacionário', '⚜️'] };
 const slaveShare = n => (n.cls ? n.cls.slave : 0) / Math.max(1, n.popT || 0);
 function unrestTick(n) {
   const sl = slaveShare(n), cs = n.csat || {}, sec = (n.cov || {}).sec || 0, low = cs.low == null ? 1 : cs.low;
@@ -114,6 +114,8 @@ function rebelsWin(n, kind, ps) {
   else if (kind === 'low') {
     n.laws.tax = 'low'; const rg = Object.keys(GOVS).filter(g => GOVS[g].cat === 'Socialista' && govOk(n, g) && g !== n.gov);
     if (rg.length) { applyGov(n, pickR(rg)); succeed(n, false); txt = 'A revolução venceu em ' + natName(n) + '.'; } else { succeed(n, false); txt = 'A revolta popular derrubou o governo de ' + natName(n) + ' e baixou os impostos.'; }
+  } else if (kind === 'react') {                                // reacionários vencem: a reforma morre e o governo recua
+    n.enact = null; n.press = 0; n.stab = Math.max(0, n.stab - 5); txt = 'Os reacionários venceram em ' + natName(n) + ': a reforma foi enterrada.';
   } else if (kind === 'rev') {                                   // revolução liberal: república (ou monarquia constitucional) e ideologia liberal
     const rg = ['presidential', 'parliamentary', 'federal', 'constitutional', 'parl_monarchy'].filter(g => GOVS[g] && govOk(n, g) && g !== n.gov);
     if (rg.length) { applyGov(n, rg[0]); succeed(n, false); } if (n.fx.i.has('liberal')) n.ideo = 'liberal'; if (lawOk(n, 'vote', 'census')) n.laws.vote = 'census';
@@ -138,6 +140,8 @@ function religTick() {                                         // uma vez por an
     }
     const ps = provsOf(n.id); if (!ps.length) return;
     if (y > 1450 && chance(.003)) { const p = pickR(ps); S.relg[p] = REL_IDS.indexOf('aurora'); if (n.id === S.player) log('🌅 Uma heresia, o Culto da Aurora, surgiu em ' + WD.provs[p].n + '.', 'info', [n.id]); }
+    const AT = FAITH_RULES.atheism, ai = REL_IDS.indexOf('atheism');   // ateus: surgem aos poucos depois de 1700; o Estado laico multiplica
+    if (ai >= 0 && y >= RELIGIONS.atheism.y0) { const pk = AT.base * (1 + edu * AT.edu) * (AT.law[n.laws.relig] ?? 1); for (const p of ps) if (S.relg[p] !== ai && chance(pk)) S.relg[p] = ai; }
     if (y > 1880 && hasT(n, 'eco_factory') && chance(.002)) { const p = pickR(ps); S.relg[p] = REL_IDS.indexOf('machine'); if (n.id === S.player) log('⚙️ A Igreja da Máquina ganhou fiéis em ' + WD.provs[p].n + '.', 'info', [n.id]); }
   });
   const fict = new Set(REL_IDS.map((r, i) => RELIGIONS[r].fict ? i : -1).filter(i => i >= 0));     // heresias se espalham devagar

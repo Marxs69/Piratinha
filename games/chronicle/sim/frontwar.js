@@ -34,6 +34,7 @@ function frontBattleTick() {
   const byF = new Map(); for (const a of S.armies) if (frontReady(a)) { if (!byF.has(a.front)) byF.set(a.front, []); byF.get(a.front).push(a); }
   for (const id in S.fbat) if (!frontById(+id)) delete S.fbat[id];
   for (const f of S.fronts || []) {
+    if (!S.wars.some(w => w.id === f.w)) continue;              // a guerra acabou neste mesmo dia
     const att = onFront(byF, f); let B = S.fbat[f.id];
     const defs = facingFronts(f).flatMap(g => onFront(byF, g)).concat(S.armies.filter(a => f.foe.includes(a.p) && a.front == null && !a.inv && atWarSide(f, a.o)));
     if (!B) {

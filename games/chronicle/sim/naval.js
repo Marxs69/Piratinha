@@ -85,12 +85,15 @@ function invasionTick() {
 }
 /* batalha naval (por dia): navios afundados levam junto as tropas que não cabem mais; quem fica bem atrás recua */
 function navalBattle(f, g) {
-  const pf = f.ships * nat(f.o).fx.ship, pg = g.ships * nat(g.o).fx.ship, f0 = f.ships, g0 = g.ships;
-  f.ships = Math.max(0, f.ships - pg * .04 * rand(.7, 1.3)); g.ships = Math.max(0, g.ships - pf * .04 * rand(.7, 1.3));
-  for (const x of [f, g]) { const c = carriedRegs(x), cap = fleetCap(x); if (c > cap && c > 0) { const k = 1 - cap / c; carriedBy(x).forEach(a => UT.forEach(t => a[t] *= 1 - k)); } }
+  const Df = navDoc(nat(f.o)), Dg = navDoc(nat(g.o));   // doutrinas navais (NAV_DOCS)
+  const pf = f.ships * nat(f.o).fx.ship * Df.dmg, pg = g.ships * nat(g.o).fx.ship * Dg.dmg, f0 = f.ships, g0 = g.ships;
+  f.ships = Math.max(0, f.ships - pg * .04 * Df.take * rand(.7, 1.3)); g.ships = Math.max(0, g.ships - pf * .04 * Dg.take * rand(.7, 1.3));
+  for (const [x, D] of [[f, Df], [g, Dg]]) { const c = carriedRegs(x), cap = fleetCap(x); if (c > cap && c > 0) { const k = (1 - cap / c) * D.cargo; carriedBy(x).forEach(a => UT.forEach(t => a[t] *= 1 - k)); } }
   const fp = f.ships * nat(f.o).fx.ship, gp = g.ships * nat(g.o).fx.ship;
-  for (const [x, xp, yp] of [[f, fp, gp], [g, gp, fp]]) if (x.ships > .2 && xp < yp * .5) fleetRetreat(x);
+  for (const [x, xp, yp, D] of [[f, fp, gp, Df], [g, gp, fp, Dg]]) if (x.ships > .2 && xp < yp * D.ret) fleetRetreat(x);
   if ((f.o === S.player || g.o === S.player) && (f0 - f.ships > .5 || g0 - g.ships > .5) && !(f.nb > S.t)) { f.nb = S.t + 30; log('Batalha naval em ' + WD.seas[f.z].n + '.', 'info', [S.player]); }
+  const H = S.navHist = S.navHist || [], L = H.find(x => x.z === f.z && S.t - x.t < 30 && ((x.a === f.o && x.b === g.o) || (x.a === g.o && x.b === f.o)));   // a mesma batalha (dias seguidos) acumula
+  if (L) { const sw = L.a !== f.o; L.la += sw ? g0 - g.ships : f0 - f.ships; L.lb += sw ? f0 - f.ships : g0 - g.ships; L.t = S.t; } else { H.unshift({ z: f.z, a: f.o, b: g.o, la: f0 - f.ships, lb: g0 - g.ships, t: S.t, t0: S.t }); if (H.length > 30) H.pop(); }
 }
 function fleetRetreat(x) {
   const inv = S.armies.find(a => a.inv && a.fleet === x.id);

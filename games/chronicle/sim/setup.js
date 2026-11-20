@@ -5,7 +5,7 @@
 function hsl(h, s, l) { const a = s * Math.min(l, 1 - l), f = k => { const x = (k + h * 12) % 12; return Math.round(255 * (l - a * Math.max(-1, Math.min(x - 3, 9 - x, 1)))); }; return [f(0), f(8), f(4)]; }
 
 function newGame(seed, y0 = START_YEAR) {
-  WD = generateWorld(seed); ownCache = null; warSet = null;
+  WD = generateWorld(seed); resetCaches();
   const P = WD.provs.length, r = mkRng(seed ^ 0x5eed);
   S = { v: 3, faith: rollFaiths(seed), culx: rollCultures(seed), rs: (seed ^ 0x2545F491) | 0, moon: null, seed, y0, t: 360 * (y0 - START_YEAR), player: -1, nations: [], own: new Int16Array(P).fill(-1), ctrl: new Int16Array(P).fill(-1), pop: new Float32Array(P), bld: WD.states.map(() => ({})),
         armies: [], fleets: [], wars: [], cols: [], sieges: {}, battles: {}, log: [], news: [], id: 1, wp: {}, over: false };
@@ -40,7 +40,7 @@ function newGame(seed, y0 = START_YEAR) {
       else if (ns.every(m => m._st.every(x => [...stAdj[x]].every(s => owner.has(s) || WD.states[s].cont !== c.id)))) break;
     }
     if (c.main) for (const s of sts) if (!owner.has(s)) { const nb = [...stAdj[s]].find(o => owner.has(o)); if (nb != null) { owner.set(s, owner.get(nb)); nat(owner.get(nb))._st.push(s); } }
-    owner.forEach((nid, s) => WD.states[s].provs.forEach(p => { S.own[p] = nid; S.ctrl[p] = nid; }));
+    owner.forEach((nid, s) => WD.states[s].provs.forEach(p => { S.own[p] = nid; S.ctrl[p] = nid; })); ownChanged();
     ns.forEach(n => {
       n.capital = WD.states[n._st[0]].cap; delete n._st; delete n.vig;
       { const ns = statesOf(n); n.rank = [0, 1, 2, 3].find(r => rankCap(n, r) >= ns); if (n.rank == null) n.rank = 3; }
@@ -49,7 +49,7 @@ function newGame(seed, y0 = START_YEAR) {
       else { grantTechs(n, adv ? y0 - 15 - (r() * 35 | 0) : 860); if (!adv && chance(.4)) delete n.techs.nav_longship; n.gov = pickR(['tribal', 'tribal', 'tribal', 'tribal_conf', 'horde', 'feudal']); n.ideo = chance(.3) ? 'warrior' : 'trad'; n.money = 60; }
       if (n.gov === 'theocracy') n.flag.c = { k: pickR(['cross_patty', 'sun', 'eye', 'crescent', 'star8']), t: TINCT[n.flag.t[0]].metal ? 'gules' : 'or', n: 1, at: 'center' };
       n.ruler = mkChar(n, { ruler: true }); if (GOVS[n.gov].succ === 'hered') { n.spouse = mkChar(n, { f: !n.ruler.f, dyn: newDynasty(n), age: ageOf(n.ruler) - 3 }); n.kids = []; if (ageOf(n.ruler) > 24) for (let k = 0; k < 1 + (r() * 3 | 0); k++) n.kids.push(mkChar(n, { age: Math.max(0, ageOf(n.ruler) - 20 - (r() * 8 | 0)) })); }
-      n.council = {}; COUNCIL.forEach(([k, , s]) => n.council[k] = mkChar(n, { boost: s, dyn: newDynasty(n) }));
+      n.council = {}; COUNCIL.forEach(([k]) => n.council[k] = councilChar(n, k));
     });
   });
   // população: mais densa no principal; terra livre tem nativos
@@ -84,7 +84,7 @@ function newGame(seed, y0 = START_YEAR) {
   S.nations.forEach(n => S.nations.forEach(o => { if (o !== n) n.rel[o.id] = 0; }));
   S.moon = generateMoon(seed);
   if (adv) advanceStart(y0, r);
-  econAll(); S.news = [];
+  econAll(); if (!adv) priceTick(true); S.news = [];
   log('O ano é ' + y0 + '. As crônicas começam.', 'world');
   return S;
 }
@@ -146,10 +146,11 @@ function advanceStart(Y, r) {
     // governo e ideologia da época (só o que a tecnologia já liberou)
     const cat = GOVS[n.gov].cat, opts = [...new Set([...n.fx.g, ...BASE_GOVS])].filter(g => govOk(n, g) && (n.kind === 'main' || GOVS[g].cat === cat || chance(.3)));
     const sc = g => (GOVS[g].cat === cat ? 120 : 0) + (n.kind === 'main' && Y >= 1100 && GOVS[g].cat === 'Monarquia' ? 140 : 0) - (n.kind === 'main' && GOVS[g].cat === 'Tribal' ? 200 : 0) + govYear(g) * .25 + r() * 160; const g = opts.sort((a, b) => sc(b) - sc(a))[0];
-    if (g && g !== n.gov) { const her = GOVS[n.gov].succ === 'hered'; applyGov(n, g); if (her !== (GOVS[g].succ === 'hered')) succeed(n, false); }
+    if (g && g !== n.gov) { const her = GOVS[n.gov].succ === 'hered'; applyGov(n, g); n.govCd = 0; if (her !== (GOVS[g].succ === 'hered')) succeed(n, false); }   // governo de início não conta como reforma recente
     if (Y >= 1453 && chance(.6)) { const io = [...n.fx.i].sort((a, b) => (TECHS.find(t => (t.fx.i || []).includes(b)) || { y: 0 }).y - (TECHS.find(t => (t.fx.i || []).includes(a)) || { y: 0 }).y); if (io.length) n.ideo = io[Math.min(io.length - 1, r() * 3 | 0)]; }
     for (const k in LAWS) if (chance(.4)) { const os = Object.keys(LAWS[k].o).filter(o => lawOk(n, k, o) && !(k === 'slavery' && o === 'legal')); if (os.length) n.laws[k] = os[os.length - 1 - (r() * Math.min(2, os.length) | 0)]; }
-    calcMods(n);
+    calcMods(n); for (const k in LAWS) if (lawOld(n, k)) { const os = Object.keys(LAWS[k].o).filter(o => lawOk(n, k, o)); if (os.length) n.laws[k] = os[0]; }   // nada de lei passada da era no início
+    formCouncil(n); calcMods(n);   // conselho escolhido pelo governo e pela ideologia da época
     // prédios: várias rodadas de construção grátis, limitadas por terra, recursos e mão de obra
     const passes = Math.round((Y - 860) / 70 * (n.kind === 'main' ? 1 : n.kind === 'cold' ? .75 : .65)), keepM = n.money, keepS = n.xslots; n.money = 1e12; n.xslots = 1e6;
     const sts = WD.states.filter(st => stateOwnerOf(st.id) === n.id), avail = devPick.filter(b => n.fx.b.has(b)).concat(n.vert ? [VERT[n.vert].bld] : []);
@@ -171,9 +172,11 @@ function advanceStart(Y, r) {
     }
     ownChanged();
   });
-  if (Y >= 1453) S.nations.filter(n => n.kind === 'main').forEach(n => { const k = clamp((Y - 1453) / 350, .1, .9); WD.provs.forEach(p => { if (p.coast && chance(k)) { n.exP[p.id] = 1; p.seas.forEach(z => n.exZ[z] = 1); } }); WD.seas.forEach(z => { if (z.provs.some(p => n.exP[p])) n.exZ[z.id] = 1; }); });
+  exploreEra(Y);
+  { const ai = REL_IDS.indexOf('atheism'), AT = FAITH_RULES.atheism; if (ai >= 0 && Y > RELIGIONS.atheism.y0) S.nations.forEach(n => { const k = Math.min(.25, AT.base * (Y - RELIGIONS.atheism.y0) * (AT.law[n.laws.relig] ?? 1)); provsOf(n.id).forEach(p => { if (chance(k)) S.relg[p] = ai; }); }); }   // ateus de antes do início
   ownChanged(); S.nations.forEach(n => { if (n.alive) { n.relig = S.relg[n.capital]; calcMods(n); } });
-  econAll(); S.nations.forEach(n => { if (n.alive) calcMods(n); });
+  const ys = eraScale(); econAll(); S.nations.forEach(n => { if (n.alive) calcMods(n); }); priceTick(true);
+  S.nations.forEach(n => { n.money *= S.plv / ys; });   // o tesouro inicial acompanha o nível de preços da época
 }
 /* povos com continente (os outros são bolsões menores) */
 const culMajor = () => WD._cm || (WD._cm = new Set(WD.conts.flatMap(c => c.cul)));
@@ -184,7 +187,7 @@ const isMinorRel = r => !(S.relMajor || []).includes(+r);
 function initRelig() {
   if (!S.culg) initCul();
   S.relg = new Uint8Array(WD.provs.length); const r = mkRng(S.seed ^ 0x2e1), heresy = i => RELIGIONS[REL_IDS[i]].fict;
-  const pool = REL_IDS.map((k, i) => i).filter(i => !heresy(i)).sort(() => r() - .5), core = pool.slice(0, 14), any = () => core[r() * core.length | 0];
+  const pool = REL_IDS.map((k, i) => i).filter(i => !heresy(i) && !RELIGIONS[REL_IDS[i]].atheist).sort(() => r() - .5), core = pool.slice(0, 14), any = () => core[r() * core.length | 0];
   const regRel = WD.regions.map(() => any()); WD.provs.forEach(p => { S.relg[p.id] = regRel[p.region]; });
   for (const n of S.nations) {
     const nb = [...neighbors(n)].map(nat).filter(x => x.majRel != null), main = nb.length && r() < .4 ? nb[r() * nb.length | 0].majRel : any(); n.majRel = main;
@@ -196,6 +199,20 @@ function initRelig() {
   [...pool.slice(14, 17), REL_IDS.indexOf('serpent')].forEach(ri => { for (let i = 0; i < 2; i++) { const st = WD.states[r() * WD.states.length | 0]; st.provs.forEach(p => { if (r() < .6) S.relg[p] = ri; }); } });   // bolsões de fés menores
   S.relMajor = [...new Set(S.nations.flatMap(n => [n.relig, n.majRel]))]; S.reserveRel = pool.filter(i => !S.relg.includes(i) && !S.relMajor.includes(i));
   S.nations.forEach(n => { delete n.majRel; if (n.ruler) n.ruler.rel = n.relig; });
+}
+/* mapa conhecido pela era (EXPLORE_ERA): litoral primeiro, interior do litoral para dentro; o mais fundo de cada continente é o último a ser conhecido */
+function exploreEra(Y) {
+  const E = EXPLORE_ERA, st = E.steps; if (Y < st[0][0]) return;
+  let i = 0; while (i < st.length - 1 && st[i + 1][0] <= Y) i++; const a = st[i], b = st[Math.min(st.length - 1, i + 1)], f = b[0] > a[0] ? clamp((Y - a[0]) / (b[0] - a[0]), 0, 1) : 0;
+  const coastK = a[1] + (b[1] - a[1]) * f, inK = a[2] + (b[2] - a[2]) * f;
+  // profundidade de cada província a partir do litoral, por continente (0 = costa)
+  const P = WD.provs.length, depth = new Int16Array(P).fill(-1), q = []; WD.provs.forEach(p => { if (p.coast) { depth[p.id] = 0; q.push(p.id); } });
+  for (let h = 0; h < q.length; h++) for (const o of WD.provs[q[h]].adj) if (depth[o] < 0 && WD.provs[o].cont === WD.provs[q[h]].cont) { depth[o] = depth[q[h]] + 1; q.push(o); }
+  const maxD = WD.conts.map(() => 1); WD.provs.forEach(p => { if (depth[p.id] > maxD[p.cont]) maxD[p.cont] = depth[p.id]; });
+  S.nations.forEach(n => { if (!n.alive) return; const k = Y >= E.catchUp ? 1 : (E.kind[n.kind] ?? .5), cK = coastK * k, iK = inK * k;
+    WD.provs.forEach(p => { const d = depth[p.id]; if (n.exP[p.id]) return;
+      if (d === 0 ? chance(cK) : d > 0 && cK > 0 && d / maxD[p.cont] <= iK + (rnd() - .5) * .1) { n.exP[p.id] = 1; p.seas.forEach(z => n.exZ[z] = 1); } });
+    WD.seas.forEach(z => { if (z.provs.some(p => n.exP[p])) n.exZ[z.id] = 1; }); });
 }
 function initExplore(n) {
   WD.provs.forEach(p => { if (p.cont === n.home) { n.exP[p.id] = 1; p.seas.forEach(z => n.exZ[z] = 1); } });

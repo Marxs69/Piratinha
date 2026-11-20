@@ -182,7 +182,7 @@ function checkDead() {
     if (!n.alive) return;
     if (!provsOf(n.id).length) {
       n.alive = false; S.armies = S.armies.filter(a => a.o !== n.id); S.fleets = S.fleets.filter(f => f.o !== n.id); S.cols = S.cols.filter(c => c.o !== n.id);
-      S.wars = S.wars.filter(w => w.a !== n.id && w.d !== n.id); S.wars.forEach(w => { w.A = w.A.filter(x => x !== n.id); w.D = w.D.filter(x => x !== n.id); }); warsChanged();
+      S.wars = S.wars.filter(w => w.a !== n.id && w.d !== n.id); S.wars.forEach(w => { w.A = w.A.filter(x => x !== n.id); w.D = w.D.filter(x => x !== n.id); }); warsChanged(); S.fronts = (S.fronts || []).filter(f => S.wars.some(x => x.id === f.w));   // front sem guerra não fica
       S.nations.forEach(o => { breakTies(o, n); if (o.senior === n.id) { delete o.senior; delete o.subj; } }); if (n.senior != null) { delete n.senior; delete n.subj; }
       log(natName(n) + ' deixou de existir.', 'world', [n.id]); if (n.id === S.player) S.over = 'dead';
     } else if (S.own[n.capital] !== n.id) { const ps = provsOf(n.id); n.capital = ps.reduce((a, b) => S.pop[a] >= S.pop[b] ? a : b); }

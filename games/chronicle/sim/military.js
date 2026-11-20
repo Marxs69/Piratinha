@@ -11,7 +11,14 @@ function unitNeeds(n, t) {
   if (t === 'vrt' && n.vert) { nd = Object.assign({}, nd, VERT_UNIT_NEED[n.vert] || {}); nd[VERT[n.vert].good] = (nd[VERT[n.vert].good] || 0) + .25; }
   return nd;
 }
-const supName = (n, k) => { let nm = SUPPORT[k].names[0][1]; for (const [t, x] of SUPPORT[k].names) if (!t || hasT(n, t)) nm = x; return nm; };
+const supName = (n, k) => { const V = n.vert && VERT_DOC[n.vert]; if (V && V[k]) return V[k]; let nm = SUPPORT[k].names[0][1]; for (const [t, x] of SUPPORT[k].names) if (!t || hasT(n, t)) nm = x; return nm; };
+/* nomes que mudam com a vertente (VERT_DOC): posturas, doutrinas navais e o nome da escola do exército e da frota */
+const stanceName = (n, k) => (n.vert && VERT_DOC[n.vert] && VERT_DOC[n.vert][k]) || STANCES[k].n;
+const navDocName = (n, k) => (n.vert && VERT_DOC[n.vert] && VERT_DOC[n.vert][k]) || NAV_DOCS[k].n;
+const armySchool = n => (n.vert && VERT_DOC[n.vert] && VERT_DOC[n.vert].escola) || 'Doutrina do exército';
+const navySchool = n => (n.vert && VERT_DOC[n.vert] && VERT_DOC[n.vert].frota) || 'Doutrina naval';
+const navDoc = n => NAV_DOCS[n.navDoc] || NAV_DOCS.line;
+function setNavDoc(n, k) { if (!NAV_DOCS[k]) return 'Inválido'; if (n.navDoc === k) return 'Já é a doutrina'; if (n.navDocCd > S.t) return 'Troca recente: de novo em ' + dateStr(n.navDocCd); n.navDoc = k; n.navDocCd = S.t + 360; return ''; }
 const supOk = (n, k) => !SUPPORT[k].tech || hasT(n, SUPPORT[k].tech);
 /* bens que o exército inteiro do país consome por mês */
 let abC = null;                                              // exércitos por dono (refeito a cada dia)
@@ -135,7 +142,7 @@ function sideDmg(s, o, ph, pip, p) {
   const n = s.n, T = TERRAIN[WD.provs[p].terr]; let d = 0;
   for (const t of UT) { const e = s.eng[t] + (t === 'art' ? s.eng.artBack * .5 : 0); if (e <= 0) continue; d += e * unitStat(n, t, ph) * unitStat(n, t, 'kill') * (n.up ? n.up[t] || 1 : 1) * (t === 'cav' ? T.cav * (s.pur && ph === 'shock' ? 1 + PURSUIT.cav : 1) : 1); }
   const st = STANCES[s.st], beat = st.beats === o.st ? 1.15 : 1;
-  return d * s.vet.m * (.6 + .4 * s.sat) * (1 + (n.m ? n.m.army : 0)) * genMul(s.gen) * st.dmg * beat * (1 - .35 * s.fat) * Math.max(.05, (5 + pip) / 10);
+  return d * s.vet.m * (.6 + .4 * s.sat) * (1 + (n.m ? n.m.army : 0)) * genMul(s.gen) * (n.milAdv && o.n && n.milAdv[o.n.id] > S.t ? 1 + SPY.mil : 1) * st.dmg * beat * (1 - .35 * s.fat) * Math.max(.05, (5 + pip) / 10);
 }
 function sidePip(s, o, roll, p) {
   const T = TERRAIN[WD.provs[p].terr], half = s.has.eng ? .5 : 1;
