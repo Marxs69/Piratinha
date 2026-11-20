@@ -145,7 +145,7 @@ function goodUsers(g) {
 
 /* ---------- custos e ações ---------- */
 const bCost = (n, b) => Math.round(BUILDINGS[b].cost * ECON.costMul * (1 - Math.min(.5, n.m.admin || 0)) * (1 + (curYear() - 860) / 600));
-const bMonths = b => Math.max(3, Math.round(BUILDINGS[b].cost / 25));
+const bMonths = b => Math.max(5, Math.round(BUILDINGS[b].cost / 25 * BUILD_SLOW));
 const HIDDEN = ['oil', 'uranium', 'rare'], RES_MULT = { iron: 3, coal: 3, gold: 2, oil: 3, copper: 3, uranium: 2, rare: 2 };
 const natRes = p => { const pr = WD.provs[p], T = TERRAIN[pr.terr], o = [];   // recursos naturais da província (além dos minerais)
   if (T.food >= 1) o.push('farm'); if (pr.temp > .55 && T.food >= .7) o.push('fiber'); if (['forest', 'taiga', 'jungle'].includes(pr.terr)) o.push('wood'); if (['hills', 'mountain', 'desert'].includes(pr.terr)) o.push('stone'); if (pr.coast) o.push('fish'); return o; };
@@ -161,7 +161,7 @@ function canProspect(n, s) {
   if ((n.pdone || {})[s]) return 'Já prospectado'; if ((n.pros || []).some(x => x.s === s)) return 'Prospecção em andamento';
   if (n.money < prospectCost()) return 'Sem dinheiro'; return '';
 }
-function prospect(n, s) { const e = canProspect(n, s); if (e) return e; n.money -= prospectCost(); (n.pros = n.pros || []).push({ s, m: 6 }); return ''; }
+function prospect(n, s) { const e = canProspect(n, s); if (e) return e; n.money -= prospectCost(); (n.pros = n.pros || []).push({ s, m: Math.round(6 * BUILD_SLOW) }); return ''; }
 function prospectDone(n, s) {
   (n.pdone = n.pdone || {})[s] = 1; S.found = S.found || {}; S.newRes = S.newRes || {};
   const can = HIDDEN.filter(r => hasT(n, PROSPECT[r])), st = WD.states[s], found = [];
@@ -218,7 +218,9 @@ function setCapital(n, p) {
   if (n.money < capCost()) return 'Sem dinheiro'; n.money -= capCost(); n.capital = p; n.capCd = S.t + 360 * 10; n.stab = Math.max(0, n.stab - 5); S.mapDirty = true;
   log('A capital de ' + natName(n) + ' agora é ' + WD.provs[p].n + '.', n.id === S.player ? 'good' : 'none', [n.id]); return '';
 }
-const consSlots = n => n.fx.slots + Math.floor((n.popT || 0) / 1000) + Math.floor(Math.max(0, n.money) / 2500) + (n.xslots || 0);
+const slotsRaw = n => n.fx.slots + Math.floor((n.popT || 0) / 1000) + Math.floor(Math.max(0, n.money) / 2500) + (n.xslots || 0);
+const slotCap = n => RANK_SLOTS[n.rank || 0] + (n.xslots || 0);   // o título limita os canteiros (comprados somam ao teto)
+const consSlots = n => Math.min(slotsRaw(n), slotCap(n));
 const slotCost = n => Math.round(150 * eraScale() * (1 + (n.xslots || 0) * .5));
 function buySlot(n) { const c = slotCost(n); if (n.money < c) return 'Sem dinheiro'; n.money -= c; n.xslots = (n.xslots || 0) + 1; return ''; }
 function build(n, s, b) { const e = canBuild(n, s, b); if (e) return e; n.money -= bCost(n, b); n.cons.push({ s, b, m: bMonths(b), tot: bMonths(b) }); return ''; }
@@ -236,19 +238,19 @@ function canRecruit(n, type, k = 1) {
   if (n.money < recCost(n, type, k)) return 'Sem dinheiro';
   return '';
 }
-function recruit(n, type, k, at) { const e = canRecruit(n, type, k); if (e) return e; n.money -= recCost(n, type, k); n.manpower -= k; const at2 = at != null ? at : n.capital; n.rec.push({ type, k, m: (type === 'vrt' ? 5 : 3) - (S.bld[WD.provs[at2].state].barracks ? 1 : 0), at: at2, x: recruitXp(n, at2) }); return ''; }
+function recruit(n, type, k, at) { const e = canRecruit(n, type, k); if (e) return e; n.money -= recCost(n, type, k); n.manpower -= k; const at2 = at != null ? at : n.capital; n.rec.push({ type, k, m: Math.round((type === 'vrt' ? 5 : 3) * BUILD_SLOW) - (S.bld[WD.provs[at2].state].barracks ? 2 : 0), at: at2, x: recruitXp(n, at2) }); return ''; }
 const shipCost = n => Math.round(30 * ECON.costMul * eraScale());
 function buildShips(n, k, p) {
   const pr = WD.provs[p]; if (!pr || !pr.coast || S.own[p] !== n.id) return 'Exige litoral próprio';
   if (!n.fx.sea) return 'Exige Barcos longos'; const c = Math.round(shipCost(n) * k * (S.bld[pr.state].shipyard ? .7 : 1)); if (n.money < c) return 'Sem dinheiro';
-  n.money -= c; n.rec.push({ type: 'ship', k, m: 4, at: p }); return '';
+  n.money -= c; n.rec.push({ type: 'ship', k, m: Math.round(4 * BUILD_SLOW), at: p }); return '';
 }
 /* generais: um por exército; marcial e traços mudam a força em batalha */
 const GEN_TR = { brave: .05, strategist: .1, craven: -.06, cruel: .03, genius: .03, ambitious: .02, paranoid: -.02, lazy: -.04, diligent: .03 };
 const genMul = c => c ? Math.max(.7, 1 + (c.st.mar - 6) * .015 + c.tr.reduce((a, t) => a + (GEN_TR[t] || 0), 0)) : 1;
 const genCost = () => Math.round(20 * eraScale());
 function genCands(n) { return [0, 1, 2].map(() => mkChar(n, { boost: 'mar', dyn: newDynasty(n), age: 24 + (rnd() * 30 | 0) })); }
-function setGeneral(n, a, c) { if (!a || a.o !== n.id) return 'Inválido'; const k = genCost(); if (n.money < k) return 'Sem dinheiro'; n.money -= k; a.gen = c; return ''; }
+function setGeneral(n, a, c) { if (!a || a.o !== n.id) return 'Inválido'; const k = genCost(); if (n.money < k) return 'Sem dinheiro'; n.money -= k; a.gen = c; if (a.g != null) groupOf(a).forEach(x => x.gen = c); return ''; }
 /* exploradores: tropa barata (só infantaria, até 5 regimentos) anda sozinha até a terra incógnita mais próxima */
 const expWhy = a => a.cav > .05 || a.art > .05 || a.vrt > .05 ? 'Só infantaria (tropa barata) explora' : regs(a) > 5.05 ? 'Grande demais: até 5 regimentos' : a.p >= WD.provs.length ? 'Precisa estar em terra' : '';
 function exploreStep(a) {
@@ -265,7 +267,7 @@ function exploreStep(a) {
   a.exp = false; if (a.o === S.player) log('Seus exploradores não acham mais terra incógnita ao alcance a pé.', 'info', [a.o]);
   else { n.manpower += regs(a); a.inf = a.cav = a.art = a.vrt = 0; }   // IA: a expedição volta para casa e debanda
 }
-function addArmy(o, p, u, xp = .1) { const a = { id: S.id++, o, p, inf: u.inf || 0, cav: u.cav || 0, art: u.art || 0, vrt: u.vrt || 0, mor: 1, xp, fat: 0, st: 'bal', sup: {}, path: [], prog: 0, need: 0, arr: S.t }; S.armies.push(a); return a; }
+function addArmy(o, p, u, xp = .1) { const a = { id: S.id++, o, p, inf: u.inf || 0, cav: u.cav || 0, art: u.art || 0, vrt: u.vrt || 0, mor: 1, xp, fat: 0, st: 'bal', sup: {}, path: [], prog: 0, need: 0, arr: S.t }; if (o === S.player) a.g = a.id; S.armies.push(a); return a; }
 function addFleet(o, z, ships) { const f = { id: S.id++, o, z, ships, path: [], prog: 0, need: 0, auto: false }; S.fleets.push(f); return f; }
 
 /* ---------- pesquisa ---------- */

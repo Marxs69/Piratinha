@@ -443,7 +443,9 @@ const GOVS = {
 /* ---------- níveis de título (como no CK3): limitam quantos estados o país sustenta (Limite de domínio) ----------
    cap: províncias sem perder estabilidade · req: mínimo para proclamar o nível · no nível 3 cada governo usa o próprio nome (fmt/t) */
 const RANK_N = ['Baronia', 'Condado', 'Ducado', 'Reino', 'Império'];
-const RANK_CAP = [2, 5, 12], RANK_REQ = [0, 2, 4, 8];   // em estados (inteiros ou não); Reino e Império dependem do continente de origem
+const RANK_CAP = [2, 5, 12], RANK_REQ = [0, 2, 4, 8];
+const RANK_SLOTS = [3, 5, 8, 12, 18];                          // teto de canteiros de obra pelo título
+const BUILD_SLOW = 2.4;                                        // obras, recrutas, navios e prospecção: prazos ×2,4 (base de 2–3 meses vira 5–7)   // em estados (inteiros ou não); Reino e Império dependem do continente de origem
 const RANK_KING = .75, RANK_EMP = 2 / 3;                    // Reino sustenta 3/4 dos estados do continente; Império exige 2/3 das províncias dele
 const RANKSET = {
   Monarquia:   { f: ['Baronato de {}', 'Condado de {}', 'Ducado de {}', null, 'Império de {}'], t: ['Barão', 'Conde', 'Duque', null, 'Imperador'] },

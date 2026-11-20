@@ -27,7 +27,7 @@ function frontsTick() {
   for (const a of S.armies) if (a.front != null && !live.has(a.front)) a.front = null;
   for (const n of S.nations) if (S.ford && S.ford[n.id]) for (const k in S.ford[n.id]) if (!live.has(+k)) delete S.ford[n.id][k];
   aiCaution();
-  if (S.t % (FRONT_EVERY * 2) === 0) { S._threat = null; S.nations.forEach(n => { if (n.alive) frontOrders(n); }); }
+  if (S.t % (FRONT_EVERY * 2) === 0) { S._threat = null; playerArmies(); S.nations.forEach(n => { if (n.alive) frontOrders(n); }); }
 }
 const frontsOf = id => (S.fronts || []).filter(f => { const w = S.wars.find(x => x.id === f.w); return w && w[f.side].includes(id); });
 const frontById = id => (S.fronts || []).find(f => f.id === id);
@@ -65,7 +65,8 @@ function frontOrders(n) {
     const rest = ord === 'adv' ? frontAdvance(n, f, list) : null; if (rest && !rest.length) continue;
     // defender: maiores exércitos nos pontos mais ameaçados, um por ponto; ponto já ocupado pelo inimigo só com 1,3× de vantagem
     const ep = enemyPower(n.id), pts = f.provs.map(p => [p, WD.provs[p].adj.reduce((s, q) => s + (ep.get(q) || 0) * .3, 0) + (S.own[p] >= 0 && nat(S.own[p]).capital === p ? 5 : 0) + fortOf(p) + (ep.get(p) ? 20 : 0)]).sort((x, y) => y[1] - x[1]);
-    const free = (rest || list).filter(a => !sieging(a)).sort((x, y) => regs(y) - regs(x)), taken = new Set();
+    disperse(n, f, pts); const listD = S.armies.filter(a => a.o === n.id && a.front === f.id && !armyBusy(a));   // exércitos do jogador se espalham pela linha
+    const free = (rest || listD).filter(a => !sieging(a) && (!rest || rest.includes(a) || !list.includes(a))).sort((x, y) => regs(y) - regs(x)), taken = new Set();
     for (const a of free) {
       const dst = a.path.length ? a.path[a.path.length - 1] : a.p, mine = armyPower(a);
       if ((ep.get(dst) || 0) > mine * .9 && dst !== a.p) a.path = [];                   // o destino virou armadilha: para

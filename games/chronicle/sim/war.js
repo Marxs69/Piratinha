@@ -38,6 +38,7 @@ function seaPath(n, from, to, blind) {                       // frotas: só por 
   if (dist[to] >= 1e9) return null; const path = []; for (let v = to; v !== from; v = prev[v]) path.unshift(v); return path;
 }
 /* safe: desvia de províncias onde o inimigo é mais forte que este exército (a IA usa; o jogador decide sozinho) */
+const orderArmyTest = (a, to) => a.p < WD.provs.length && !!findPath(nat(a.o), a.p, to, a);   // há caminho por terra (ou travessia curta)?
 function orderArmy(a, to, safe) { const n = nat(a.o); if (a.p === to) { a.path = []; return true; } const path = findPath(n, a.p, to, a, safe ? dangerFor(a) : null); if (!path) return false; a.path = path; a.prog = 0; a.need = 0; a.retreat = false; return true; }
 function orderFleet(f, z) { const n = nat(f.o); const path = seaPath(n, f.z, z) || (seaExploreOk(n) ? seaPath(n, f.z, z, true) : null); if (!path) return false; f.path = path; f.prog = 0; f.need = 0; return true; }
 function explore(n, v) {
