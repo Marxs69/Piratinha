@@ -73,7 +73,7 @@ function menu() {
   for (let i = 0; i < 5; i++) { const im = new Image(); im.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(flagSVG(flagRandom(r), 'm' + i)); box.append(im); }
 }
 $('#m-new').onclick = () => { show('setup'); $('#s-seed').value = (Math.random() * 1e9 | 0) + ''; genWorld(); };
-$('#m-cont').onclick = () => { if (loadGame()) startPlay(false); else say('Não foi possível carregar.', 'bad'); };
+$('#m-cont').onclick = () => { let ok = false; try { ok = loadGame(); } catch (e) { console.error(e); } if (ok) startPlay(false); else { S = null; say('Não foi possível carregar: o save é de outra versão ou está corrompido.', 'bad'); } };
 $('#s-back').onclick = () => { S = null; menu(); };
 $('#s-gen').onclick = () => { $('#s-seed').value = (Math.random() * 1e9 | 0) + ''; genWorld(); };
 $('#s-seed').onchange = () => genWorld();
@@ -268,7 +268,7 @@ function sideNat(sd, id) {
   const n = nat(id), mine = me(), h = el('div', 'side-h');
   h.append(flagEl(n.flag, 'fl')); const tt = el('div'); tt.append(el('h2', '', natName(n)), tip(el('small', 'dim', GOVS[n.gov].n + ' · ' + IDEOS[n.ideo].n), govTip(n.gov))); h.append(tt); sd.append(h);
   const ruler = el('span', '', titleOf(n) + ' ' + charName(n.ruler) + ' (' + ageOf(n.ruler) + ')'); tip(ruler, n.ruler.tr.map(t => TRAITS[t].n + (TRAITS[t].ai ? ': ' + TRAITS[t].ai : '')).join('\n'));
-  sd.append(kv([['Governante', ruler], ['Províncias', provsOf(id).length], ['População', popStr(n.popT || 0)], ['PIB', money(n.gdp || 0) + '/mês'], ['Exército', fmtK(S.armies.filter(a => a.o === id).reduce((s, a) => s + regs(a), 0))], ['Tecnologias', techCount(n)], ['Vertente', n.vert ? VERT[n.vert].n : '—'], ['Relação', id === mine.id ? '—' : Math.round(n.rel[mine.id] || 0) + '', 'Como eles veem você (−100 a 100). Muda com acordos, ideologia, fronteiras e guerras.']]));
+  sd.append(kv([['Governante', ruler], ['Cultura', CULTURES[n.cul].n + (CULTURES[n.cul].par != null ? ' (' + culHeritage(n.cul) + ')' : '')], ['Religião', relName(n.relig), (faithOf(n.relig).d || '') + '\n' + modLines(faithOf(n.relig).doc).join('\n')], ['Províncias', provsOf(id).length], ['População', popStr(n.popT || 0)], ['PIB', money(n.gdp || 0) + '/mês'], ['Exército', fmtK(S.armies.filter(a => a.o === id).reduce((s, a) => s + regs(a), 0))], ['Tecnologias', techCount(n)], ['Vertente', n.vert ? VERT[n.vert].n : '—'], ['Relação', id === mine.id ? '—' : Math.round(n.rel[mine.id] || 0) + '', 'Como eles veem você (−100 a 100). Muda com acordos, ideologia, fronteiras e guerras.']]));
   if (id === mine.id) { sd.append(sec('', btn('🏛️ Governo', () => openWin('gov')))); return; }
   const st = dipStatus(mine, n); if (st.length) sd.append(sec('Relações', ...st.map(x => el('div', '', x))));
   sd.append(sec('Ações', dipButtons(n)));
@@ -1097,6 +1097,7 @@ initRender(cv); menu(); requestAnimationFrame(loop);
   }
   if (q.get('plague')) { const y0 = S.t; S.t = 360 * (1361 - START_YEAR); for (let d = 0; d < +q.get('plague'); d++) advanceDay(); }
   S.offer = null; S.calls = []; S.dipOffers = [];
+  if (q.get('reload')) { saveGame(); S = null; if (!loadGame()) throw new Error('load falhou'); }
   startPlay(false); if (q.get('mode')) { R.mode = q.get('mode'); drawModes($('#modes'), true); if (R.mode === 'res') select('res'); }
   if (q.get('z')) { R.cam.z = +q.get('z'); centerOn(WD.provs[main.capital].cx * K, WD.provs[main.capital].cy * K); }
   if (q.get('tab')) UI[q.get('win') + 'Tab'] = q.get('tab');
@@ -1108,6 +1109,8 @@ initRender(cv); menu(); requestAnimationFrame(loop);
   if (q.get('ctx')) { const p = provsOf(main.id).map(p => WD.provs[p].adj.find(o => S.own[o] >= 0 && S.own[o] !== main.id)).find(x => x != null); const [sx, sy] = toScreen(WD.provs[p].cx * K, WD.provs[p].cy * K); ctxMenu(sx, sy, p); }
   if (q.get('council')) councilPick('marshal', 'Marechal');
   if (q.get('vprev')) UI.vprev = q.get('vprev');
+  if (q.get('nat')) { const o = S.nations.find(x => x.alive && x.id !== main.id && main.exP[x.capital]); if (o) select('nat', o.id); }
+  if (q.get('fleet')) { const f = S.fleets.find(x => x.o === main.id); if (f) select('fleet', f.id); }
   if (q.get('vpend')) { me().vpend = q.get('vpend'); pendingModals(); }
   if (q.get('ev')) { const n = me(), ev = EVENT[q.get('ev')]; if (ev) { n.evWait = ev.id; notify(n.id, ev.e + ' ' + ev.t, fillTxt(n, ev.m), { ev: ev.id }); pendingModals(); } }
   if (q.get('setup')) { S.player = -1; show('setup'); R.view = -1; S.mapDirty = true; fitCam(); setupCard(main.id); drawModes($('#s-modes')); }

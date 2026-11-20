@@ -14,9 +14,11 @@ function unitNeeds(n, t) {
 const supName = (n, k) => { let nm = SUPPORT[k].names[0][1]; for (const [t, x] of SUPPORT[k].names) if (!t || hasT(n, t)) nm = x; return nm; };
 const supOk = (n, k) => !SUPPORT[k].tech || hasT(n, SUPPORT[k].tech);
 /* bens que o exército inteiro do país consome por mês */
+let abC = null;                                              // exércitos por dono (refeito a cada dia)
+const armiesOf = id => { if (!abC || abC.t !== S.t || abC.k !== S.armies.length) { abC = { t: S.t, k: S.armies.length, m: new Map() }; for (const a of S.armies) { const l = abC.m.get(a.o); if (l) l.push(a); else abC.m.set(a.o, [a]); } } return abC.m.get(id) || []; };
 function armyDemand(n) {
   const R = { inf: 0, cav: 0, art: 0, vrt: 0 }, sc = { recon: 0, eng: 0, med: 0 }, d = {};
-  for (const a of S.armies) if (a.o === n.id) { UT.forEach(t => R[t] += a[t]); for (const k in a.sup || {}) sc[k]++; }
+  for (const a of armiesOf(n.id)) { UT.forEach(t => R[t] += a[t]); for (const k in a.sup || {}) sc[k]++; }
   UT.forEach(t => { if (R[t] > 0) { const nd = unitNeeds(n, t); for (const g in nd) d[g] = (d[g] || 0) + nd[g] * R[t]; } });
   for (const k in sc) if (sc[k]) for (const g in SUPPORT[k].need) d[g] = (d[g] || 0) + SUPPORT[k].need[g] * sc[k] * 3;
   return { R, sc, d };
@@ -62,7 +64,12 @@ function addMen(a, t, k, xp) { const r = regs(a); a.xp = ((a.xp || 0) * r + xp *
 
 /* ---------- suprimento e atrito ---------- */
 /* países amigos: o próprio, aliados e quem luta do mesmo lado em alguma guerra */
+let frC = null;                                               // amigos por país, refeitos a cada dia (guerras e alianças mudam pouco)
 function friendsOf(o) {
+  if (!frC || frC.t !== S.t || frC.w !== S.wars.length) frC = { t: S.t, w: S.wars.length, m: new Map() };
+  let c = frC.m.get(o); if (c) return c; c = friendsOf0(o); frC.m.set(o, c); return c;
+}
+function friendsOf0(o) {
   const s = new Set([o]); const n = nat(o); (n.allies || []).forEach(x => s.add(x));
   for (const w of S.wars) { const side = w.A.includes(o) ? w.A : w.D.includes(o) ? w.D : null; if (side) side.forEach(x => s.add(x)); }
   return s;
@@ -77,7 +84,7 @@ function supplyDist(o) {
   supC.m.set(o, d); return d;
 }
 const logiRange = n => LOGI_BASE + (n.fx ? n.fx.logi : 0);
-const inSupply = a => a.p >= WD.provs.length || supplyDist(a.o)[a.p] <= logiRange(nat(a.o));
+const inSupply = a => { if (a.p >= WD.provs.length) return true; const c = S.ctrl[a.p]; if (c === a.o || (friendsOf(a.o).has(c) && S.own[a.p] === c)) return true; return supplyDist(a.o)[a.p] <= logiRange(nat(a.o)); };   // em território amigo nem precisa da busca
 /* quantos regimentos a província sustenta para o país o (EU4: limite de suprimento) */
 function provSupply(p, o) {
   const pr = WD.provs[p], n = nat(o), fr = friendsOf(o), ct = S.ctrl[p];

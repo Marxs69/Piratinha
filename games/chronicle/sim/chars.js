@@ -68,7 +68,7 @@ function succeed(n, death) {
     n.dyn = newDynasty(n); n.ruler = mkChar(n, { ruler: true, age: g.succ === 'theo' ? 50 + (rnd() * 20 | 0) : undefined, boost: g.succ === 'junta' ? 'mar' : null });
     n.stab -= g.succ === 'junta' ? 10 : g.succ === 'elect' ? 5 : 2;
   }
-  n.termEnd = curYear() + (g.term || 4); rulerIdentity(n);
+  n.termEnd = curYear() + (g.term || 4); rulerIdentity(n); n.stab = clamp(n.stab, 0, 100);
   log('Novo governo em ' + natName(n) + ': ' + titleOf(n).toLowerCase() + ' ' + charName(n.ruler) + '.', n.id === S.player ? 'info' : 'none', [n.id]);
   calcMods(n);
 }

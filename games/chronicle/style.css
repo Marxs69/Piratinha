@@ -264,3 +264,4 @@ h4.bgrp { font: 700 11px var(--title); color: var(--dim); letter-spacing: 1px; m
 .ttabs .btn:last-child { margin-left: auto; }
 .tprevw { display: flex; gap: 4px; align-items: stretch; } .tprevw .tech { flex: 1; } .tprevw .btn { align-self: center; }
 .vprev { margin-bottom: 12px; } .vprev .chips { margin-top: 4px; }
+#hint { z-index: 60; position: fixed; }

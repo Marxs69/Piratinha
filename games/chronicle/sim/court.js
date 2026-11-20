@@ -30,7 +30,7 @@ function spawnNation(provs, o = {}) {
   n.ruler = o.ruler || mkChar(n, { ruler: true }); n.council = {}; COUNCIL.forEach(([k, , st]) => n.council[k] = mkChar(n, { boost: st, dyn: newDynasty(n) }));
   if (GOVS[n.gov].succ === 'hered') { n.spouse = mkChar(n, { f: !n.ruler.f, dyn: newDynasty(n), age: Math.max(16, ageOf(n.ruler) - 3) }); n.kids = []; }
   if (src) for (let p = 0; p < P; p++) n.exP[p] = src.exP[p]; initExplore(n);
-  if (S._mine) S._mine[id] = []; ownChanged(); warsChanged(); strC = null; enterC = null;
+  if (S._mine) S._mine[id] = []; ownChanged(); warsChanged(); strC = null; enterC = null; checkDead();   // quem perdeu a capital para o país novo muda de capital (ou some)
   calcMods(n); n.mpMax = provs.reduce((s, p) => s + S.pop[p], 0) * .03; n.manpower = n.mpMax * .3;
   return n;
 }
