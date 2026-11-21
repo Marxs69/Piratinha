@@ -123,7 +123,7 @@ const roomCode = () => Math.random().toString(36).slice(2, 7).toUpperCase();
 /* painel da sala: jogadores (com o país de cada um) e chat; o anfitrião pode expulsar */
 function drawRoom() {
   const r = $('#room'); r.hidden = !UI.room || !(NET.host || NET.client) || UI.scr !== 'game'; if (r.hidden) return; NET.unread = 0;
-  r.innerHTML = ''; const h = el('header'); h.append(el('b', '', '🌐 Sala ' + NET.code), btn('✕', () => { UI.room = false; drawRoom(); drawTop(); }, 'x sm')); r.append(h);
+  r.innerHTML = ''; const h = el('header'); h.append(el('b', '', '🌐 Sala ' + NET.code.toUpperCase()), btn('✕', () => { UI.room = false; drawRoom(); drawTop(); }, 'x sm')); r.append(h);
   const pl = el('div', 'rplayers'); NET.players().forEach(p => { const n = nat(p.pid), row = el('div', 'rp');
     if (n) row.append(flagImgEl(n.flag)); row.append(el('b', '', p.name + (p.host ? ' 👑' : '') + (p.pid === S.player ? ' (você)' : '')), el('small', 'dim', n ? natName(n) : '—'));
     if (NET.host && p.peer) row.append(btn('Expulsar', () => { NET.kick(p.peer); drawRoom(); drawTop(); }, 'sm red', '', 'Tira o jogador da sala; o país volta para a IA'));
@@ -134,7 +134,7 @@ function drawRoom() {
   log0.scrollTop = log0.scrollHeight; if (UI.roomFocus) { inp.focus(); UI.roomFocus = false; }
 }
 function netHooks() {
-  NET.onChat = () => { if (UI.room) { const f = document.activeElement && document.activeElement.closest && document.activeElement.closest('#room'); UI.roomFocus = !!f; drawRoom(); } else drawTop(); };
+  NET.onChat = () => { if (!S || UI.scr !== 'game') return; if (UI.room) { const f = document.activeElement && document.activeElement.closest && document.activeElement.closest('#room'); UI.roomFocus = !!f; drawRoom(); } else drawTop(); };
   NET.onInfo = m => say(m, 'info');
   NET.onPauseReq = who => { say(who + ' pediu pausa.', 'info'); };
   NET.onClosed = () => { NET.close(); UI.room = false; drawRoom(); S = null; menu(); say('A sala foi fechada.', 'bad'); };
@@ -144,7 +144,7 @@ function hostRoomModal() {
   modal(m => { m.append(el('h2', '', '🌐 Abrir sala'), el('p', '', 'Você será o anfitrião: só o seu jogo simula e você controla a velocidade e a pausa.'), el('p', 'dim', 'Mande o código para os amigos (Entrar numa sala, no menu inicial). Código começando com LOCAL testa entre abas do mesmo navegador.'));
     const inp = el('input'); inp.value = code; inp.maxLength = 16; const r = el('div', 'row');
     const nm = el('input'); nm.placeholder = 'Seu nome'; nm.maxLength = 24;
-    r.append(btn('Abrir', async () => { try { await NET.openRoom(inp.value.trim() || code, null, nm.value.trim() || 'Anfitrião'); closeModal(); say('Sala ' + NET.code + ' aberta.', 'good'); drawTop(); } catch (e) { say('Não foi possível abrir a sala: ' + e.message, 'bad'); } }, 'grn'), btn('Cancelar', closeModal));
+    r.append(btn('Abrir', async () => { try { await NET.openRoom(inp.value.trim() || code, null, nm.value.trim() || 'Anfitrião'); closeModal(); say('Sala ' + NET.code.toUpperCase() + ' aberta.', 'good'); drawTop(); } catch (e) { say('Não foi possível abrir a sala: ' + e.message, 'bad'); } }, 'grn'), btn('Cancelar', closeModal));
     m.append(inp, nm, r); });
 }
 function joinRoomModal() {
@@ -211,7 +211,7 @@ function gameMenu() {
     m.append(el('h2', '', 'Grand Chronicle'));
     if (!NET.client) m.append(btn('💾 Salvar', () => { say(saveGame() ? 'Jogo salvo.' : 'Não foi possível salvar.', 'good'); closeModal(); }));
     if (!NET.host && !NET.client) m.append(btn('🌐 Abrir sala multijogador', () => { closeModal(); hostRoomModal(); }, '', '', 'Você vira o anfitrião: só o seu jogo simula; até ' + (NET_MAX - 1) + ' amigos entram pelo código e escolhem um país livre (quem sair volta para a IA).'));
-    else m.append(btn(NET.host ? '🌐 Fechar a sala' : '🌐 Sair da sala', () => { NET.close(); closeModal(); if (!S || UI.scr !== 'game' || NET.client) { S = null; menu(); } refresh(); }));
+    else m.append(btn(NET.host ? '🌐 Fechar a sala' : '🌐 Sair da sala', () => { const wasClient = NET.client; NET.close(); closeModal(); UI.room = false; drawRoom(); if (wasClient || !S) { S = null; menu(); } else refresh(); }));   // quem sai volta ao menu; o anfitrião segue sozinho
     m.append(btn('🚪 Salvar e sair para o menu', () => { saveGame(); closeModal(); S = null; menu(); }));
     m.append(btn('🔧 Recalcular (debug)', () => { const r = repairGame(true); closeModal(); refresh(); say('Recalculado: ' + r.fixed + ' valor' + (r.fixed === 1 ? '' : 'es') + ' inválido' + (r.fixed === 1 ? '' : 's') + ' corrigido' + (r.fixed === 1 ? '' : 's') + ', ' + r.merged + ' exércitos da IA juntados.', 'good'); }, '', '', 'Refaz os cálculos: corrige números inválidos (−NaN/mês), refaz a economia e os modificadores, junta exércitos pequenos da IA parados no mesmo lugar e replaneja as marchas dela.'));
     m.append(el('p', 'dim', 'Mapa: arraste com o botão esquerdo para selecionar tropas · botão direito move as tropas ou abre ações com o país · WASD ou arrastar com o botão direito move a câmera · roda dá zoom · espaço pausa.'));
@@ -1436,15 +1436,22 @@ MINI.addEventListener('pointerdown', e => { const go = ev => { const r = MINI.ge
 /* ---------- laço ---------- */
 const busy = box => box.contains(document.activeElement) && /^(SELECT|INPUT)$/.test(document.activeElement.tagName);
 let lastT = performance.now(), lastUi = 0, lastMonth = -1, lastMini = 0;
-function loop(now) {
-  const dt = Math.min(.25, (now - lastT) / 1000); lastT = now;
-  if (UI.keys.size && S) { const v = 700 * dt / R.cam.z, k = UI.keys; if (k.has('KeyW') || k.has('ArrowUp')) R.cam.y -= v; if (k.has('KeyS') || k.has('ArrowDown')) R.cam.y += v; if (k.has('KeyA') || k.has('ArrowLeft')) R.cam.x -= v; if (k.has('KeyD') || k.has('ArrowRight')) R.cam.x += v; clampCam(); }
+/* simulação e rede do anfitrião: roda no laço de desenho e, com a aba escondida (sem requestAnimationFrame), pelo relógio do Worker (bgPump) */
+let lastSimT = performance.now(), lastSimRun = 0;
+function simStep(now) {
+  const dt = Math.min(.25, Math.max(0, now - lastSimT) / 1000); lastSimT = now; lastSimRun = now;
   if (S && NET.host) NET.hostTick(now);
   if (S && UI.scr === 'game' && !S.over && UI.speed && $('#modal').hidden && !NET.client) {
     UI.acc += dt * SPEEDS[UI.speed]; let n = 0;
     while (UI.acc >= 1 && n < 30) { UI.acc -= 1; n++; advanceDay(); if (S.over || hasPending(S.player)) break; if (S.t % 360 === 0 && !NET.client) saveGame(); }
     if (UI.acc > 3) UI.acc = 0;
   }
+}
+function bgPump() { const now = performance.now(); if (now - lastSimRun > 250) simStep(now); }
+function loop(now) {
+  const dt = Math.min(.25, (now - lastT) / 1000); lastT = now;
+  if (UI.keys.size && S) { const v = 700 * dt / R.cam.z, k = UI.keys; if (k.has('KeyW') || k.has('ArrowUp')) R.cam.y -= v; if (k.has('KeyS') || k.has('ArrowDown')) R.cam.y += v; if (k.has('KeyA') || k.has('ArrowLeft')) R.cam.x -= v; if (k.has('KeyD') || k.has('ArrowRight')) R.cam.x += v; clampCam(); }
+  simStep(now);
   if (S && UI.scr === 'game') {
     S.news.length = 0; pendingModals();
     if (S.over && $('#modal').hidden && !UI.ended) { UI.ended = true; endScreen(); }

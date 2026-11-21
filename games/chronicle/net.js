@@ -11,6 +11,7 @@
 'use strict';
 
 const NET_APP = 'piratinha-chronicle-1', NET_PROTO = 1, NET_MAX = 8, NET_SNAP_DAYS = 30, NET_SNAP_MS = 4000;
+const NET_DEAD_MS = 20000;                                   // sem sinal de vida por esse tempo = desconectado
 
 function bcTransport(code) {
   const ch = new BroadcastChannel('chronicle-' + code), me = Math.random().toString(36).slice(2, 10), peers = new Set();
@@ -41,7 +42,17 @@ async function p2pTransport(code) {
   t.leave = () => room.leave();
   return t;
 }
-const openTransport = code => (code || '').startsWith('local') ? bcTransport(code) : p2pTransport(code);
+const roomKey = code => String(code || '').trim().toLowerCase();   // LOCAL7 e local7 são a mesma sala
+const openTransport = code => roomKey(code).startsWith('local') ? bcTransport(roomKey(code)) : p2pTransport(roomKey(code));
+/* relógio num Worker: abas em segundo plano param o requestAnimationFrame e quase param os timers; o anfitrião não pode parar
+   (se o Worker não puder ser criado ou não responder, usa um timer comum) */
+function workerClock(hz, fn) {
+  let w = null, id = null, alive = false, stopped = false;
+  const fallback = () => { if (id || stopped) return; if (w) w.terminate(); w = null; id = setInterval(fn, 1000 / hz); };
+  try { w = new Worker(URL.createObjectURL(new Blob(['setInterval(() => postMessage(0), ' + (1000 / hz) + ');'], { type: 'text/javascript' })));
+    w.onmessage = () => { alive = true; fn(); }; w.onerror = fallback; setTimeout(() => { if (!alive) fallback(); }, 600); } catch (e) { fallback(); }
+  return () => { stopped = true; if (w) w.terminate(); if (id) clearInterval(id); };
+}
 
 /* gzip quando existe CompressionStream (navegadores atuais); senão texto puro */
 async function netPack(obj) {
@@ -100,7 +111,10 @@ const NET = {
   /* ---------- anfitrião ---------- */
   async openRoom(code, transport, name) {
     if (!S || S.player < 0) throw new Error('Abra a sala com uma partida em andamento');
-    const t = NET.t = transport || await openTransport(code); NET.host = true; NET.code = code; NET.name = name || NET.name || 'Anfitrião'; S.humans = [S.player]; NET.prev = null; NET.seq = 0;
+    code = roomKey(code); const t = NET.t = transport || await openTransport(code); NET.host = true; NET.code = code;
+    NET.name = name || NET.name || 'Anfitrião'; S.humans = [S.player]; NET.prev = null; NET.seq = 0;
+    if (NET.bg) NET.bg(); NET.bg = typeof bgPump === 'function' ? workerClock(8, bgPump) : null;   // continua simulando e enviando com a aba escondida
+    NET.startBeat();
     t.onJoin = () => {};
     t.onLeave = peer => NET.dropPeer(peer, ' saiu');
     t.onMsg = (m, from) => NET.hostMsg(m, from);
@@ -117,12 +131,14 @@ const NET = {
       NET.t.send({ t: 'lobby', nations: NET.freeNations(), year: curYear(), seed: S.seed, host: S.player >= 0 ? natName(nat(S.player)) : '', players: NET.players().map(x => x.name) }, from); return;
     }
     if (m.t === 'pick') {
+      if (p && p.pid === m.pid) { p.seq = -1; NET.dirty = true; return; }   // escolha repetida (o cliente reenvia até chegar o estado): só manda o retrato de novo
       const n = nat(m.pid); if (!n || !n.alive || isHuman(m.pid)) { NET.t.send({ t: 'deny', why: 'Esse país já tem dono', again: true, nations: NET.freeNations() }, from); return; }
-      const name = String(m.name || 'Jogador').slice(0, 24); NET.peers.set(from, { pid: m.pid, name, seq: -1 }); S.humans.push(m.pid); (S.mpNames = S.mpNames || {})[m.pid] = name;
+      const name = String(m.name || 'Jogador').slice(0, 24); NET.peers.set(from, { pid: m.pid, name, seq: -1, seen: Date.now() }); S.humans.push(m.pid); (S.mpNames = S.mpNames || {})[m.pid] = name;
       log(name + ' assumiu ' + natName(n) + '.', 'world', [m.pid]); NET.sys(name + ' entrou com ' + natName(n) + '.');
       NET.dirty = true; NET.lastSnapMs = 0; return;                  // o próximo envio leva o retrato completo para ele
     }
     if (!p) return;                                              // daqui em diante só quem já escolheu país
+    p.seen = Date.now(); if (m.t === 'ping') return;
     if (m.t === 'cmd') { const e = runCmd(p.pid, m.c, m.a); NET.t.send({ t: 'res', rid: m.rid, e }, from); NET.dirty = true; return; }
     if (m.t === 'resync') { p.seq = -1; NET.dirty = true; return; }
     if (m.t === 'chat') { const line = { from: p.name, pid: p.pid, m: String(m.m || '').slice(0, 300), at: dateStr() }; NET.addChat(line); NET.t.send({ t: 'chat', line }); return; }
@@ -151,12 +167,19 @@ const NET = {
 
   /* ---------- cliente ---------- */
   async join(code, name, transport) {
-    const t = NET.t = transport || await openTransport(code); NET.client = true; NET.code = code; NET.name = name || 'Jogador'; NET.flat = null; NET.seq = 0;
+    code = roomKey(code); const t = NET.t = transport || await openTransport(code); NET.client = true; NET.code = code; NET.name = name || 'Jogador'; NET.flat = null; NET.seq = 0; NET.wantPid = null;
     t.onJoin = peer => { if (NET.hostId == null) t.send({ t: 'join', name: NET.name, proto: NET_PROTO }, peer); };
+    // reenvia até ter resposta: a conexão com o anfitrião pode ter aberto antes destes avisos, e mensagens se perdem
+    clearInterval(NET.retry); NET.retry = setInterval(() => { if (!NET.client || NET.t !== t) { clearInterval(NET.retry); return; }
+      if (NET.hostId == null) t.send({ t: 'join', name: NET.name, proto: NET_PROTO });
+      else if (NET.wantPid != null && !NET.flat) t.send({ t: 'pick', pid: NET.wantPid, name: NET.name }, NET.hostId);
+      else if (NET.flat) clearInterval(NET.retry); }, 1500);
+    NET.hostSeen = Date.now(); NET.startBeat();
     t.onLeave = peer => { if (peer === NET.hostId) { NET.info('O anfitrião fechou a sala.'); if (NET.onClosed) NET.onClosed(); } };
     t.onMsg = async (raw, from) => {
       const m = raw instanceof Uint8Array || raw instanceof ArrayBuffer || typeof raw === 'string' ? await netUnpack(raw instanceof ArrayBuffer ? new Uint8Array(raw) : raw) : raw;
-      if (!m || !m.t) return;
+      if (!m || !m.t || NET.t !== t || !NET.client) return;            // chegou depois de sair da sala
+      if (from === NET.hostId) NET.hostSeen = Date.now(); if (m.t === 'ping') return;
       if (m.t === 'lobby' || (m.t === 'deny' && m.again)) { NET.hostId = from; if (NET.onLobby) NET.onLobby(m); return; }
       if (m.t === 'deny') { NET.info(m.why); return; }
       if (from !== NET.hostId) return;
@@ -177,5 +200,12 @@ const NET = {
   cmd(c, a, cb) { const rid = ++NET.rid; NET.waiting.set(rid, cb || (e => { if (e) NET.info(e); })); NET.t.send({ t: 'cmd', c, a, rid }, NET.hostId); },
   say(text) { text = String(text || '').trim().slice(0, 300); if (!text) return; if (NET.host) { const line = { from: NET.name || 'Anfitrião', pid: S.player, m: text, at: dateStr() }; NET.addChat(line); NET.t.send({ t: 'chat', line }); } else if (NET.client) NET.t.send({ t: 'chat', m: text }, NET.hostId); },
   askPause() { if (NET.client) NET.t.send({ t: 'pause' }, NET.hostId); },
-  close() { if (NET.t) NET.t.leave(); NET.host = NET.client = false; NET.t = null; NET.peers.clear(); NET.hostId = null; NET.pid = -1; NET.prev = NET.flat = null; NET.chat = []; NET.unread = 0; if (S) S.humans = null; },
+  /* sinal de vida a cada 2 s: quem some por 20 s sem avisar (queda de rede, aba fechada à força) sai da sala */
+  startBeat() { if (NET.hb) NET.hb(); NET.hb = workerClock(.5, () => NET.beat()); },
+  beat() {
+    if (!NET.t) return; const now = Date.now();
+    if (NET.host) { if (NET.peers.size) NET.t.send({ t: 'ping' }); for (const [id, p] of [...NET.peers]) if (now - (p.seen || now) > NET_DEAD_MS) NET.dropPeer(id, ' perdeu a conexão'); }
+    else if (NET.client && NET.hostId != null) { NET.t.send({ t: 'ping' }, NET.hostId); if (NET.flat && now - (NET.hostSeen || now) > NET_DEAD_MS) { NET.info('Sem resposta do anfitrião.'); if (NET.onClosed) NET.onClosed(); } }
+  },
+  close() { clearInterval(NET.retry); if (NET.hb) { NET.hb(); NET.hb = null; } if (NET.bg) { NET.bg(); NET.bg = null; } if (NET.t) NET.t.leave(); NET.host = NET.client = false; NET.t = null; NET.peers.clear(); NET.hostId = null; NET.pid = -1; NET.prev = NET.flat = null; NET.chat = []; NET.unread = 0; if (S) S.humans = null; },
 };
