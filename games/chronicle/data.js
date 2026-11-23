@@ -1,7 +1,7 @@
 /* Grand Chronicle — dados derivados: índices e tabelas montadas a partir do conteúdo (content/*.js).
    As tabelas em si ficam em content/ (só dados, editáveis); a lógica fica em sim/. Para equilibrar, mexa nos números de content/. */
 'use strict';
-const { START_YEAR, END_YEAR, VERT_DECLINE, BUILD_SLOW, WIDTH_BASE, LOGI_BASE, SHIP_CAP, COUNCIL_TRAIT_W, HOARD_MONTHS, HOARD_MIN, HOARD_LEAK, APPOINT_CD, APPOINT_CD_DEATH, PRICE_BASE, PRICE_EXP, PRICE_LAG } = CONTENT.DEFINES;
+const { TECH_BASE, TECH_TAU, TECH_AHEAD, TECH_DIFF, ERA_FRAC, REFUSE_STAB, ALIENS, NEW_NATION, CRISIS, SEPAR, STAB_SOFT, WEX, START_YEAR, END_YEAR, VERT_DECLINE, BUILD_SLOW, WIDTH_BASE, LOGI_BASE, SHIP_CAP, COUNCIL_TRAIT_W, HOARD_MONTHS, HOARD_MIN, HOARD_LEAK, APPOINT_CD, APPOINT_CD_DEATH, PRICE_BASE, PRICE_EXP, PRICE_LAG } = CONTENT.DEFINES;
 const { NAV_DOCS, VERT_DOC, EXPLORE_ERA, FAITH_RULES, GOODS, SUBSIST, CLASSES, JOBS, JOB_N, BFX_CAP, REQS, BUILDINGS, BGROUPS, SVC, CATS, VERTS, VUNITS, NEEDS, VERT_SUF, VERT_UPFX, GOVS, RANK_N, RANK_CAP, RANK_REQ, DOMAIN, RANK_SLOTS, RANKSET, IDEOS, MODS, LAWS, LAW_DEF, CPOL, RPOL_N, CUL_SLOTS, REL_SLOTS, DIPLO, DIP_ACC, DIP_DRIFT, INTERACT, PLOT, SPY, PEACE, COUP_GOVS, ELECT_FORMS, COUNCIL_MODE, ENACT, GOV_TR, SLAVE_REB, SUBJECTS, SUBJ_PROG, SUBJ_ACTS, SUBJ_BACK, SUBJ_LAWS, SUBJ_LAW_DEF, UNITS, UNIT_BASE, UNIT_ERA, UNIT_NEEDS, VERT_UNIT_NEED, VET, SUPPORT, STANCES, PURSUIT, SHIPS, TERRAIN, ERAS, ERA_LIM, DISEASES, PANDEMICS, INVASIONS, WORLD_EVENTS, ROCKETS, MOON_TYPES, ALIEN_ERAS, TRAITS, STATS, ROLE_NAMES, SECRETS, SCHEMES, TUTOR_TR, TRAIT_OPP, COUNCIL, LANGS, COLD_FAMS, CUL_LIST, RELIGIONS, FAITH_GRP, DOC_POOL, HEAD_POOL, HOLY_POOL, GRP_D, DOCTRINES, TENETS, REFORMS, FERV } = CONTENT;
 const EVENTS = CONTENT.EVENTS, EVENT = Object.fromEntries(EVENTS.map(e => [e.id, e]));
 
@@ -37,11 +37,11 @@ VERTS.forEach(v => {
 const techFx = t => t.vr ? TECH[t.vr].fx : t.fx;
 
 const eraOf = y => { let e = ERAS[0][1]; for (const [a, n] of ERAS) if (y >= a) e = n; return e; };
-/* era do país (índice em ERAS): avança quando todas as técnicas comuns da era em que ele está foram feitas (as da vertente contam pela versão dela) */
+/* era do país (índice em ERAS): avança com ERA_FRAC (80%) das técnicas comuns da era seguinte feitas (as da vertente contam pela versão dela) */
 let ERA_CORE = null;
 function natEra(n) {
   if (!ERA_CORE) ERA_CORE = ERAS.map((e, k) => k ? TECHS.filter(t => !t.v && t.y < e[0] && (k === 1 || t.y >= ERAS[k - 1][0])).map(t => t.id) : []);
-  let k = 0; while (k + 1 < ERAS.length && ERA_CORE[k + 1].every(id => hasT(n, id))) k++; return k;
+  let k = 0; while (k + 1 < ERAS.length && ERA_CORE[k + 1].filter(id => hasT(n, id)).length >= ERA_CORE[k + 1].length * ERA_FRAC) k++; return k;
 }
 const eraLim = (n, k) => ERA_LIM[k][Math.min(ERA_LIM[k].length - 1, n.era || 0)];
 const isSvcB = d => !!(d.fx && (d.fx.svc || d.fx.svcP)) && !d.max;

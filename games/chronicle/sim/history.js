@@ -4,12 +4,13 @@
    Tudo acontece no máximo uma vez (S.hist) e só se as condições aparecerem dentro da janela. */
 'use strict';
 
+const winP = (W, y) => { const x = Math.min(1, (y - W.y[0]) / (W.y[1] - W.y[0])); return W.p[0] + (W.p[1] - W.p[0]) * x * x; };   // chance mensal que sobe na janela
 function histTick() {
   S.hist = S.hist || {}; const y = curYear();
   for (const I of INVASIONS) { if (S.hist[I.id] || y < I.y[0] || y > I.y[1]) continue; if (chance(y >= I.y[1] - 1 ? .5 : 2 / ((I.y[1] - I.y[0]) * 12))) invade(I); }
   const W = WORLD_EVENTS;
-  if (inWin(W.greatwar, y) && !S.hist.greatwar && chance(.04)) bigWar('greatwar');
-  if (inWin(W.worldwar, y) && !S.hist.worldwar && S.hist.greatwar && y - S.hist.greatwar.y >= 15 && chance(.05)) bigWar('worldwar');
+  if (inWin(W.greatwar, y) && !S.hist.greatwar && chance(winP(W.greatwar, y))) bigWar('greatwar');
+  if (inWin(W.worldwar, y) && !S.hist.worldwar && S.hist.greatwar && y - S.hist.greatwar.y >= 15 && chance(winP(W.worldwar, y))) bigWar('worldwar');
   if (inWin(W.coldwar, y) && !S.hist.coldwar && (!S.hist.worldwar || S.hist.worldwar.end)) coldWar();
   if (S.cold && (y > W.coldwar.y[1] || !nat(S.cold.a).alive || !nat(S.cold.b).alive)) { log('A Guerra Fria terminou.', 'world'); S.cold = null; }
   if (S.hist.worldwar && !S.hist.worldwar.end && !S.wars.some(w => w.id === S.hist.worldwar.w)) S.hist.worldwar.end = y;
@@ -40,7 +41,7 @@ function invade(I) {
   const cul = I.cul === 'local' ? S.culg[provs[0]] : pickR(famCul.length ? famCul : freeCul.length ? freeCul : [S.culg[provs[0]]]);
   const freeRel = (S.reserveRel || []).filter(i => !S.nations.some(x => x.alive && x.relig === i)), relig = I.relig === 'local' ? S.relg[provs[0]] : freeRel.length ? pickR(freeRel) : S.relg[provs[0]];
   provs.forEach(p => { if (chance(.7)) S.relg[p] = relig; });
-  const n = spawnNation(provs, { cul, gov: I.gov, ideo: 'warrior', relig, name: I.n, money: 400, kind: I.from === 'cold' ? 'cold' : 'main' });
+  const n = spawnNation(provs, { cul, gov: I.gov, ideo: 'warrior', relig, name: I.n, money: Math.round(NEW_NATION.horde * eraScale()), kind: I.from === 'cold' ? 'cold' : 'main' });
   const best = victims.map(nat).filter(v => v.alive).sort((a, b) => strength(b) - strength(a))[0]; if (best) { n.techs = Object.assign({}, best.techs); calcMods(n); }
   n.horde = curYear() + I.years; n.ruler.tr = ['ambitious', I.cav > .5 ? 'strategist' : 'brave', 'cruel']; n.ruler.st.mar = 18;
   if (I.ships) { const c = provs.filter(p => WD.provs[p].coast).sort((a, b) => S.pop[b] - S.pop[a])[0]; if (c != null) n.capital = c; }   // invasores do mar: base no litoral
@@ -64,14 +65,16 @@ function revolutionWave() {
 /* ---------- guerras do mundo: as duas maiores potências rivais arrastam os aliados ---------- */
 function bigWar(id) {
   const W = WORLD_EVENTS[id], top = S.nations.filter(n => n.alive && n.senior == null).sort((a, b) => strength(b) - strength(a)).slice(0, 8);
-  let pair = null;
-  for (const a of top) for (const b of top) { if (a === b || atWar(a.id, b.id) || has(a, 'allies', b.id) || (a.rel[b.id] || 0) > 10) continue;
-    const ag = (IDEOS[a.ideo].war || 1) + (a.ruler.tr.includes('ambitious') ? .5 : 0); if (!pair || ag + strength(a) / 1e4 > pair[2]) pair = [a, b, ag + strength(a) / 1e4]; }
-  if (!pair) return; const [a, b] = pair;
-  a.truce[b.id] = 0; const e = declareWar(a, b, null, null); if (e) return;
+  // par: a potência mais forte que tem um rival entre as maiores (não aliado, sem guerra entre os dois, relação ≤ 10) contra o rival mais forte dela;
+  // declara quem é mais belicoso (ideologia, ambição); empate, o mais forte
+  const rival = (a, b) => a !== b && !atWar(a.id, b.id) && !has(a, 'allies', b.id) && (a.rel[b.id] || 0) <= 10;
+  const ag = x => (IDEOS[x.ideo].war || 1) + (x.ruler && x.ruler.tr.includes('ambitious') ? .5 : 0);
+  let a = null, b = null;   // tenta os pares na ordem (mais forte com rival, rival mais forte dele); se a declaração não vale (pacto, Guerra Fria…), o próximo
+  for (const p0 of top) { for (const p1 of top) { if (!rival(p0, p1)) continue; const [x, y] = ag(p1) > ag(p0) ? [p1, p0] : [p0, p1]; const t0 = x.truce[y.id]; x.truce[y.id] = 0; if (!declareWar(x, y, null, null)) { a = x; b = y; break; } x.truce[y.id] = t0; } if (a) break; }
+  if (!a) return;
   const w = S.wars[S.wars.length - 1]; w.big = id;
   // as outras potências escolhem lado pela relação
-  top.filter(x => x !== a && x !== b && !sideOf(w, x.id) && !x.truce[a.id] && !x.truce[b.id]).forEach(x => { const ra = x.rel[a.id] || 0, rb = x.rel[b.id] || 0; if (Math.abs(ra - rb) > 20 && !isHuman(x.id)) joinWar(w, x.id, ra > rb ? 'A' : 'D'); });
+  top.filter(x => x !== a && x !== b && !sideOf(w, x.id) && !(x.truce[a.id] > S.t) && !(x.truce[b.id] > S.t)).forEach(x => { const ra = x.rel[a.id] || 0, rb = x.rel[b.id] || 0; if (Math.abs(ra - rb) > 20 && !isHuman(x.id)) joinWar(w, x.id, ra > rb ? 'A' : 'D'); });
   S.hist[id] = { y: curYear(), w: w.id };
   log(W.e + ' ' + W.n + ': ' + natName(a) + ' contra ' + natName(b) + '. O mundo inteiro escolhe um lado.', 'world', [...w.A, ...w.D]);
   notifyAll(W.e + ' ' + W.n, natName(a) + ' declarou guerra a ' + natName(b) + '. ' + (w.A.length + w.D.length) + ' países já estão em guerra.');

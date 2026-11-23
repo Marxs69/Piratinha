@@ -70,6 +70,17 @@ function charMonthly(n) {
   const risk = g.coup * .0012 * (n.stab < 40 ? 1 + (40 - n.stab) / 8 : .35) * Math.max(.1, 1 + (n.m.coup || 0));
   if (!(n.coupCd > S.t) && chance(risk)) coup(n);
 }
+/* crise de regime (CRISIS): estab. abaixo do piso por N meses seguidos. Vale para todos, inclusive súdito em união pessoal e governo sem sucessão;
+   o golpe só acontece onde o governo admite troca (não união, não 'ai'). Conta todo mês, também no mês de morte do governante. */
+function crisisTick(n) {
+  n.lowM = n.stab < CRISIS.stab ? (n.lowM || 0) + 1 : 0;
+  if (n.lowM < CRISIS.months || !n.alive) return;
+  n.lowM = 0; CRISTAT.n++; (CRISTAT.by[n.id] = (CRISTAT.by[n.id] || 0) + 1);
+  const union = n.senior != null && (!n.subj || n.subj.tier === 'union');
+  if (!union && GOVS[n.gov].succ !== 'ai') coup(n);
+  n.wex = Math.min(n.wex, 10); n.stab = Math.max(n.stab, CRISIS.to); log('Crise de regime em ' + natName(n) + ': o governo caiu.', isHuman(n.id) ? 'bad' : 'world', [n.id]);
+}
+const CRISTAT = { n: 0, by: {} };                             // medição (fora do save)
 /* num regime autoritário, se o novo governante é de outra cultura ou fé, o país passa a ser a dele (a antiga vira minoria) */
 function rulerIdentity(n) {
   const R = n.ruler; if (!R || !isAuth(n) || (n.subj && n.subj.tier === 'union')) return;

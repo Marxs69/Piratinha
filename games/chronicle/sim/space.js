@@ -5,9 +5,10 @@
 function generateMoon(seed) {
   const r = mkRng(seed ^ 0x3007), [type, col] = MOON_TYPES[r() * MOON_TYPES.length | 0], cul = CULTURES[r() * CUL_MAJOR | 0], used = new Set();
   const x = r(), life = x < .72 ? 'none' : x < .86 ? 'micro' : x < .95 ? 'complex' : 'intel';
-  const civs = life === 'intel' ? Array.from({ length: 1 + (r() * 3 | 0) }, () => { const era = r() * ALIEN_ERAS.length | 0; return { n: nameGen(CULTURES[r() * CUL_MAJOR | 0], r, used), era, aggro: r() < .45, pow: Math.round((era + 1) ** 2 * (20 + r() * 40)), rel: {} }; }) : [];
+  let civs = life === 'intel' ? Array.from({ length: 1 + (r() * 3 | 0) }, () => { const era = r() * ALIEN_ERAS.length | 0; return { n: nameGen(CULTURES[r() * CUL_MAJOR | 0], r, used), era, aggro: r() < .45, pow: Math.round((era + 1) ** 2 * (20 + r() * 40)), rel: {} }; }) : [];
   const craters = Array.from({ length: 14 }, () => [r() * 2 - 1, r() * 2 - 1, .05 + r() * .18]);
-  return { n: nameGen(cul, r, used), type, col, grav: Math.round((.1 + r() * .3) * 100) / 100, life, civs, craters, known: {}, landed: {}, base: {} };
+  const life2 = !ALIENS.on && life === 'intel' ? 'complex' : life; if (!ALIENS.on) civs = [];   // aliens desligados: os sorteios acontecem do mesmo jeito
+  return { n: nameGen(cul, r, used), type, col, grav: Math.round((.1 + r() * .3) * 100) / 100, life: life2, civs, craters, known: {}, landed: {}, base: {} };
 }
 const launchOk = n => (n.bfx || {}).launch > 0;
 const SPACE = {
@@ -33,7 +34,7 @@ function spaceDone(n, k) {
   log((k === 'sat' ? natName(n) + ' pôs um satélite em órbita' : (first ? 'Pela primeira vez na história, ' : '') + natName(n) + ' concluiu: ' + SPACE[k].n + ' em ' + M.n) + ' (' + rk + ').', isHuman(n.id) ? 'good' : first ? 'world' : 'none', [n.id]);
 }
 function alienAct(n, ci, kind) {                             // contato, comércio, presente ou guerra com uma civilização da lua
-  const c = S.moon.civs[ci]; if (!c) return 'Inválido'; if (!hasT(n, 'spc_contact') || !S.moon.known[n.id]) return 'Exige Protocolos de contato e sondar a lua';
+  if (!ALIENS.on) return 'Indisponível'; const c = S.moon.civs[ci]; if (!c) return 'Inválido'; if (!hasT(n, 'spc_contact') || !S.moon.known[n.id]) return 'Exige Protocolos de contato e sondar a lua';
   c.rel[n.id] = c.rel[n.id] || 0;
   if (kind === 'gift') { const cost = Math.round(200 * eraScale()); if (n.money < cost) return 'Sem dinheiro'; n.money -= cost; c.rel[n.id] += 25; return ''; }
   if (kind === 'trade') { if (c.rel[n.id] < (c.aggro ? 40 : 0)) return 'Eles não confiam em você'; if (c.trade && c.trade.includes(n.id)) return 'Já há comércio'; (c.trade = c.trade || []).push(n.id); n.alienTrade = (n.alienTrade || 0) + 1; log(natName(n) + ' abriu comércio com ' + c.n + '.', 'world', [n.id]); return ''; }
@@ -45,7 +46,7 @@ function alienAct(n, ci, kind) {                             // contato, comérc
   return '';
 }
 function alienTick() {                                        // civilizações agressivas atacam bases e, se avançadas, a própria Terra
-  const M = S.moon; if (!M || M.life !== 'intel') return;
+  const M = S.moon; if (!ALIENS.on || !M || M.life !== 'intel') return;
   M.civs.forEach(c => {
     if (!c.aggro || c.era < 4 || c.subj != null) return;
     S.nations.forEach(n => {

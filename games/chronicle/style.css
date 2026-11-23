@@ -326,3 +326,22 @@ table.t select { margin: 0; max-width: 150px; } .docrow { display: flex; flex-di
 .erafx small { display: block; font: 600 13px "Alegreya Sans", sans-serif; letter-spacing: .35em; text-transform: uppercase; color: #d9b45a; opacity: .85; }
 .erafx b { display: block; font: 700 44px "Cinzel", serif; color: #f3e6c4; text-shadow: 0 2px 14px rgba(0, 0, 0, .8); margin-top: 4px; }
 @keyframes erafx { 0% { opacity: 0; transform: translateY(8px); } 18% { opacity: 1; transform: none; } 75% { opacity: 1; } 100% { opacity: 0; transform: translateY(-6px); } }
+
+/* rodada de correção (2026-11-22, critico-v): nada vaza pela barra, janelas pelo conteúdo, contraste e tabelas */
+.bar { background: linear-gradient(#1e1810, #16120c); }
+#win { z-index: 10; height: auto; max-height: calc(100% - 70px); }
+.erafx { z-index: 9; }
+#wm { left: 12px; transform: none; bottom: 4px; }
+.tech.lock { opacity: .62; }
+.tech b, .tech small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+table.t th:not(:first-child), table.t td:not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; }
+h4.era { margin-top: 16px; }
+.card + .card, .card + h4 { margin-top: 10px; }
+.chip { color: #e6dcc6; }
+#mlegend { position: absolute; right: 10px; bottom: calc(100% + 6px); max-width: 300px; padding: 6px 8px; display: flex; flex-wrap: wrap; gap: 3px 10px; font-size: 11px; color: var(--text); }
+#mlegend .li { display: flex; align-items: center; gap: 4px; } #mlegend .sw { width: 11px; height: 11px; border-radius: 2px; border: 1px solid rgba(0,0,0,.5); }
+#mlegend { position: absolute; right: calc(100% + 6px); bottom: 0; width: max-content; max-width: 300px; padding: 6px 8px; display: flex; flex-wrap: wrap; gap: 3px 10px; font-size: 11px; color: var(--text); z-index: 3; }
+#mlegend .li { display: flex; align-items: center; gap: 4px; } #mlegend .sw { width: 11px; height: 11px; border-radius: 2px; border: 1px solid rgba(0,0,0,.5); }
+.polsl .btn:not(.on) { background: transparent; opacity: .75; }   /* só a opção escolhida aparece preenchida */
+.polsl .btn.on { background: rgba(217,180,90,.42); color: #fff4d6; opacity: 1; }
+.dhead { position: sticky; top: 0; background: #1c1711; font-size: 11px; color: var(--dim); }

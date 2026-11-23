@@ -47,7 +47,7 @@ function provColors() {
     else if (mode === 'pop') { const v = Math.pow(S.pop[p] / WD.provs[p].size / maxPop, .5); c = [40 + v * 215, 40 + v * 170, 90 - v * 60]; }
     else if (mode === 'reg') c = regCol[WD.provs[p].region].map((v, i) => v * (.85 + (WD.provs[p].state % 3) * .08));
     else if (mode === 'cont') c = contCol[WD.provs[p].cont];
-    else if (mode.startsWith('svc:')) { const st = WD.provs[p].state, cv = S.scov && S.scov[st] && stateOwnerOf(st) === o ? S.scov[st][mode.slice(4)] : 0; c = o < 0 ? null : [200 - cv * 160, 70 + cv * 150, 70 + cv * 40]; }
+    else if (mode.startsWith('svc:')) { const st = WD.provs[p].state, cv = S.scov && S.scov[st] && stateOwnerOf(st) === o ? S.scov[st][mode.slice(4)] : 0, h = SVC_HUE[mode.slice(4)] || [120, 200, 120]; c = o < 0 ? null : [70 + (h[0] - 70) * cv, 66 + (h[1] - 66) * cv, 60 + (h[2] - 60) * cv]; }   /* um tom por serviço */
     else if (mode === 'plague') { const PS = S.pands || []; c = PS.some(P => P.inf[p] != null) ? [30, 70, 20] : (S.epis || []).some(E => E.inf[p] != null) ? [120, 150, 40] : PS.some(P => P.done[p]) ? [150, 150, 140] : o >= 0 ? [205, 200, 180] : null; }
     else if (mode === 'res') c = stateTone(WD.provs[p].state);   // todas as províncias do estado com a mesma cor
     else if (mode === 'cul') c = hsl(((S.culg ? S.culg[p] : WD.provs[p].cul) * .17) % 1, .45, .55);
@@ -205,7 +205,7 @@ function drawFrame() {
     for (const zz of WD.seas) { if (me && !me.exZ[zz.id]) continue; if (!vis(zz.cx * K, zz.cy * K)) continue; const [sx, sy] = toScreen(zz.cx * K, zz.cy * K); c.fillStyle = 'rgba(200,225,255,.55)'; c.fillText(zz.n, sx, sy); }
   }
   // obras e oleodutos
-  if (R.links && z >= .9) {
+  if (R.links && z >= 1.5 && R.mode === 'pol') {   // estradas, trilhos e oleodutos: só no político, de perto
     const line = (a, b, off = 0) => { const pa = WD.provs[a], pb = WD.provs[b]; let [x0, y0] = toScreen(pa.cx * K + K / 2, pa.cy * K + K / 2), [x1, y1] = toScreen(pb.cx * K + K / 2, pb.cy * K + K / 2);
       if (off) { const L = Math.hypot(x1 - x0, y1 - y0) || 1, ox = -(y1 - y0) / L * off, oy = (x1 - x0) / L * off; x0 += ox; x1 += ox; y0 += oy; y1 += oy; } c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1); c.stroke(); };
     c.lineCap = 'round';
@@ -240,7 +240,9 @@ function drawFrame() {
   }
   // exércitos (agrupados por província)
   const slot = new Map();
+  const tokens = R.mode === 'pol' || R.mode === 'dip' || R.mode === 'ter';   // modos temáticos sem fichas de exército
   for (const a of S.armies) {
+    if (!tokens && !(me && a.o === me.id)) continue;
     if (!me || (a.o !== me.id && (far || !(a.p < P ? me.exP[a.p] : me.exZ[a.p - P])))) continue;
     const [wx, wy] = armyXY(a); if (!vis(wx, wy)) continue;
     const k = Math.round(wx) + ',' + Math.round(wy), i = slot.get(k) || 0; slot.set(k, i + 1);

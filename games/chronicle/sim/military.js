@@ -102,7 +102,7 @@ function provSupply(p, o) {
 function attritionOf(a) {
   const P = WD.provs.length; if (a.p >= P) return [0, []];
   const n = nat(a.o), fr = friendsOf(a.o), pr = WD.provs[a.p], why = [];
-  const f = a.front != null && !(a.fready > S.t) && typeof frontById === 'function' ? frontById(a.front) : null;
+  const f = a.front != null && a.fp === a.front && !(a.fready > S.t) && typeof frontById === 'function' ? frontById(a.front) : null;
   let tot = 0, cap; if (f) { for (const b of S.armies) if (b.front === a.front && b.o === a.o) tot += regs(b); cap = WD.states[f.st].provs.filter(p => fr.has(S.ctrl[p])).reduce((s, p) => s + provSupply(p, a.o), 0); }   // no front o estado inteiro abastece
   else { for (const b of S.armies) if (b.p === a.p && fr.has(b.o)) tot += regs(b); cap = provSupply(a.p, a.o); } a.cap = cap;
   const home = fr.has(S.ctrl[a.p]) && fr.has(S.own[a.p]);
@@ -160,7 +160,7 @@ function applyLoss(s, loss, w) {
   for (const a of s.list) {
     const la = loss * wt(a) / W, front = a.inf + a.cav + a.vrt, artW = a.art * (front > 0 ? .2 : 1), den = Math.max(.01, front + artW);
     for (const t of UT) { const share = (t === 'art' ? artW : a[t]) / den; a[t] = Math.max(0, a[t] - la * share); }
-    if (w) { w.loss = w.loss || {}; w.loss[a.o] = (w.loss[a.o] || 0) + la; }
+    if (w) { w.loss = w.loss || {}; w.loss[a.o] = (w.loss[a.o] || 0) + la; } const ln = nat(a.o); ln._lossM = (ln._lossM || 0) + la;
   }
 }
 const warOfPair = (x, y) => S.wars.find(w => (w.A.includes(x) && w.D.includes(y)) || (w.A.includes(y) && w.D.includes(x)));

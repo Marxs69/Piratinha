@@ -45,16 +45,17 @@ function termsWhy(w, picker, L, t) {
   if (t.subj && t.provs.length >= provsOf(L).length) return 'Não sobra nada para virar súdito';
   if (t.subj && !SUBJECTS[t.subj].cost) return 'Esse vínculo não se impõe na paz';
   if (t.subj && nat(L).senior != null) return 'Já é súdito de outro país';
+  if (t.subj && subjectsOf(picker).length >= subjCap(n)) return 'Limite de súditos (' + subjCap(n) + ' pelo título)';
   if (c > budget) return 'Faltam pontos: custa ' + c + ', a rendição deles vale ' + budget;
   if (provsOf(L).length > PEACE.annexProvs && t.provs.reduce((s, p) => s + provShare(p), 0) > PEACE.maxShare + 1e-6) return 'Um tratado leva no máximo ' + PEACE.maxShare + '% do país (pela população)';
-  if (t.provs.length && statesOf(n, t.provs) > domCap(n) * 1.1 + 1) return 'Seu título não sustenta tantos estados (limite ' + domCap(n) + ')';
+  if ((t.provs.length || t.subj) && domUsed(n, t.provs, t.subj && { n: nat(L), tier: t.subj }) > domCap(n) * 1.1 + 1) return 'Seu título não sustenta tantos estados (limite ' + domCap(n) + ')';
   return '';
 }
 
 /* ---------- aplicar ---------- */
 function applyTerms(w, winner, L, t) {
   const ln = nat(L), wn = nat(winner), parts = [];
-  if (t.provs.length) { const sh = t.provs.reduce((s, p) => s + provShare(p), 0), ae = sh * PEACE.ae;   // expansão agressiva: os vizinhos desconfiam
+  if (t.provs.length) { const ae = t.provs.length * PEACE.ae;   // expansão agressiva pelo tamanho absoluto tomado: os vizinhos desconfiam
     wn.ae = (wn.ae || 0) + ae; neighbors0(wn).forEach(id => { const x = nat(id); if (x && x.alive && id !== L) x.rel[winner] = clamp((x.rel[winner] || 0) - ae * PEACE.aeRel, -100, 100); });
     t.provs.forEach(p => { S.own[p] = winner; S.ctrl[p] = winner; }); parts.push(t.provs.length + ' província' + (t.provs.length > 1 ? 's' : '')); }
   if (t.rep) { ln.rep = { to: winner, until: S.t + 360 * REP.years }; parts.push('reparações por ' + REP.years + ' anos'); }
@@ -73,7 +74,6 @@ function separatePeace(w, L, winner, t) {
   // tréguas e devolução das ocupações entre quem sai e o outro lado
   const pairs = lead ? w.A.flatMap(x => w.D.map(y => [x, y])) : enemies.map(y => [L, y]);
   pairs.forEach(([x, y]) => { if (nat(x).alive && nat(y).alive) { nat(x).truce[y] = S.t + 360 * PEACE.truce; nat(y).truce[x] = S.t + 360 * PEACE.truce; } });
-  for (let p = 0; p < S.own.length; p++) { const o = S.own[p], c = S.ctrl[p]; if (o < 0 || c < 0 || o === c) continue; if (pairs.some(([x, y]) => (o === x && c === y) || (o === y && c === x))) S.ctrl[p] = o; }
   if (lead) {
     // os outros perdedores: se o lado capitulou, os vencedores (IA) tomam o que os pontos deles pagam; senão, paz branca
     const winSide = sd === 'A' ? 'D' : 'A', capit = winner != null && surrender(w, sd) >= 1;
@@ -82,7 +82,7 @@ function separatePeace(w, L, winner, t) {
       for (const id of sideIds(w, winSide)) { if (isHuman(id) || !tot) continue; const b = budget * contribVs(w, id, L2) / tot; if (b < 3) continue; const tt = aiTerms(w, id, L2, b, taken); if (tt.provs.length || tt.subj || tt.rep) applyTerms(w, id, L2, tt); } }
     S.wars = S.wars.filter(x => x !== w);
   } else { w.A = w.A.filter(x => x !== L); w.D = w.D.filter(x => x !== L); if (!w.A.length || !w.D.length) S.wars = S.wars.filter(x => x !== w); }
-  warsChanged(); ownChanged(); checkDead(); S.fronts = (S.fronts || []).filter(f => S.wars.some(x => x.id === f.w)); S.armies.forEach(a => { if (a.front != null && !S.fronts.some(f => f.id === a.front)) a.front = null; });
+  warsChanged(); fixCtrl(); ownChanged(); checkDead(); S.fronts = (S.fronts || []).filter(f => S.wars.some(x => x.id === f.w)); S.armies.forEach(a => { if (a.front != null && !S.fronts.some(f => f.id === a.front)) a.front = null; });
   S.armies.forEach(a => { if (leaving.includes(a.o) && a.p < WD.provs.length && S.own[a.p] !== a.o && nat(a.o).alive && !a.inv) goHome(a); });   // tropas em terra estrangeira marcham de volta ao estado próprio mais perto
   const wn = winner != null ? natName(nat(winner)) : null;
   const txt = winner == null ? (lead ? 'Paz branca entre ' + natName(nat(w.a)) + ' e ' + natName(nat(w.d)) + '.' : ln + ' saiu da guerra (paz branca).')
@@ -99,9 +99,9 @@ function aiTerms(w, picker, L, budget, taken = new Set()) {
   const cands = provsOf(L).filter(p => !taken.has(p)).map(p => [p, (n.claims[WD.provs[p].state] ? 50 : 0) + (WD.provs[p].adj.some(o => S.own[o] === picker) ? 20 : 0) + (S.ctrl[p] === picker ? 30 : 0) + rnd() * 5]).sort((a, b) => b[1] - a[1]);
   let left = budget;
   const capS = provsOf(L).length > PEACE.annexProvs ? PEACE.maxShare : 100; let share = 0;   // teto por tratado (PEACE)
-  for (const [p] of cands) { const c = provPrice(w, picker, p), sh = provShare(p); if (c > left || share + sh > capS + 1e-6) continue; share += sh; if (statesOf(n, t.provs.concat(p)) > domCap(n) * 1.1 + 1) continue; t.provs.push(p); taken.add(p); left -= c; }
-  if (t.provs.length < provsOf(L).length && nat(L).senior == null) { const rest = 100 - t.provs.reduce((s, p) => s + provShare(p), 0);
-    for (const k of ['puppet', 'vassal', 'protect']) if (SUBJECTS[k].cost * rest <= left && (personality(n).war > 1 || rest < 60)) { t.subj = k; left -= SUBJECTS[k].cost * rest; break; } }
+  for (const [p] of cands) { const c = provPrice(w, picker, p), sh = provShare(p); if (c > left || share + sh > capS + 1e-6) continue; if (domUsed(n, t.provs.concat(p)) > domCap(n) * 1.1 + 1) continue; share += sh; t.provs.push(p); taken.add(p); left -= c; }
+  if (t.provs.length < provsOf(L).length && nat(L).senior == null && subjectsOf(picker).length < subjCap(n)) { const rest = 100 - t.provs.reduce((s, p) => s + provShare(p), 0);
+    for (const k of ['puppet', 'vassal', 'protect']) if (SUBJECTS[k].cost * rest <= left && (personality(n).war > 1 || rest < 60) && domUsed(n, t.provs, { n: nat(L), tier: k }) <= domCap(n) * 1.1 + 1) { t.subj = k; left -= SUBJECTS[k].cost * rest; break; } }
   if (left >= REP.cost && !t.subj) t.rep = true;
   return t;
 }
@@ -125,7 +125,11 @@ function aiPeace(w) {
     if (isHuman(L)) notifyAll('🏳️ Capitulação', 'Seu lado capitulou e teve de aceitar os termos de ' + natName(nat(winLead)) + '.');
     separatePeace(w, L, winLead, t); return;
   }
-  if (months > 12 * 7 && sl < .3 && chance(.05)) { if (!human) separatePeace(w, w.d, null, null); else { const hp = isHuman(w.a) ? w.a : w.d; if (isHuman(hp) && !pendGet('offer', hp)) pendSet('offer', hp, { w: w.id, winner: null, L: hp === w.a ? w.d : w.a, t: null, to: hp }); } }
+  // paz branca por cansaço (os dois líderes cansados, ninguém perto de vencer) e empate de guerra longa: mesma regra para todos —
+  // se um líder é jogador, ele recebe a proposta e decide (recusar não custa nada); só os líderes contam
+  const whitePeace = () => { const hp = [w.a, w.d].find(isHuman); if (hp == null) { separatePeace(w, w.d, null, null); return; } if (!pendGet('offer', hp)) pendSet('offer', hp, { w: w.id, winner: null, L: hp === w.a ? w.d : w.a, t: null, to: hp }); };
+  if (months >= 24 && Math.min(nat(w.a).wex, nat(w.d).wex) >= 20 && sl < .6 && chance(.06)) { whitePeace(); return; }
+  if (months > 12 * 7 && sl < .3 && chance(.05)) whitePeace();
 }
 /* jogador: impõe a paz a L (separada, se L não for líder) ou pede paz branca */
 function proposePeace(w, L, t, pid = S.player) {

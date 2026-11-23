@@ -153,13 +153,13 @@ function callAllies(w, side) {                                // aliados e parce
     if (isHuman(id)) { S.calls = S.calls || []; S.calls.push({ w: w.id, side, from: lead.id, to: id }); return; }
     const p = (al.ruler.tr.includes('honest') ? 1 : side === 'D' ? .75 : .45) + (al.rel[lead.id] || 0) / 400 - (al.ruler.tr.includes('craven') ? .3 : 0);
     if (chance(p)) joinWar(w, id, side);
-    else { breakTies(al, lead); noWarPact(al, lead, DIPLO.unally.noWar); al.rel[lead.id] -= 40; lead.rel[id] = (lead.rel[id] || 0) - 60; log(natName(al) + ' recusou o chamado de ' + natName(lead) + ' e a aliança acabou.', 'world', [id, lead.id]); }
+    else { breakTies(al, lead); noWarPact(al, lead, DIPLO.unally.noWar); al.stab = Math.max(0, al.stab - REFUSE_STAB); al.rel[lead.id] -= 40; lead.rel[id] = (lead.rel[id] || 0) - 60; log(natName(al) + ' recusou o chamado de ' + natName(lead) + ' e a aliança acabou.', 'world', [id, lead.id]); }
   });
 }
 function answerCall(c, yes) {
   const pid = c.to ?? S.player, w = S.wars.find(x => x.id === c.w), me = nat(pid), lead = nat(c.from); if (!w) return;
   if (yes) joinWar(w, pid, c.side);
-  else { breakTies(me, lead); noWarPact(me, lead, DIPLO.unally.noWar); lead.rel[me.id] = (lead.rel[me.id] || 0) - 60; me.stab = Math.max(0, me.stab - 5); log('Você recusou o chamado de ' + natName(lead) + '. A aliança acabou.', 'bad', [S.player]); }
+  else { breakTies(me, lead); noWarPact(me, lead, DIPLO.unally.noWar); lead.rel[me.id] = (lead.rel[me.id] || 0) - 60; me.stab = Math.max(0, me.stab - REFUSE_STAB); log('Você recusou o chamado de ' + natName(lead) + '. A aliança acabou.', 'bad', [S.player]); }
 }
 function declareWar(n, t, s, cb) {                           // cb 'holy' = guerra santa (pouca perda de estabilidade)
   if (atWar(n.id, t.id)) return 'Já em guerra'; if (n.truce[t.id] > S.t) return 'Trégua em vigor';
@@ -169,24 +169,50 @@ function declareWar(n, t, s, cb) {                           // cb 'holy' = guer
   if (noWarUntil(n, t)) return 'Aliança rompida há pouco: guerra só a partir de ' + yearOf(noWarUntil(n, t));
   if (coldBlocked(n.id, t.id)) return 'Guerra Fria: as superpotências não se enfrentam diretamente';
   if (cb === 'holy') { const e = holyWhy(n, t); if (e) return e; }
-  const claim = (s != null && n.claims[s]) || cb === 'holy';
+  const claim = (s != null && n.claims[s]) || cb === 'holy' || cb === 'coal';   // coalizão contra quem tem EA alta também é casus belli
   const w = { id: S.id++, A: [n.id], D: [t.id], a: n.id, d: t.id, goal: s, start: S.t, loss: {}, bp: {}, score: 0, holy: cb === 'holy' ? n.relig : null };
   S.wars.push(w); warsChanged();
   n.stab = Math.max(0, n.stab - (claim ? 3 : 15)); t.rel[n.id] = -100; n.rel[t.id] = -100; breakTies(n, t);
   log(natName(n) + (cb === 'holy' ? ' declarou ' + holyName(n.relig).toLowerCase() + ' contra ' : ' declarou guerra a ') + natName(t) + '!', 'world', [n.id, t.id]);
   callAllies(w, 'D'); callAllies(w, 'A');
+  coalCands(n, t).forEach(id => { if (sideOf(w, id)) return; if (isHuman(id)) { S.calls = S.calls || []; S.calls.push({ w: w.id, side: 'D', from: t.id, to: id }); } else joinWar(w, id, 'D'); });
   return '';
 }
+/* coalizão por conta própria (mundo/mês): contra um país com EA ≥ PEACE.coal, em paz, os vizinhos hostis (coalCands) que somam
+   ≥ PEACE.coalPow × a força do bloco dele declaram juntos (PEACE.coalChance por mês). Líder = o mais forte; jogador não é arrastado. */
+function coalitionTick() {
+  for (const t of S.nations) {
+    if (!t.alive || (t.ae || 0) < PEACE.coal || warsOf(t.id).length || t.horde) continue;
+    const c = [...neighbors0(t)].filter(id => { const x = nat(id); return x && x.alive && !isHuman(id) && x.senior == null && (x.rel[t.id] || 0) <= PEACE.coalRel && !has(t, 'allies', id) && !warsOf(id).length && !(x.truce[t.id] > S.t) && !coldBlocked(id, t.id); });
+    if (c.length < 2) continue;
+    const pw = c.reduce((a, id) => a + milPower(nat(id)), 0); if (pw < blocPower(t, nat(c[0])) * PEACE.coalPow || !chance(PEACE.coalChance)) continue;
+    const lead = nat(c.reduce((a, b) => milPower(nat(a)) >= milPower(nat(b)) ? a : b));
+    if (declareWar(lead, t, null, 'coal')) continue;
+    const w = S.wars[S.wars.length - 1]; c.forEach(id => { if (id !== lead.id && !sideOf(w, id)) joinWar(w, id, 'A'); });
+    log('⚔️ Coalizão de ' + c.length + ' países contra ' + natName(t) + ', liderada por ' + natName(lead) + '.', 'world', [t.id, ...c]);
+  }
+}
+/* coalizão: com expansão agressiva alta (PEACE.coal), os vizinhos que desconfiam do agressor (relação ≤ coalRel) defendem a vítima */
+function coalCands(n, t) {
+  if ((n.ae || 0) < PEACE.coal) return [];
+  return [...neighbors0(n)].filter(id => { const x = nat(id); return x && x.alive && id !== t.id && x.senior == null && (x.rel[n.id] || 0) <= PEACE.coalRel && !has(n, 'allies', id) && !atWar(id, t.id) && !coldBlocked(id, n.id); });
+}
 const sideProvs = ids => { const out = []; ids.forEach(id => out.push(...provsOf(id))); return out; };
+/* fim de participação: toda província ocupada por quem não está mais em guerra com o dono volta ao dono (rebeldes, −1, ficam) */
+function fixCtrl() {
+  let k = 0;
+  for (let p = 0; p < S.own.length; p++) { const o = S.own[p], c = S.ctrl[p]; if (o < 0 || c < 0 || o === c || atWar(o, c)) continue; S.ctrl[p] = o; delete S.sieges[p]; k++; }
+  if (k) ownChanged(); return k;
+}
 function checkDead() {
   S.nations.forEach(n => {
     if (!n.alive) return;
     if (!provsOf(n.id).length) {
       n.alive = false; S.armies = S.armies.filter(a => a.o !== n.id); S.fleets = S.fleets.filter(f => f.o !== n.id); S.cols = S.cols.filter(c => c.o !== n.id);
-      S.wars = S.wars.filter(w => w.a !== n.id && w.d !== n.id); S.wars.forEach(w => { w.A = w.A.filter(x => x !== n.id); w.D = w.D.filter(x => x !== n.id); }); warsChanged(); S.fronts = (S.fronts || []).filter(f => S.wars.some(x => x.id === f.w));   // front sem guerra não fica
+      S.wars = S.wars.filter(w => w.a !== n.id && w.d !== n.id); S.wars.forEach(w => { w.A = w.A.filter(x => x !== n.id); w.D = w.D.filter(x => x !== n.id); }); warsChanged(); fixCtrl(); S.fronts = (S.fronts || []).filter(f => S.wars.some(x => x.id === f.w));   // front sem guerra não fica
       S.nations.forEach(o => { breakTies(o, n); if (o.senior === n.id) { delete o.senior; delete o.subj; } }); if (n.senior != null) { delete n.senior; delete n.subj; }
       log(natName(n) + ' deixou de existir.', 'world', [n.id]); if (isHuman(n.id)) S.over = 'dead';
     } else if (S.own[n.capital] !== n.id) { const ps = provsOf(n.id); n.capital = ps.reduce((a, b) => S.pop[a] >= S.pop[b] ? a : b); }
   });
 }
-function fabricate(n, s) { if (n.fab) return 'Já fabricando'; const c = Math.round(40 * eraScale()); if (n.money < c) return 'Sem dinheiro'; n.money -= c; n.fab = { s, m: 6 }; return ''; }
+function fabricate(n, s) { if (n.fab) return 'Já fabricando'; const c = Math.round(80 * eraScale()); if (n.money < c) return 'Sem dinheiro'; n.money -= c; n.fab = { s, m: 12 }; return ''; }

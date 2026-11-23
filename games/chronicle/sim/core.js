@@ -14,6 +14,10 @@ const pickR = a => a[rnd() * a.length | 0];
 const rint = k => rnd() * k | 0;
 const yearOf = t => START_YEAR + Math.floor(t / 360);
 const curYear = () => yearOf(S.t);
+/* hash canônico do estado (chaves ordenadas, sem undefined): o mesmo no navegador e nos harness — prova de que algo não muda a partida */
+const fnvHash = s => { let h = 0x811c9dc5; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(16); };
+const canonJSON = x => Array.isArray(x) ? '[' + x.map(canonJSON).join(',') + ']' : x && typeof x === 'object' ? '{' + Object.keys(x).sort().filter(k => x[k] !== undefined).map(k => JSON.stringify(k) + ':' + canonJSON(x[k])).join(',') + '}' : JSON.stringify(x);
+function stateHash() { const o = JSON.parse(JSON.stringify(packState(false))); delete o.humans; return fnvHash(canonJSON(o)); }
 /* nível de preços: todo custo e valor em ducados (obras, leis, tropas, eventos, teto do tesouro) é × isto. Vem da economia do mundo (priceTick); antes do primeiro mês, do ano */
 const yearScale = () => 1 + (curYear() - 860) / 300;            // custos mensais (manutenção) andam com a era
 const eraScale = () => (S && S.plv) || yearScale();
@@ -36,7 +40,7 @@ const log = (m, k = 'info', who = []) => { S.log.unshift({ d: dateStr(), m, k })
 let ownCache = null;                                         // listas de províncias por dono (refeitas quando muda dono)
 function provsOf(id) { if (!ownCache) { ownCache = S.nations.map(() => []); for (let p = 0; p < S.own.length; p++) if (S.own[p] >= 0) ownCache[S.own[p]].push(p); } return ownCache[id] || []; }
 /* zera todos os caches da simulação (mundo novo ou save carregado): nada do mundo anterior pode vazar */
-function resetCaches() { ownCache = null; warSet = null; strC = null; nbC.clear(); epC = null; abC = null; frC = null; supC = null; enterC = null; cnC = null; BI = null; }
+function resetCaches() { ownCache = null; warSet = null; strC = null; nbC.clear(); epC = null; abC = null; frC = null; supC = null; enterC = null; cnC = null; BI = null; difC = null; mpC = null; }
 /* jogadores humanos: S.humans (multiplayer) ou o jogador local (S.player). A simulação só pergunta isHuman; a interface usa me() */
 const humans = () => S.humans ? S.humans.filter(id => nat(id) && nat(id).alive) : S.player >= 0 ? [S.player] : [];
 /* pendências de cada jogador humano (multiplayer: cada um tem as suas): offer = proposta de paz da IA · conf = impor a paz · lead = escolher o líder */
@@ -45,7 +49,7 @@ const pendSet = (k, pid, v) => { S.pend = S.pend || {}; (S.pend[k] = S.pend[k] |
 const pendDel = (k, pid) => { if (S.pend && S.pend[k]) delete S.pend[k][pid]; };
 const hasPending = pid => !!(pendGet('offer', pid) || pendGet('conf', pid) || pendGet('lead', pid) || (S.calls || []).some(c => (c.to ?? S.player) === pid) || (S.dipOffers || []).some(c => (c.to ?? S.player) === pid));
 const isHuman = id => id != null && id >= 0 && (S.humans ? S.humans.includes(id) : id === S.player);
-function ownChanged() { ownCache = null; S.mapDirty = true; enterC = null; }
+function ownChanged() { ownCache = null; S.mapDirty = true; enterC = null; nbC.clear(); }
 const hasTech = (n, id) => !!n.techs[id];
 let warSet = null;                                          // pares em guerra (refeito quando guerras começam ou acabam)
 const warsChanged = () => { warSet = null; enterC = null; };
@@ -97,7 +101,7 @@ function charMods(n, c, seat) {
   return out;
 }
 const MOD_SOURCES = [
-  n => (n.ae || 0) >= 1 ? [['Expansão agressiva ' + Math.round(n.ae), { stab: -n.ae * PEACE.aeStab }]] : [],   // terra tomada em tratados (sim/peace.js); some devagar
+  n => (n.ae || 0) >= 1 ? [['Expansão agressiva ' + Math.round(n.ae), { stab: -Math.min(PEACE.aeStabMax, n.ae * PEACE.aeStab) }]] : [],   // terra tomada em tratados (sim/peace.js); some devagar
   n => [['Governo: ' + GOVS[n.gov].n, GOVS[n.gov].m], ['Ideologia: ' + IDEOS[n.ideo].n, IDEOS[n.ideo].m]],
   n => [...n.eff].filter(id => TECH[id] && TECH[id].fx.m).map(id => ['Tecnologia: ' + TECH[id].n, TECH[id].fx.m]),
   n => Object.keys(n.vdec || {}).map(k => { const v = VERT[k], o = {}; for (const m in v.m) o[m] = v.m[m] * VERT_DECLINE; return ['Vertente recusada: ' + v.n, o]; }),   // quem não escolhe leva 10% do bônus

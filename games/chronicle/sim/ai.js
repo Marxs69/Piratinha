@@ -26,8 +26,9 @@ function ai(n) {
   }
   if (chance(.003) && !(n.ideoCd > S.t) && !isElective(n)) { const inf = ideoInfluence(n), opts = [...n.fx.i].filter(i => i !== n.ideo).sort((a, b) => (inf[b] || 0) - (inf[a] || 0)); if (opts.length) setIdeo(n, chance(.7) ? opts[0] : pickR(opts)); }
   if (slow) { aiDiplomacy(n); aiFaith(n); aiCourt(n); }
-  if (slow && govAge(n) > 15 && !(n.govCd > S.t) && chance(.1)) { const nx = govNextOf(n); if (nx) setGov(n, nx); }   // a IA reforma por conta própria só depois de anos de crise
-  if (slow && chance(.05)) { const L = n.laws; if (n.money < 0 && L.tax === 'normal') setLaw(n, 'tax', 'high'); else if (n.stab < 25 && (L.tax === 'high' || L.tax === 'extort')) setLaw(n, 'tax', 'normal'); else if (atWarNow(n) && L.draft === 'limited') setLaw(n, 'draft', 'wide'); else if (!atWarNow(n) && L.draft === 'wide') setLaw(n, 'draft', 'limited'); else if (n.money > 3000 && L.spend === 'normal' && hasT(n, 'soc_welfare')) setLaw(n, 'spend', 'welfare'); }
+  if (slow && GOVS[n.gov].cat === 'Tribal' && curYear() >= (GOVS[n.gov].until || 2000) - 250 && !(n.horde && curYear() <= n.horde) && !(n.govCd > S.t) && chance(.03)) { const up = govReach(n).filter(g => GOVS[g].cat !== 'Tribal'); if (up.length) setGov(n, up.includes(GOVS[n.gov].next) ? GOVS[n.gov].next : pickR(up)); }   // tribo com técnica e título vira reino
+  if (slow && govAge(n) > 5 && !(n.govCd > S.t) && chance(.1)) { const nx = govNextOf(n); if (nx) setGov(n, nx); }   // a IA reforma por conta própria só depois de anos de crise
+  if (slow && chance(.05)) { const L = n.laws; if (n.money < 0 && L.tax === 'normal') setLaw(n, 'tax', 'high'); else if (n.stab < 25 && (L.tax === 'high' || L.tax === 'extort')) setLaw(n, 'tax', 'normal'); else if (atWarNow(n) && L.draft === 'limited') setLaw(n, 'draft', 'wide'); else if (!atWarNow(n) && L.draft === 'wide') setLaw(n, 'draft', 'limited'); else if (n.money > hoardCap(n) * .6 && L.spend === 'normal' && hasT(n, 'soc_welfare')) setLaw(n, 'spend', 'welfare'); }
   if (slow && isElective(n) && n.sup && (n.sup[n.ideo] || 0) < .3 && n.money > campaignCost() * 4) campaign(n);
   if (slow && !n.enact && chance(.2)) { const k = Object.keys(LAWS).find(k => lawOld(n, k)); if (k) { const os = Object.keys(LAWS[k].o).filter(o => lawOk(n, k, o)); if (os.length) setLaw(n, k, os[0]); } }   // troca a lei que ficou ultrapassada
   // agenda do governo: o que governante (peso 3) e conselho (1 cada) mais querem pela ideologia vira proposta (um conselho inteiro socialista empurra o país para a república popular)
@@ -75,7 +76,10 @@ function ai(n) {
   }
   // exército: generais, exploradores, rebeldes, dívida, recrutamento e organização (aiArmy)
   const myArmies = S.armies.filter(a => a.o === n.id), myR = myArmies.reduce((a, x) => a + regs(x), 0), atWarN = warsOf(n.id).length;
-  if (slow && n.money > genCost() * 4) { const a = myArmies.filter(a => !a.gen && !a.exp && regs(a) >= 4).sort((x, y) => regs(y) - regs(x))[0]; if (a && chance(.3)) setGeneral(n, a, genCands(n).sort((x, y) => genMul(y) - genMul(x))[0]); }
+  if (slow && n.money > genCost() * 10 && chance(.1)) {   // generais: um a cada três exércitos, só nos grandes
+    const gs = groupsOf(n.id).filter(G => !G.some(a => a.exp)), sz = G => G.reduce((s, a) => s + regs(a), 0), withG = gs.filter(G => G.some(a => a.gen)).length;
+    const G = gs.filter(G => !G.some(a => a.gen) && sz(G) >= armyFull(n) * .6).sort((x, y) => sz(y) - sz(x))[0];
+    if (G && withG < Math.floor((gs.length + 1) / 3)) setGeneral(n, G[0], genCands(n).sort((x, y) => genMul(y) - genMul(x))[0]); }
   if (slow && !atWarN && chance(.06 * P.colon) && !(n.expCd > S.t) && !myArmies.some(a => a.exp)) {   // manda uma tropa barata explorar a terra incógnita
     const a = myArmies.find(a => a.p === n.capital && a.inf >= 2 && !a.path.length); n.expCd = S.t + 360 * 4;
     if (a) { a.inf -= 1; const e = addArmy(n.id, a.p, { inf: 1 }, a.xp); e.exp = true; }
@@ -103,10 +107,9 @@ function ai(n) {
   if ((slow || horde) && (!atWarN || (horde && atWarN < 2)) && n.senior == null && (horde || (!overCap(n) && n.stab > 35 && n.money > 0 && (n.ae || 0) < PEACE.aeBlock)) && chance(horde ? .3 : .012 * IDEOS[n.ideo].war * P.war * (GOVS[n.gov].cat === 'Tribal' ? 1.4 : 1))) {
     const nb = new Set(); for (const p of provsOf(n.id)) for (const o of WD.provs[p].adj) { const t = S.own[o]; if (t >= 0 && t !== n.id) nb.add(t); }
     if (n.kind === 'cold' || n.fx.col) S.nations.forEach(t => { if (t.alive && t.id !== n.id && provsOf(t.id).some(p => n.exP[p] && WD.provs[p].coast) && chance(.15)) nb.add(t.id); });
-    const myP = myR * (1 + n.m.army) * n.up.inf;
-    const myAll = myP + (n.allies || []).map(nat).filter(x => x.alive).reduce((s, x) => s + strength(x) * .5, 0);
-    const targets = [...nb].map(nat).filter(t => t.alive && !(n.truce[t.id] > S.t) && !atWar(n.id, t.id) && !has(n, 'allies', t.id) && !(has(n, 'marr', t.id) && chance(.7)) && t.senior !== n.id && t.id !== n.senior)
-      .map(t => [t, strength(t) + (t.allies || []).map(nat).filter(x => x.alive).reduce((s, x) => s + strength(x) * .6, 0)]).filter(([t, pw]) => myAll > pw * (horde ? .8 : 1.35) && !coldBlocked(n.id, t.id));
+    const edge = horde ? .8 : 1.3;
+    const targets = [...nb].map(nat).filter(t => t.alive && !(n.truce[t.id] > S.t) && !atWar(n.id, t.id) && !has(n, 'allies', t.id) && !noWarUntil(n, t) && !(has(n, 'marr', t.id) && chance(.7)) && t.senior !== n.id && t.id !== n.senior)
+      .map(t => [t, blocPower(t, n) + coalCands(n, t).reduce((s, id) => s + milPower(nat(id)) * .8, 0)]).filter(([t, pw]) => blocPower(n, t) > pw * edge && !coldBlocked(n.id, t.id));   // conta a coalizão que viria
     if (targets.length) { const [t] = pickR(targets); const st = WD.states.find(s => s.provs.some(p => S.own[p] === t.id) && s.provs.some(p => WD.provs[p].adj.some(o => S.own[o] === n.id))); declareWar(n, t, st ? st.id : null); }
   } else if (slow && !atWarN && !n.fab && chance(.06 * P.claim) && n.money > 80) {
     const st = WD.states.find(s => !n.claims[s.id] && s.provs.some(p => S.own[p] >= 0 && S.own[p] !== n.id && WD.provs[p].adj.some(o => S.own[o] === n.id)));
@@ -115,6 +118,20 @@ function ai(n) {
   aiArmy(n, P, rebP);
 }
 
+/* força de guerra de um bloco: o país (exércitos pela qualidade) e quem viria junto contra foe (aliados, súditos que lutam, suserano);
+   aliados pesam menos (podem recusar o chamado); quem também é aliado do outro lado não conta */
+let mpC = null;
+const milPower = n => { if (!mpC || mpC.t !== (S.t / 30 | 0)) { mpC = { t: S.t / 30 | 0, m: new Float64Array(S.nations.length) }; for (const a of S.armies) if (!a.exp) mpC.m[a.o] += armyPower(a); } return mpC.m[n.id] + 1; };
+function blocPower(n, foe) {
+  let s = milPower(n); const seen = new Set([n.id]);
+  const add = (id, w) => { const x = nat(id); if (!x || !x.alive || seen.has(id) || (foe && (id === foe.id || has(foe, 'allies', id) || atWar(id, n.id)))) return; seen.add(id); s += milPower(x) * w; };
+  (n.allies || []).forEach(id => add(id, nat(id) && (nat(id).senior === n.id || n.senior === id) ? 1 : .7));
+  subjectsOf(n.id).forEach(j => add(j.id, !j.subj || SUBJECTS[j.subj.tier].war ? 1 : .5)); if (n.senior != null) add(n.senior, 1);
+  return s;
+}
+/* exércitos que a IA mantém (ERA_LIM.armies) e o tamanho cheio de cada um */
+const aiArmyMax = n => eraLim(n, 'armies');
+const armyFull = n => clamp(Math.round((WIDTH_BASE + n.fx.width) * 1.25), 6, 60);
 /* ---------- IA militar: exércitos de campanha do tamanho da largura de combate, reunidos num depósito e distribuídos pelos fronts ---------- */
 /* tamanho de um exército de campanha: pouco mais que a largura de combate, mas país pequeno não espera juntar o que não tem */
 const armyTarget = n => { const w = clamp(Math.round((WIDTH_BASE + n.fx.width) * 1.25), 6, 60), tot = S.armies.reduce((s, a) => s + (a.o === n.id && !a.exp ? regs(a) : 0), 0); return clamp(Math.min(w, tot * .5), 3, w); };
@@ -135,18 +152,30 @@ function aiBorder(n) {
   n._bd = { t: S.t, p }; return p;
 }
 function aiRecruit(n, myArmies, myR, atWarN, P) {
-  const want = (n.subj && SUBJ_LAWS.army.o[n.subj.laws.army].demil ? .3 : 1) * clamp((n.popT || 0) * .006 * (atWarN ? 1.5 : 1) * (.7 + IDEOS[n.ideo].war * .25) * (n.money > 3000 ? 1.6 : 1) * P.army, 2, 1200);
+  const full = armyFull(n), max = aiArmyMax(n);
+  const want = Math.min(max * full, (n.subj && SUBJ_LAWS.army.o[n.subj.laws.army].demil ? .3 : 1) * clamp((n.popT || 0) * .006 * (atWarN ? 1.5 : 1) * (.7 + IDEOS[n.ideo].war * .25) * (n.money > hoardCap(n) * .6 ? 1.6 : 1) * P.army, 2, 1200));
   const queued = n.rec.reduce((a, r) => a + (r.type !== 'ship' ? r.k : 0), 0);
   if (myR + queued >= want || !(n.income > 0 || n.money > 500)) return;
   const mp = Math.floor(n.manpower), batch = Math.min(mp, Math.max(3, Math.ceil((want - myR - queued) / 2)));
-  if (batch < 3 && !(atWarN && batch >= 1)) return;                                 // espera juntar homens: nada de regimentos soltos
+  if (batch < 3) return;                                                            // espera juntar homens: nada de regimentos soltos (também em guerra)
+  // como o jogador em Militar > Exército: o lote inteiro vai para um exército só (o menor que ainda não está cheio) ou forma um novo, até o limite da era
+  const size = new Map(); groupsOf(n.id).forEach(G => { if (!G.some(a => a.exp)) size.set(gid(G[0]), G.reduce((s, a) => s + regs(a), 0)); });
+  n.rec.forEach(r => { if (r.type !== 'ship' && r.g != null) size.set(r.g, (size.get(r.g) || 0) + r.k); });
+  const open = [...size].filter(([, v]) => v < full).sort((x, y) => x[1] - y[1]);
+  let g, at = aiDepot(n);
+  const gp = k => { const h = myArmies.filter(a => gid(a) === k).sort((x, y) => regs(y) - regs(x))[0]; if (!h || h.p >= WD.provs.length) return 1e9; const A = WD.provs[h.p], B = WD.provs[at]; return Math.hypot(A.cx - B.cx, A.cy - B.cy); };
+  if (open.length && (size.size >= max || open[0][1] < full * .6)) g = open.slice().sort((x, y) => gp(x[0]) - gp(y[0]))[0][0];   // o lote reforça o grupo aberto mais perto do depósito
+  else if (size.size < max) g = S.id++;
+  else g = [...size].sort((x, y) => x[1] - y[1])[0][0];
+  const h = myArmies.filter(a => gid(a) === g).sort((x, y) => regs(y) - regs(x))[0];
+  if (h && h.p < WD.provs.length && S.own[h.p] === n.id && S.ctrl[h.p] === n.id) at = h.p;   // treina onde o exército está (se for território próprio)
   const have = { inf: 0, cav: 0, art: 0, vrt: 0 }; myArmies.forEach(a => UT.forEach(t => have[t] += a[t])); n.rec.forEach(r => { if (have[r.type] != null) have[r.type] += r.k; });
   const vOk = n.vert && (n.tsat ? n.tsat.vrt : 1) > .5, cavOk = (n.tsat ? n.tsat.cav : 1) > .6;
   const mix = { inf: .6, cav: cavOk ? .2 : .05, art: canArt(n) ? .2 : 0, vrt: vOk ? .2 : 0 }, tot = Object.values(mix).reduce((a, b) => a + b, 0), all = myR + queued + batch;
   const def = UT.map(t => [t, mix[t] / tot * all - have[t]]).filter(x => x[1] > .5).sort((a, b) => b[1] - a[1]);
-  const at = aiDepot(n); let left = batch;
-  for (const [t, d] of def) { const k = Math.min(left, Math.max(1, Math.round(d))); if (k < 1) continue; if (!recruit(n, t, k, at)) left -= k; if (left <= 0) break; }
-  if (left === batch) recruit(n, 'inf', batch, at);
+  let left = batch;
+  for (const [t, d] of def) { const k = Math.min(left, Math.max(1, Math.round(d))); if (k < 1) continue; if (!CMDS.recruit(n, t, k, at, g)) left -= k; if (left <= 0) break; }
+  if (left === batch) CMDS.recruit(n, 'inf', batch, at, g);
 }
 function aiStance(n, a, adv) { a.st = !adv ? 'def' : vetLv(a) >= 2 || personality(n).war > 1.2 ? 'agg' : 'bal'; }
 function aiSupport(n, a, T) {
@@ -163,23 +192,29 @@ function aiArmyFront(n, P, rebP) {
   const lead = G => G.slice().sort((x, y) => regs(y) - regs(x))[0];
   if (slow) for (const G of groups) { const h = lead(G); if (!armyBusy(h)) { const b = Object.keys(h.sup || {}).length; aiSupport(n, h, T); if (Object.keys(h.sup || {}).length > b) G.forEach(x => x.sup = Object.assign({}, h.sup)); } }
   // grupos pequenos: juntam-se ao grupo maior (o caminho é feito pelos destacamentos ao se reagrupar)
-  const big = groups.filter(G => size(G) >= T * .35).sort((x, y) => size(y) - size(x));
-  for (const G of groups) if (size(G) < T * .35 && big.length && !G.some(armyBusy)) { joinGroups(lead(big[0]), G[0]); G.forEach(a => { a.front = big[0][0].front; if (!war && a.p !== lead(big[0]).p) orderArmy(a, lead(big[0]).p, true); }); }
+  const big = groups.filter(G => size(G) >= T * .35).sort((x, y) => size(y) - size(x)), extra = new Set(groups.slice().sort((x, y) => size(y) - size(x)).slice(aiArmyMax(n)));
+  const recG = new Set(n.rec.map(r => r.g));                 // exército novo ainda em treino não é engolido
+  for (const G of groups) { const to = big.find(B => B !== G); if ((size(G) < T * .35 && !recG.has(gid(G[0])) || extra.has(G)) && to && !G.some(armyBusy)) { joinGroups(lead(to), G[0]); G.forEach(a => { a.front = to[0].front; if (!war && a.p !== lead(to).p) orderArmy(a, lead(to).p, true); }); } }
+  // exército grande demais (bem acima da largura de combate) se divide enquanto houver vaga no limite da era
+  if (slow) { const gs = groupsOf(n.id).filter(G => !G.some(a => a.exp || a.inv)), full = armyFull(n), G = gs.filter(G => size(G) > full * 1.6 && !G.some(armyBusy)).sort((x, y) => size(y) - size(x))[0];
+    if (G && gs.length < aiArmyMax(n)) { const ng = splitGroup(lead(G), G[0].front); groupsOf(n.id).filter(H => gid(H[0]) === ng).forEach(H => H.forEach(a => { a.st = G[0].st; a.drill = G[0].drill; })); } }
   const field = groupsOf(n.id).filter(G => !G.some(a => a.exp || a.inv));
   if (war) {
     if (!fs.length) { aiOverseas(n, field.map(lead)); return; }
     // concentração: primeiro os fronts com inimigo dentro do território (defesa), depois os estados inimigos mais fracos, até ter vantagem em cada um
-    const need = new Map(fs.map(f => [f.id, f.foe.reduce((s, q) => s + foeNear(n.id, q), 0) / Math.max(1, Math.sqrt(f.foe.length)) + 2])), got = new Map(fs.map(f => [f.id, 0]));
+    const need = new Map(fs.map(f => [f.id, frontDefense(f, n.id) + 2])), got = new Map(fs.map(f => [f.id, 0]));
     const ep = enemyPower(n.id), intr = f => f.provs.some(p => WD.provs[p].adj.some(q => ep.get(q) && friendsOf(n.id).has(S.ctrl[q])) || ep.get(p));
     const claim = f => f.foe.some(q => n.claims[WD.provs[q].state]) ? .6 : 1, order = fs.slice().sort((x, y) => (intr(y) - intr(x)) || need.get(x.id) * claim(x) - need.get(y.id) * claim(y));
     field.forEach(G => { if (!got.has(G[0].front)) G.forEach(a => a.front = null); });
     const pool = [];                                            // quem já está num front fica enquanto ele precisar (sem vai e vem que interrompe avanços)
     for (const G of field.slice().sort((x, y) => powG(y) - powG(x))) { const f = G[0].front; if (f != null && got.has(f) && got.get(f) < need.get(f) * 1.6) got.set(f, got.get(f) + powG(G)); else pool.push(G); }
-    for (const f of order) { while (pool.length && got.get(f.id) < need.get(f.id) * 1.6) { const G = pool.shift(); G.forEach(a => { if (a.front !== f.id) a.path = []; a.front = f.id; }); got.set(f.id, got.get(f.id) + powG(G)); } }
-    for (const G of pool) { const f = order[0]; G.forEach(a => a.front = f.id); got.set(f.id, got.get(f.id) + powG(G)); }   // sobra reforça o front principal
+    const send = (G, f) => { G.forEach(a => { if (a.front !== f.id) a.path = []; a.front = f.id; }); got.set(f.id, got.get(f.id) + powG(G)); pool.splice(pool.indexOf(G), 1); };
+    for (const f of order) { while (got.get(f.id) < need.get(f.id) * 1.6) { const G = pool.find(G => !frontBlocked(lead(G), f)); if (!G) break; send(G, f); } }
+    for (const G of pool.slice()) { const f = order.find(f => !frontBlocked(lead(G), f)); if (f) send(G, f); }   // sobra reforça o front principal que alcança
+    if (pool.length) aiOverseas(n, pool.map(lead));                // nenhum front ao alcance por terra: vai por mar
     const bold = 1.3 / Math.max(.7, P.war);
     for (const f of fs) { const adv = got.get(f.id) > need.get(f.id) * bold; setFord(n.id, f.id, adv ? 'adv' : 'hold'); field.filter(G => G[0].front === f.id).forEach(G => { const h = lead(G); aiStance(n, h, adv); G.forEach(x => x.st = h.st); }); }
-    return;
+    mergeGroupParts(n.id); return;
   }
   // paz: sem front; os destacamentos se reúnem; os grupos ficam no depósito (fronteira perigosa), treinando se o caixa permitir; rebeldes primeiro
   const drill = n.money > 400 * eraScale() && n.income > 0;

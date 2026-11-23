@@ -1,1 +1,6 @@
 ignorar/
+
+# notas de trabalho (referência de mecânicas, resumos, críticos) e agentes locais: ficam fora do repositório
+*.md
+!/README.md
+.claude/

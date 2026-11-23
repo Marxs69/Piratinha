@@ -120,7 +120,30 @@ function rebelTick() {
     per[o] = per[o] || []; per[o].push(p); S.pop[p] *= .997;
     if (chance(.05)) { const q = WD.provs[p].adj.find(x => S.own[x] === o && S.ctrl[x] === o && x !== nat(o).capital && !S.armies.some(a => a.p === x && a.o === o)); if (q != null) { S.ctrl[q] = -1; R0[q] = { k: r.k, o, s: r.s * .8 }; S.mapDirty = true; } }
   }
-  for (const o in per) { const n = nat(+o), ps = per[o]; n.stab = Math.max(0, n.stab - Math.min(6, ps.length * .5)); if (ps.length >= Math.max(3, provsOf(n.id).length * .3)) rebelsWin(n, R0[ps[0]].k, ps); }
+  for (const o in per) { const n = nat(+o), ps = per[o]; if (ps.length >= Math.max(3, provsOf(n.id).length * .3) && ps.reduce((a, p) => a + S.pop[p], 0) >= (n.popT || 0) * .2) rebelsWin(n, R0[ps[0]].k, ps); }   // o peso na estabilidade é o fator do alvo (stabParts, −1,5 por província), não um dreno direto
+}
+/* secessão por excesso de domínio (SEPAR): país acima do limite, em paz, pode perder o estado mais afastado da capital
+   (pesa mais se a cultura ou a fé do estado forem outras). Tropas no estado mais fortes que o levante o seguram (−3 estab.). */
+function separatismTick() {
+  for (const n of S.nations.slice()) {
+    if (!n.alive || n.horde || n.capital < 0 || warsOf(n.id).length) continue;
+    const ov = overCap(n); if (!ov) { if (n.sepN) n.sepN = Math.max(0, n.sepN - 1 / 12); continue; } if (!chance(Math.min(SEPAR.max, SEPAR.k * ov))) continue;
+    const by = new Map(); for (const p of provsOf(n.id)) { const s = WD.provs[p].state; if (!by.has(s)) by.set(s, []); by.get(s).push(p); }
+    const c = WD.provs[n.capital]; let best = null, bs = -1;
+    for (const [s, ps] of by) {
+      if (ps.includes(n.capital) || ps.some(p => S.ctrl[p] !== n.id) || WD.states[s].provs.some(p => S.own[p] !== n.id)) continue;
+      const cp = WD.provs[WD.states[s].cap], sc = Math.hypot(cp.cx - c.cx, cp.cy - c.cy) + (S.culg[WD.states[s].cap] !== n.cul ? 150 : 0) + (S.relg[WD.states[s].cap] !== n.relig ? 80 : 0);
+      if (sc > bs) { bs = sc; best = ps; }
+    }
+    if (!best) continue;
+    const str = Math.max(2, best.reduce((a, p) => a + S.pop[p], 0) * .06 * (1 + .25 * ov + .2 * (n.sepN || 0))), here = S.armies.filter(a => a.o === n.id && best.includes(a.p));
+    const st = WD.states[WD.provs[best[0]].state];
+    if (here.reduce((a, x) => a + regs(x) * (1 + n.m.army) * genMul(x.gen), 0) > str) { n.stab = Math.max(0, n.stab - 3); n.wex = Math.min(WEX.cap, (n.wex || 0) + 2); n.sepN = (n.sepN || 0) + 1; log('🏴 Um movimento de secessão em ' + st.n + ' foi contido pelas tropas de ' + natName(n) + '.', isHuman(n.id) ? 'info' : 'none', [n.id]); continue; }
+    const m = spawnNation(best, { cul: S.culg[st.cap], relig: S.relg[st.cap], from: n.id });
+    m.truce[n.id] = n.truce[m.id] = S.t + 360 * 5; m.rel[n.id] = n.rel[m.id] = -50;
+    const txt = st.n + ' se separou de ' + natName(n) + ' e formou ' + natName(m) + ': o país passava do limite de domínio em ' + ov + ' estado' + (ov > 1 ? 's' : '') + '.';
+    log('🏴 ' + txt, isHuman(n.id) ? 'bad' : 'world', [n.id, m.id]); notify(n.id, '🏴 Secessão', txt);
+  }
 }
 function rebelsWin(n, kind, ps) {
   let txt;

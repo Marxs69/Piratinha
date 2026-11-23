@@ -43,8 +43,8 @@ function newGame(seed, y0 = START_YEAR) {
     owner.forEach((nid, s) => WD.states[s].provs.forEach(p => { S.own[p] = nid; S.ctrl[p] = nid; })); ownChanged();
     ns.forEach(n => {
       n.capital = WD.states[n._st[0]].cap; delete n._st; delete n.vig;
-      { const ns = statesOf(n); n.rank = [0, 1, 2, 3, 4].find(r => rankCap(n, r) >= ns); if (n.rank == null) n.rank = 4; }
-      if (n.kind === 'main') { grantTechs(n, adv ? y0 - (r() * 12 | 0) : 880 + (r() * 40 | 0)); n.gov = pickR(['feudal', 'feudal', 'feudal', 'feudal', 'elective', 'elective', 'tribal', 'theocracy']); n.ideo = chance(.25) ? 'warrior' : 'trad'; n.money = 160; }
+      n.rank = startRank(n);
+      if (n.kind === 'main') { const ty = adv ? y0 - (r() * 12 | 0) : 880 + (r() * 40 | 0); if (!adv) grantTechs(n, ty); /* início avançado: as técnicas do principal vêm só de advanceStart (grantUntil); o sorteio fica para não mudar a sequência */ n.gov = pickR(['feudal', 'feudal', 'feudal', 'feudal', 'elective', 'elective', 'tribal', 'theocracy']); n.ideo = chance(.25) ? 'warrior' : 'trad'; n.money = 160; }
       else if (n.kind === 'cold') { grantTechs(n, adv ? y0 - 10 - (r() * 25 | 0) : 860, ['nav_longship']); n.gov = pickR(['tribal', 'tribal', 'tribal_conf']); n.ideo = 'warrior'; n.money = 90; }
       else { grantTechs(n, adv ? y0 - 15 - (r() * 35 | 0) : 860); if (!adv && chance(.4)) delete n.techs.nav_longship; n.gov = pickR(['tribal', 'tribal', 'tribal', 'tribal_conf', 'horde', 'feudal']); n.ideo = chance(.3) ? 'warrior' : 'trad'; n.money = 60; }
       if (n.gov === 'theocracy') n.flag.c = { k: pickR(['cross_patty', 'sun', 'eye', 'crescent', 'star8']), t: TINCT[n.flag.t[0]].metal ? 'gules' : 'or', n: 1, at: 'center' };
@@ -174,7 +174,8 @@ function advanceStart(Y, r) {
   });
   exploreEra(Y);
   { const ai = REL_IDS.indexOf('atheism'), AT = FAITH_RULES.atheism; if (ai >= 0 && Y > RELIGIONS.atheism.y0) S.nations.forEach(n => { const k = Math.min(.25, AT.base * (Y - RELIGIONS.atheism.y0) * (AT.law[n.laws.relig] ?? 1)); provsOf(n.id).forEach(p => { if (chance(k)) S.relg[p] = ai; }); }); }   // ateus de antes do início
-  ownChanged(); S.nations.forEach(n => { if (n.alive) { n.relig = S.relg[n.capital]; calcMods(n); } });
+  ownChanged(); S.nations.forEach(n => { if (!n.alive) return; const fc = S.relg[n.capital]; if (!RELIGIONS[REL_IDS[fc]].atheist) n.relig = fc;   // capital com ateus semeados não torna o Estado ateu
+    [n.ruler, n.spouse, ...(n.kids || [])].forEach(c => { if (c) c.rel = n.relig; }); calcMods(n); });   // a família do governante segue a fé oficial
   const ys = eraScale(); econAll(); S.nations.forEach(n => { if (n.alive) calcMods(n); }); priceTick(true);
   S.nations.forEach(n => { n.money *= S.plv / ys; });   // o tesouro inicial acompanha o nível de preços da época
 }
