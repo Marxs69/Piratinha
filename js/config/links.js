@@ -10,7 +10,7 @@ const ICO = f => './assets/icons/sites/' + f + '.png';   // ícone de reserva, u
 const LINKS = [
   { n: 'DODI Repacks',        u: 'https://dodi-repacks.site/',                       g: 'repack', i: ICO('dodi-repacks-site') },
   { n: 'FitGirl Repacks',     u: 'https://fitgirl-repacks.site/',                    g: 'repack', i: ICO('fitgirl-repacks-site') },
-  { n: 'GameBounty',          u: 'https://gamebounty.world/',                        g: 'repack', i: ICO('gamebounty-world') },
+  { n: 'GameBounty',          u: 'https://gamebounty.st/',                        g: 'repack', i: ICO('gamebounty-world') },
   { n: 'KaOsKrew',            u: 'https://www.kaoskrew.org/viewforum.php?f=13',      g: 'repack', i: ICO('kaoskrew-org') },
   { n: 'Appnetica',           u: 'https://appnetica.com/',                           g: 'scene',  i: ICO('appnetica-com') },
   { n: 'GLOAD',               u: 'https://gload.to/',                                g: 'scene',  i: ICO('gload-to') },
