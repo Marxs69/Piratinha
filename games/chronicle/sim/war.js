@@ -24,6 +24,67 @@ function findPath(n, from, to, army, avoid) {
   if (dist[to] >= 1e9) return null;
   const path = []; for (let v = to; v !== from; v = prev[v]) path.unshift(v); return path;
 }
+/* R1b (critico-c, passos 1, 2 e 6): buscas com as mesmas regras de findPath (terra conhecida em que pode entrar, travessia de um mar livre).
+   Sem rnd(); empates pela ordem do Heap e de adj, como em findPath. Nada fica guardado (nenhum cache novo). */
+/* caminho até o alvo mais perto entre vários, num Dijkstra só: o primeiro alvo de t1 (prioridade) que sair da fila vence; sem t1 alcançável,
+   o primeiro de t2. Devolve o caminho ([] se já está num alvo) ou null. */
+function findPathMulti(n, from, t1, t2, army) {
+  const P = WD.provs.length; if (from >= P) return null;
+  const dist = new Float32Array(P).fill(1e9), prev = new Int32Array(P).fill(-1), done = new Uint8Array(P), hp = new Heap(), fz = new Map();
+  dist[from] = 0; hp.push(0, from);
+  const speed = (1 + Math.max(-.5, n.m.speed || 0)) * (army ? armySpeed(army) : 1), ferry = n.fx.sea >= 1, tgt = v => t1.has(v) || t2.has(v);
+  let hit = -1, alt = -1;
+  while (hp.size) {
+    const u = hp.pop(); if (done[u]) continue; done[u] = 1;
+    if (t1.has(u)) { hit = u; break; }
+    if (alt < 0 && t2.has(u)) { alt = u; if (!t1.size) break; }
+    const du = dist[u], pr = WD.provs[u];
+    const relax = (v, c) => { if (du + c < dist[v]) { dist[v] = du + c; prev[v] = u; hp.push(du + c, v); } };
+    for (const v of pr.adj) if (n.exP[v] && (tgt(v) || canEnter(n.id, v))) relax(v, edgeDays(n, u, v) / speed);
+    if (ferry && pr.coast) for (const z of pr.seas) { if (!fz.has(z)) fz.set(z, canFerry(n, z)); if (!fz.get(z)) continue;
+      for (const v of WD.seas[z].provs) if (v !== u && n.exP[v] && !pr.adj.includes(v) && (tgt(v) || canEnter(n.id, v))) relax(v, FERRY_DAYS); }
+  }
+  const to = hit >= 0 ? hit : alt; if (to < 0) return null;
+  const path = []; for (let v = to; v !== from; v = prev[v]) path.unshift(v); return path;
+}
+/* distância (dias) do ponto de partida a todas as províncias alcançáveis (1e9 = sem caminho), sem alvo */
+function pathDist(n, from, army) {
+  const P = WD.provs.length, dist = new Float32Array(P).fill(1e9); if (from >= P) return dist;
+  const done = new Uint8Array(P), hp = new Heap(), fz = new Map(), speed = (1 + Math.max(-.5, n.m.speed || 0)) * (army ? armySpeed(army) : 1), ferry = n.fx.sea >= 1;
+  dist[from] = 0; hp.push(0, from);
+  while (hp.size) {
+    const u = hp.pop(); if (done[u]) continue; done[u] = 1; const du = dist[u], pr = WD.provs[u];
+    const relax = (v, c) => { if (du + c < dist[v]) { dist[v] = du + c; hp.push(du + c, v); } };
+    for (const v of pr.adj) if (n.exP[v] && canEnter(n.id, v)) relax(v, edgeDays(n, u, v) / speed);
+    if (ferry && pr.coast) for (const z of pr.seas) { if (!fz.has(z)) fz.set(z, canFerry(n, z)); if (!fz.get(z)) continue;
+      for (const v of WD.seas[z].provs) if (v !== u && n.exP[v] && !pr.adj.includes(v) && canEnter(n.id, v)) relax(v, FERRY_DAYS); }
+  }
+  return dist;
+}
+/* componentes de alcance de um país: províncias conhecidas em que ele pode entrar, ligadas por terra ou por travessia de um mar livre.
+   reachTo(n, R, from, to) responde "findPath(n, from, to) existe?" sem montar o caminho (o destino pode ser uma província em que não se entra). */
+function reachComp(n) {
+  const P = WD.provs.length, comp = new Int32Array(P).fill(-1), ferry = n.fx.sea >= 1, fz = new Map(), seaDone = new Uint8Array(WD.seas.length); let k = 0;
+  const ok = v => n.exP[v] && canEnter(n.id, v), fOk = z => { if (!fz.has(z)) fz.set(z, canFerry(n, z)); return fz.get(z); };
+  for (let s = 0; s < P; s++) { if (comp[s] >= 0 || !ok(s)) continue; const q = [s]; comp[s] = k;
+    for (let h = 0; h < q.length; h++) { const u = q[h], pr = WD.provs[u];
+      for (const v of pr.adj) if (comp[v] < 0 && ok(v)) { comp[v] = k; q.push(v); }
+      if (ferry && pr.coast) for (const z of pr.seas) { if (seaDone[z] || !fOk(z)) continue; seaDone[z] = 1; for (const v of WD.seas[z].provs) if (comp[v] < 0 && ok(v)) { comp[v] = k; q.push(v); } } }
+    k++; }
+  return { comp, fOk, ferry, starts: new Map() };
+}
+function reachTo(n, R, from, to) {
+  const P = WD.provs.length; if (from >= P || to >= P) return false; if (from === to) return true;
+  let C = R.starts.get(from);
+  if (!C) { C = new Set(); const pf = WD.provs[from]; if (R.comp[from] >= 0) C.add(R.comp[from]); for (const v of pf.adj) if (R.comp[v] >= 0) C.add(R.comp[v]);
+    if (R.ferry && pf.coast) for (const z of pf.seas) if (R.fOk(z)) for (const v of WD.seas[z].provs) if (R.comp[v] >= 0) C.add(R.comp[v]);
+    R.starts.set(from, C); }
+  if (R.comp[to] >= 0) return C.has(R.comp[to]);
+  if (!n.exP[to]) return false;                                   // destino em que não se entra: basta chegar a um vizinho (ou a uma costa do mesmo mar livre)
+  const pt = WD.provs[to], in1 = u => u === from || (R.comp[u] >= 0 && C.has(R.comp[u]));
+  if (pt.adj.some(in1)) return true;
+  return R.ferry && pt.coast && pt.seas.some(z => R.fOk(z) && WD.seas[z].provs.some(u => u !== to && WD.provs[u].coast && in1(u)));
+}
 function edgeDays(n, a, b) {
   const pb = WD.provs[b], sp = S.own[b] === n.id && S.stSpd ? S.stSpd[pb.state] : 0;
   return 7 * TERRAIN[pb.terr].move / (1 + sp);
@@ -54,7 +115,7 @@ function dayTick() {
   for (const a of S.armies) {
     if (a.exp && !a.path.length) exploreStep(a);
     if (a.exp && a.p < P && S.own[a.p] === -1 && S.pop[a.p] > 3) a.inf *= .9985;   // nativos e doenças: exploradores perdem gente
-    if (!a.path.length) continue;
+    if (!a.path.length) { if (a.retreat && !a.inBattle) a.retreat = false; continue; }   // retirada sem caminho fora de batalha termina (senão o exército fica "ocupado" para sempre)
     const n = nat(a.o), next = a.path[0];
     if (!a.need) {
       if (a.p >= P || next >= P) { a.path = []; continue; }
@@ -119,10 +180,10 @@ function siegeAt(p, list) {
   if (sg.v >= 1) {
     delete S.sieges[p];
     if (reb) { delete S.rebels[p]; S.ctrl[p] = own; S.mapDirty = true; if (isHuman(own)) log('Rebeldes vencidos em ' + WD.provs[p].n + '.', 'good', [own]); return; }
-    const liberate = own === o;
+    const liberate = own === o || (own >= 0 && !atWar(o, own));   // tomar de um ocupante devolve a província ao dono, se não estamos em guerra com ele
     S.ctrl[p] = liberate ? own : o; S.mapDirty = true;
     if (!liberate && own >= 0 && nat(own).capital === p) log('A capital de ' + natName(nat(own)) + ', ' + WD.provs[p].n + ', caiu diante de ' + natName(n) + '!', isHuman(own) ? 'bad' : 'world', [own, o]);
-    if (isHuman(o) || isHuman(own)) log((liberate ? 'Libertamos ' : 'Cerco concluído: ') + WD.provs[p].n + (liberate ? '' : ' foi ocupada por ' + natName(n)) + '.', isHuman(o) ? 'good' : 'bad', [S.player]);
+    if (isHuman(o) || isHuman(own)) log((liberate ? 'Libertamos ' : 'Cerco concluído: ') + WD.provs[p].n + (liberate ? (own !== o ? ', devolvida a ' + natName(nat(own)) : '') : ' foi ocupada por ' + natName(n)) + '.', isHuman(o) ? 'good' : 'bad', [S.player]);
   }
 }
 function autoExplore(f) {                                    // vai ao mar de fronteira mais próximo (desconhecido, com costa ou vizinhos desconhecidos)
@@ -148,18 +209,19 @@ function callAllies(w, side) {                                // aliados e parce
   const calls = new Set([...(lead.allies || []), ...subjectsOf(lead.id).map(j => j.id), ...(lead.senior != null ? [lead.senior] : [])]);   // súditos acompanham o suserano; o suserano defende o súdito
   calls.forEach(id => {
     const al = nat(id); if (!al.alive || sideOf(w, id) || id === foe) return;
+    if (al.senior != null && al.senior !== lead.id && sideOf(w, al.senior) && sideOf(w, al.senior) !== side) return;   // súdito de outro (protetorado, domínio) não entra contra o próprio suserano
     if (al.senior === lead.id && (!al.subj || SUBJECTS[al.subj.tier].war)) { joinWar(w, id, side); return; }
     if (lead.senior === id) { joinWar(w, id, side); return; }
     if (isHuman(id)) { S.calls = S.calls || []; S.calls.push({ w: w.id, side, from: lead.id, to: id }); return; }
     const p = (al.ruler.tr.includes('honest') ? 1 : side === 'D' ? .75 : .45) + (al.rel[lead.id] || 0) / 400 - (al.ruler.tr.includes('craven') ? .3 : 0);
     if (chance(p)) joinWar(w, id, side);
-    else { breakTies(al, lead); noWarPact(al, lead, DIPLO.unally.noWar); al.rel[lead.id] -= 40; lead.rel[id] = (lead.rel[id] || 0) - 60; log(natName(al) + ' recusou o chamado de ' + natName(lead) + ' e a aliança acabou.', 'world', [id, lead.id]); }
+    else { breakTies(al, lead); noWarPact(al, lead, DIPLO.unally.noWar); al.stab = Math.max(0, al.stab - REFUSE_STAB); al.rel[lead.id] -= 40; lead.rel[id] = (lead.rel[id] || 0) - 60; log(natName(al) + ' recusou o chamado de ' + natName(lead) + ' e a aliança acabou.', 'world', [id, lead.id]); }
   });
 }
 function answerCall(c, yes) {
   const pid = c.to ?? S.player, w = S.wars.find(x => x.id === c.w), me = nat(pid), lead = nat(c.from); if (!w) return;
   if (yes) joinWar(w, pid, c.side);
-  else { breakTies(me, lead); noWarPact(me, lead, DIPLO.unally.noWar); lead.rel[me.id] = (lead.rel[me.id] || 0) - 60; me.stab = Math.max(0, me.stab - 5); log('Você recusou o chamado de ' + natName(lead) + '. A aliança acabou.', 'bad', [S.player]); }
+  else { breakTies(me, lead); noWarPact(me, lead, DIPLO.unally.noWar); lead.rel[me.id] = (lead.rel[me.id] || 0) - 60; me.stab = Math.max(0, me.stab - REFUSE_STAB); log('Você recusou o chamado de ' + natName(lead) + '. A aliança acabou.', 'bad', [S.player]); }
 }
 function declareWar(n, t, s, cb) {                           // cb 'holy' = guerra santa (pouca perda de estabilidade)
   if (atWar(n.id, t.id)) return 'Já em guerra'; if (n.truce[t.id] > S.t) return 'Trégua em vigor';
@@ -169,24 +231,62 @@ function declareWar(n, t, s, cb) {                           // cb 'holy' = guer
   if (noWarUntil(n, t)) return 'Aliança rompida há pouco: guerra só a partir de ' + yearOf(noWarUntil(n, t));
   if (coldBlocked(n.id, t.id)) return 'Guerra Fria: as superpotências não se enfrentam diretamente';
   if (cb === 'holy') { const e = holyWhy(n, t); if (e) return e; }
-  const claim = (s != null && n.claims[s]) || cb === 'holy';
-  const w = { id: S.id++, A: [n.id], D: [t.id], a: n.id, d: t.id, goal: s, start: S.t, loss: {}, bp: {}, score: 0, holy: cb === 'holy' ? n.relig : null };
+  const claim = (s != null && n.claims[s]) || cb === 'holy' || cb === 'coal';   // coalizão contra quem tem EA alta também é casus belli
+  const w = { id: S.id++, A: [n.id], D: [t.id], a: n.id, d: t.id, goal: s, start: S.t, nc: S.t, lc: S.t, T: 0, loss: {}, bp: {}, score: 0, holy: cb === 'holy' ? n.relig : null };
   S.wars.push(w); warsChanged();
   n.stab = Math.max(0, n.stab - (claim ? 3 : 15)); t.rel[n.id] = -100; n.rel[t.id] = -100; breakTies(n, t);
   log(natName(n) + (cb === 'holy' ? ' declarou ' + holyName(n.relig).toLowerCase() + ' contra ' : ' declarou guerra a ') + natName(t) + '!', 'world', [n.id, t.id]);
   callAllies(w, 'D'); callAllies(w, 'A');
+  coalCands(n, t).forEach(id => { if (sideOf(w, id)) return; if (isHuman(id)) { S.calls = S.calls || []; S.calls.push({ w: w.id, side: 'D', from: t.id, to: id }); } else joinWar(w, id, 'D'); });
   return '';
 }
+/* coalizão por conta própria (mundo/mês): contra um país com EA ≥ PEACE.coal, em paz, os vizinhos hostis (coalCands) que somam
+   ≥ PEACE.coalPow × a força do bloco dele declaram juntos (PEACE.coalChance por mês). Líder = o mais forte; jogador não é arrastado. */
+function coalitionTick() {
+  for (const t of S.nations) {
+    if (!t.alive || (t.ae || 0) < PEACE.coal || warsOf(t.id).length || isHorde(t)) continue;
+    const c = [...neighbors0(t)].filter(id => { const x = nat(id); return x && x.alive && !isHuman(id) && x.senior == null && (x.rel[t.id] || 0) <= PEACE.coalRel && !has(t, 'allies', id) && !warsOf(id).length && !(x.truce[t.id] > S.t) && !coldBlocked(id, t.id); });
+    if (c.length < 2) continue;
+    const pw = c.reduce((a, id) => a + milPower(nat(id)), 0); if (pw < blocPower(t, nat(c[0])) * PEACE.coalPow || !chance(PEACE.coalChance)) continue;
+    const lead = nat(c.reduce((a, b) => milPower(nat(a)) >= milPower(nat(b)) ? a : b));
+    if (declareWar(lead, t, null, 'coal')) continue;
+    const w = S.wars[S.wars.length - 1]; c.forEach(id => { if (id !== lead.id && !sideOf(w, id)) joinWar(w, id, 'A'); });
+    log('⚔️ Coalizão de ' + c.length + ' países contra ' + natName(t) + ', liderada por ' + natName(lead) + '.', 'world', [t.id, ...c]);
+  }
+}
+/* coalizão: com expansão agressiva alta (PEACE.coal), os vizinhos que desconfiam do agressor (relação ≤ coalRel) defendem a vítima */
+function coalCands(n, t) {
+  if ((n.ae || 0) < PEACE.coal) return [];
+  return [...neighbors0(n)].filter(id => { const x = nat(id); return x && x.alive && id !== t.id && x.senior == null && (x.rel[n.id] || 0) <= PEACE.coalRel && !has(n, 'allies', id) && !atWar(id, t.id) && !coldBlocked(id, n.id); });
+}
 const sideProvs = ids => { const out = []; ids.forEach(id => out.push(...provsOf(id))); return out; };
+/* fim de participação: toda província ocupada por quem não está mais em guerra com o dono volta ao dono (rebeldes, −1, ficam) */
+function fixCtrl() {
+  let k = 0;
+  for (let p = 0; p < S.own.length; p++) { const o = S.own[p], c = S.ctrl[p]; if (o < 0 || c < 0 || o === c || atWar(o, c)) continue; S.ctrl[p] = o; delete S.sieges[p]; k++; }
+  if (k) ownChanged(); return k;
+}
 function checkDead() {
   S.nations.forEach(n => {
     if (!n.alive) return;
     if (!provsOf(n.id).length) {
       n.alive = false; S.armies = S.armies.filter(a => a.o !== n.id); S.fleets = S.fleets.filter(f => f.o !== n.id); S.cols = S.cols.filter(c => c.o !== n.id);
-      S.wars = S.wars.filter(w => w.a !== n.id && w.d !== n.id); S.wars.forEach(w => { w.A = w.A.filter(x => x !== n.id); w.D = w.D.filter(x => x !== n.id); }); warsChanged(); S.fronts = (S.fronts || []).filter(f => S.wars.some(x => x.id === f.w));   // front sem guerra não fica
+      S.wars = S.wars.filter(w => w.a !== n.id && w.d !== n.id); S.wars.forEach(w => { w.A = w.A.filter(x => x !== n.id); w.D = w.D.filter(x => x !== n.id); }); warsChanged(); fixCtrl(); S.fronts = (S.fronts || []).filter(f => S.wars.some(x => x.id === f.w));   // front sem guerra não fica
       S.nations.forEach(o => { breakTies(o, n); if (o.senior === n.id) { delete o.senior; delete o.subj; } }); if (n.senior != null) { delete n.senior; delete n.subj; }
-      log(natName(n) + ' deixou de existir.', 'world', [n.id]); if (isHuman(n.id)) S.over = 'dead';
+      log(natName(n) + ' deixou de existir.', 'world', [n.id]); if (isHuman(n.id)) humanFell(n);
     } else if (S.own[n.capital] !== n.id) { const ps = provsOf(n.id); n.capital = ps.reduce((a, b) => S.pop[a] >= S.pop[b] ? a : b); }
   });
 }
-function fabricate(n, s) { if (n.fab) return 'Já fabricando'; const c = Math.round(40 * eraScale()); if (n.money < c) return 'Sem dinheiro'; n.money -= c; n.fab = { s, m: 6 }; return ''; }
+/* jogador sem país. Integrado por união ou vassalagem a um país da IA: pode continuar com ele (1× por partida e por jogador).
+   No multiplayer quem cai vira observador (pode assumir um país livre da IA); a partida só acaba quando não sobra jogador vivo. */
+function humanFell(n) {
+  const by = n.endBy && nat(n.endBy.by), ok = by && by.alive && !isHuman(by.id) && !(S.swapUsed || {})[n.id];
+  if (ok) { S.swapOffer = Object.assign(S.swapOffer || {}, { [n.id]: by.id }); return; }   // a interface pergunta (pendingModals)
+  humanOut(n.id);
+}
+function humanOut(pid) {
+  if (!S.humans) { S.over = 'dead'; return; }                     // sozinho: fim
+  (S.obs = S.obs || {})[pid] = 1;                                 // multiplayer: observador
+  if (!humans().length) S.over = 'dead';                          // ninguém vivo: fim para todos
+}
+function fabricate(n, s) { if (n.fab) return 'Já fabricando'; const c = Math.round(80 * eraScale()); if (n.money < c) return 'Sem dinheiro'; n.money -= c; n.fab = { s, m: 12 }; return ''; }

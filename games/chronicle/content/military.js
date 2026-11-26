@@ -60,6 +60,10 @@ CONTENT.STANCES = {
   def: { n: 'Defensiva', e: '🛡️', dmg: .85, take: .8, mor: 1, fat: .8, beats: 'agg', act: 'hold', d: 'Segura a linha e vai abater tropas inimigas que avançaram. Baixas −20%, cansa menos; dano −15%' },
 };
 
+/* IA nos fronts: aiEdge = vantagem mínima para atacar (batalha de front) e para mandar avançar; cautela = multiplicador do avanço pela
+   agressividade do governante (guerra dos traços): cautelaMax na mais pacífica, cautelaMin na mais belicosa, linear entre as duas */
+CONTENT.AI_FRONT = { aiEdge: 1.1, cautelaMin: 1, cautelaMax: 1.5, hister: 1.6 };   // hister: a sobra de um front cheio só troca para front que precise de mais de hister × o que tem
+
 CONTENT.PURSUIT = { mul: 2, cav: .1 };// bônus de perseguição (evento de treino): perseguição ×2 e choque da cavalaria +10%, por 1–2 anos
 
 CONTENT.SHIPS = [['nav_longship', 'Barcos longos'], ['nav_knarr', 'Knarrs'], ['nav_cog', 'Cocas'], ['nav_caravel', 'Caravelas'], ['nav_galleon', 'Galeões'], ['nav_lineship', 'Naus de linha'], ['nav_steamship', 'Vapores'], ['nav_ironclad', 'Encouraçados'], ['nav_dreadnought', 'Dreadnoughts'], ['nav_carrier', 'Porta-aviões'], ['nav_nuclearsub', 'Submarinos nucleares'], ['nav_aegis', 'Destróieres de mísseis'], ['nav_autonomous', 'Frotas autônomas'], ['nav_orbit', 'Naves orbitais']];

@@ -107,3 +107,30 @@ CONTENT.CUL_LIST = [['Aelírica', 'liq'], ['Sarvelina', 'liq'], ['Thalassiana', 
   ['Tlaxuni', 'mes'], ['Ixcoral', 'mes'], ['Chalpaya', 'mes'], ['Mexoqui', 'mes'], ['Yaxtepe', 'mes'],
   ['Zvarnia', 'sla'], ['Kroviana', 'sla'], ['Belostria', 'sla'], ['Drovaki', 'sla'], ['Svetrova', 'sla'],
   ['Velária', 'lat'], ['Corvínia', 'lat'], ['Taurena', 'lat'], ['Mirantia', 'lat'], ['Solvária', 'lat']];
+
+// texto de abertura (montado por partes; {cul} cultura, {fe} fé, {pais} país, {gov} governo, {cont} continente, {viz} maior vizinho, {vfe} fé do vizinho).
+// "when" escolhe a frase: kind (main/far/cold), size (small/mid/big), same (1 = mesma fé do vizinho, 0 = outra), rel (good/bad/cold). Sem "when" = vale sempre.
+CONTENT.FLAVOR = {
+  cul: [
+    { t: 'O povo {cul} reza segundo a fé {fe}.' },
+    { t: 'Entre os {cul}, a fé {fe} marca o calendário e a lei.' },
+    { t: 'Os {cul} carregam velhos costumes e a devoção {fe}.' },
+  ],
+  nat: [
+    { t: '{pais} é um pequeno domínio, {gov}, que ainda luta por espaço.', when: { size: 'small' } },
+    { t: '{pais}, {gov}, tem terra e gente para crescer.', when: { size: 'mid' } },
+    { t: '{pais} é uma potência, {gov}, e os vizinhos sabem disso.', when: { size: 'big' } },
+  ],
+  cont: [
+    { t: '{cont} é o coração do mundo conhecido, cheio de rivais.', when: { kind: 'main' } },
+    { t: 'Longe do centro do mundo, {cont} segue o próprio ritmo.', when: { kind: 'far' } },
+    { t: 'Nas terras frias de {cont}, o mar é estrada e sustento.', when: { kind: 'cold' } },
+  ],
+  nb: [
+    { t: 'Ao lado, {viz} divide a mesma fé, e a amizade é antiga.', when: { same: 1, rel: 'good' } },
+    { t: '{viz} reza como vocês, mas a disputa por terra pesa mais que a fé.', when: { same: 1, rel: 'bad' } },
+    { t: '{viz} segue a fé {vfe}, e a desconfiança cresce na fronteira.', when: { same: 0, rel: 'bad' } },
+    { t: '{viz} segue a fé {vfe}; o comércio fala mais alto que os sermões.', when: { same: 0, rel: 'good' } },
+    { t: 'O maior vizinho, {viz}, observa em silêncio.', when: { rel: 'cold' } },
+  ],
+};

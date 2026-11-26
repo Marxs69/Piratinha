@@ -106,7 +106,7 @@ const NET = {
   info(m) { if (NET.onInfo) NET.onInfo(m); },
   players() { return NET.host ? [{ name: NET.name || 'Anfitrião', pid: S.player, host: true }, ...[...NET.peers.entries()].map(([id, p]) => ({ peer: id, name: p.name, pid: p.pid }))] : (NET.names || []).map(([pid, name, host]) => ({ pid, name, host: !!host })); },
   addChat(line) { NET.chat.push(line); if (NET.chat.length > 100) NET.chat.shift(); NET.unread++; if (NET.onChat) NET.onChat(line); },
-  meta() { return { speed: typeof UI !== 'undefined' ? UI.speed : 0, humans: S.humans, names: NET.players().map(p => [p.pid, p.name, p.host ? 1 : 0]) }; },
+  meta() { return { speed: typeof UI !== 'undefined' ? UI.speed : 0, humans: S.humans, moved: S.moved, names: NET.players().map(p => [p.pid, p.name, p.host ? 1 : 0]) }; },
 
   /* ---------- anfitrião ---------- */
   async openRoom(code, transport, name) {
@@ -139,7 +139,7 @@ const NET = {
     }
     if (!p) return;                                              // daqui em diante só quem já escolheu país
     p.seen = Date.now(); if (m.t === 'ping') return;
-    if (m.t === 'cmd') { const e = runCmd(p.pid, m.c, m.a); NET.t.send({ t: 'res', rid: m.rid, e }, from); NET.dirty = true; return; }
+    if (m.t === 'cmd') { const e = runCmd(p.pid, m.c, m.a); if (S.moved && S.moved[p.pid] != null) p.pid = S.moved[p.pid]; NET.t.send({ t: 'res', rid: m.rid, e }, from); NET.dirty = true; return; }   // troca de país: o jogador passa a responder pelo novo
     if (m.t === 'resync') { p.seq = -1; NET.dirty = true; return; }
     if (m.t === 'chat') { const line = { from: p.name, pid: p.pid, m: String(m.m || '').slice(0, 300), at: dateStr() }; NET.addChat(line); NET.t.send({ t: 'chat', line }); return; }
     if (m.t === 'pause') { if (NET.onPauseReq) NET.onPauseReq(p.name); return; }
@@ -194,6 +194,7 @@ const NET = {
   apply(meta) {
     unpackState(unflatState(NET.flat), true);
     if (NET.pid < 0) NET.pid = (meta.humans || []).find(id => id === NET.wantPid) ?? -1;
+    if (meta.moved && meta.moved[NET.pid] != null) NET.pid = meta.moved[NET.pid];   // trocou de país
     S.player = NET.pid; S.humans = meta.humans; NET.speed = meta.speed; NET.names = meta.names || []; if (NET.onState) NET.onState();
   },
   pick(pid) { NET.wantPid = pid; NET.t.send({ t: 'pick', pid, name: NET.name }, NET.hostId); },

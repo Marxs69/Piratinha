@@ -22,7 +22,8 @@ CONTENT.TERRAIN = {
 
 /* limites que crescem a cada era alcançada pelo país (completar as técnicas da era): por índice de ERAS
    slots = canteiros de obra (também limitados pelo título) · bld = níveis de cada prédio por estado (os que não têm max próprio) · svc = níveis de cada serviço público por estado */
-CONTENT.ERA_LIM = { slots: [5, 6, 7, 8, 10, 12, 14, 16, 18], bld: [4, 5, 6, 8, 10, 12, 14, 16, 20], svc: [2, 3, 3, 4, 5, 6, 7, 8, 10] };
+CONTENT.ERA_LIM = { slots: [5, 6, 7, 8, 10, 12, 14, 16, 18], bld: [4, 5, 6, 8, 10, 12, 14, 16, 20], svc: [2, 3, 3, 4, 5, 6, 7, 8, 10],
+  armies: [5, 7, 9, 11, 13, 15, 17, 19, 21] };   // armies: exércitos que a IA mantém (5 + 2 por era)
 
 CONTENT.ERAS = [[860, 'Alta Idade Média'], [1000, 'Idade Média'], [1450, 'Renascimento'], [1650, 'Era Moderna'], [1780, 'Era das Revoluções'], [1880, 'Era Industrial'], [1945, 'Guerra Fria'], [2000, 'Era Digital'], [2060, 'Futuro']];
 
@@ -68,8 +69,8 @@ CONTENT.INVASIONS = [
 /* ondas e guerras do mundo */
 CONTENT.WORLD_EVENTS = {
   revolutions: { n: 'Era das Revoluções', y: [1789, 1850], e: '🗽' },
-  greatwar:    { n: 'Grande Guerra', y: [1905, 1925], e: '💥' },
-  worldwar:    { n: 'Segunda Guerra Mundial', y: [1933, 1948], e: '☢️' },
+  greatwar:    { n: 'Grande Guerra', y: [1905, 1925], p: [.004, .034], e: '💥' },   // p = chance/mês no início e no fim da janela (sobe em curva: mediana ~1914)
+  worldwar:    { n: 'Segunda Guerra Mundial', y: [1933, 1948], p: [.005, .04], e: '☢️' },
   coldwar:     { n: 'Guerra Fria', y: [1946, 1995], e: '🧊' },
 };
 

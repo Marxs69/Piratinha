@@ -21,10 +21,10 @@ function splitGroup(a, fid) {
 }
 function joinGroups(a, b) { const k = gid(a); groupOf(b).forEach(x => { x.g = k; x.front = a.front; x.st = a.st; x.gen = x.gen || a.gen; }); }
 const setGroupFront = (a, fid) => groupOf(a).forEach(x => { x.front = fid; x.path = []; });
-/* destacamentos do mesmo grupo parados na mesma província voltam a ser um só */
+/* destacamentos do mesmo grupo parados na mesma província, ou já na linha do mesmo front, voltam a ser um só (no maior) */
 function mergeGroupParts(id) {
-  const by = new Map(); for (const a of armiesOf(id)) { if (a.g == null || a.path.length || a.inBattle || a.inv || a.exp || a.p >= WD.provs.length) continue; const k = a.g + ':' + a.p; if (!by.has(k)) by.set(k, []); by.get(k).push(a); }
-  let any = false; by.forEach(l => { if (l.length < 2) return; l.slice(1).forEach(b => mergeInto(l[0], b)); any = true; });
+  const by = new Map(); for (const a of armiesOf(id)) { if (a.g == null || a.path.length || a.inBattle || a.inv || a.exp || a.p >= WD.provs.length || a.fbd === S.t) continue; const k = a.g + ':' + (a.front != null && a.fp === a.front ? 'f' + a.front : a.p); if (!by.has(k)) by.set(k, []); by.get(k).push(a); }
+  let any = false; by.forEach(l => { if (l.length < 2) return; l.sort((x, y) => regs(y) - regs(x)); l.slice(1).forEach(b => mergeInto(l[0], b)); any = true; });
   if (any) S.armies = S.armies.filter(a => regs(a) > .08);
 }
 /* exércitos do jogador fora dos fronts: entram sozinhos no front mais ameaçado; sem guerra, vão atrás de rebeldes e se reagrupam */
@@ -35,8 +35,9 @@ function humanArmies(n) {
   const fs = frontsOf(n.id), groups = groupsOf(n.id).filter(G => !G.some(a => a.exp || a.inv));
   if (fs.length) { const need = f => f.foe.reduce((s, q) => s + foeNear(n.id, q), 0);
     for (const G of groups) if (G[0].front == null || !fs.some(f => f.id === G[0].front)) {   // agressivos vão ao front mais próximo; os demais ao mais ameaçado
-      const h = G[0], o = WD.provs[h.p < WD.provs.length ? h.p : n.capital], d = f => Math.min(...f.provs.map(p => Math.hypot(WD.provs[p].cx - o.cx, WD.provs[p].cy - o.cy)));
-      const f = stanceOf(h) === 'agg' ? fs.slice().sort((x, y) => d(x) - d(y))[0] : fs.slice().sort((x, y) => need(y) - need(x))[0]; G.forEach(a => { a.front = f.id; a.path = []; }); } }
+      const h = G[0], o = WD.provs[h.p < WD.provs.length ? h.p : n.capital], d = f => Math.min(...f.provs.map(p => Math.hypot(WD.provs[p].cx - o.cx, WD.provs[p].cy - o.cy))), ok = fs.filter(f => !frontBlocked(h, f));
+      if (!ok.length) continue;
+      const f = stanceOf(h) === 'agg' ? ok.sort((x, y) => d(x) - d(y))[0] : ok.sort((x, y) => need(y) - need(x))[0]; G.forEach(a => { a.front = f.id; a.path = []; }); } }
   else {
     const reb = Object.keys(S.rebels || {}).map(Number).filter(p => S.own[p] === n.id);
     for (const G of groups) { G.forEach(a => a.front = null); const lead = G.slice().sort((x, y) => regs(y) - regs(x))[0]; if (armyBusy(lead)) continue;

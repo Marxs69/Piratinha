@@ -197,7 +197,7 @@ function generateWorld(seed) {
 
   // 8. estados (~7 províncias) e regiões (~6 estados), sempre dentro do mesmo continente
   const cluster = (items, adjOf, contOf, size) => {
-    const lab = new Int32Array(items).fill(-1), groups = []; const order = [...Array(items).keys()].sort(() => r() - .5);
+    const lab = new Int32Array(items).fill(-1), groups = []; const order = shuffleR([...Array(items).keys()], r);
     for (const s of order) {
       if (lab[s] !== -1) continue; const g = groups.length, mem = [s]; lab[s] = g;
       for (let h = 0; h < mem.length && mem.length < size; h++) for (const o of adjOf(mem[h])) if (lab[o] === -1 && contOf(o) === contOf(s) && mem.length < size) { lab[o] = g; mem.push(o); }
@@ -223,7 +223,7 @@ function generateWorld(seed) {
 
   // 9. culturas por região (núcleos por continente), recursos e nomes
   // cada partida sorteia quais povos vivem em cada continente (o frio só com famílias do frio); povos que sobram viram bolsões menores
-  const ord = CULTURES.map((_, i) => i).sort(() => r() - .5), usedC = new Set();
+  const ord = shuffleR(CULTURES.map((_, i) => i), r), usedC = new Set();
   const take = (ok, k) => { const out = []; for (const i of ord) { if (out.length >= k) break; if (!usedC.has(i) && ok(CULTURES[i])) { out.push(i); usedC.add(i); } } return out; };
   conts.slice().sort((a, b) => (b.main - a.main) || (b.cold - a.cold)).forEach(c => { const k = Math.max(1, Math.min(c.main ? 6 : 4, 1 + Math.round(c.provs / 220)));
     c.cul = c.cold ? take(C => COLD_FAMS.includes(C.fam), 1) : take(C => !c.main || C.fam !== 'gut', k); if (!c.cul.length) c.cul = take(() => true, 1); c.culC = c.cul.map(() => null); });

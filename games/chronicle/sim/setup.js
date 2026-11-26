@@ -9,6 +9,7 @@ function newGame(seed, y0 = START_YEAR) {
   const P = WD.provs.length, r = mkRng(seed ^ 0x5eed);
   S = { v: 3, faith: rollFaiths(seed), culx: rollCultures(seed), rs: (seed ^ 0x2545F491) | 0, moon: null, seed, y0, t: 360 * (y0 - START_YEAR), player: -1, nations: [], own: new Int16Array(P).fill(-1), ctrl: new Int16Array(P).fill(-1), pop: new Float32Array(P), bld: WD.states.map(() => ({})),
         armies: [], fleets: [], wars: [], cols: [], sieges: {}, battles: {}, log: [], news: [], id: 1, wp: {}, over: false };
+  if (y0 >= FUTURE_START.y) S.endY = FUTURE_START.end;   // início de teste no futuro: a crônica vai até 2500 (campo só existe nesse caso)
   GOOD_IDS.forEach(g => S.wp[g] = GOODS[g].p);
   const stAdj = WD.states.map(() => new Set());
   WD.provs.forEach(p => p.adj.forEach(o => { const a = p.state, b = WD.provs[o].state; if (a !== b) stAdj[a].add(b); }));
@@ -26,7 +27,7 @@ function newGame(seed, y0 = START_YEAR) {
     if (c.empty) return;
     const sts = WD.states.filter(s => s.cont === c.id).map(s => s.id); if (!sts.length) return;
     const nN = c.main ? clamp(Math.round(sts.length / 3.2), 18, 48) : c.cold ? clamp(Math.round(sts.length / 3), 2, 6) : clamp(Math.round(sts.length / 5), 2, 14);
-    const owner = new Map(), order = sts.slice().sort(() => r() - .5), caps = [];
+    const owner = new Map(), order = shuffleR(sts, r), caps = [];
     for (const s of order) { if (caps.length >= nN) break; if (caps.every(o => !stAdj[o].has(s))) caps.push(s); }
     const ns = caps.map(s => {
       const cul = WD.regions[WD.states[s].region].cul, n = mkNation(cul, c.id, c.main ? 'main' : c.cold ? 'cold' : 'far');
@@ -43,8 +44,8 @@ function newGame(seed, y0 = START_YEAR) {
     owner.forEach((nid, s) => WD.states[s].provs.forEach(p => { S.own[p] = nid; S.ctrl[p] = nid; })); ownChanged();
     ns.forEach(n => {
       n.capital = WD.states[n._st[0]].cap; delete n._st; delete n.vig;
-      { const ns = statesOf(n); n.rank = [0, 1, 2, 3, 4].find(r => rankCap(n, r) >= ns); if (n.rank == null) n.rank = 4; }
-      if (n.kind === 'main') { grantTechs(n, adv ? y0 - (r() * 12 | 0) : 880 + (r() * 40 | 0)); n.gov = pickR(['feudal', 'feudal', 'feudal', 'feudal', 'elective', 'elective', 'tribal', 'theocracy']); n.ideo = chance(.25) ? 'warrior' : 'trad'; n.money = 160; }
+      n.rank = startRank(n);
+      if (n.kind === 'main') { const ty = adv ? y0 - (r() * 12 | 0) : 880 + (r() * 40 | 0); if (!adv) grantTechs(n, ty); /* início avançado: as técnicas do principal vêm só de advanceStart (grantUntil); o sorteio fica para não mudar a sequência */ n.gov = pickR(['feudal', 'feudal', 'feudal', 'feudal', 'elective', 'elective', 'tribal', 'theocracy']); n.ideo = chance(.25) ? 'warrior' : 'trad'; n.money = 160; }
       else if (n.kind === 'cold') { grantTechs(n, adv ? y0 - 10 - (r() * 25 | 0) : 860, ['nav_longship']); n.gov = pickR(['tribal', 'tribal', 'tribal_conf']); n.ideo = 'warrior'; n.money = 90; }
       else { grantTechs(n, adv ? y0 - 15 - (r() * 35 | 0) : 860); if (!adv && chance(.4)) delete n.techs.nav_longship; n.gov = pickR(['tribal', 'tribal', 'tribal', 'tribal_conf', 'horde', 'feudal']); n.ideo = chance(.3) ? 'warrior' : 'trad'; n.money = 60; }
       if (n.gov === 'theocracy') n.flag.c = { k: pickR(['cross_patty', 'sun', 'eye', 'crescent', 'star8']), t: TINCT[n.flag.t[0]].metal ? 'gules' : 'or', n: 1, at: 'center' };
@@ -56,7 +57,7 @@ function newGame(seed, y0 = START_YEAR) {
   WD.provs.forEach(p => {
     const c = WD.conts[p.cont], o = S.own[p.id], base = p.size * TERRAIN[p.terr].pop;
     S.pop[p.id] = base * (c.main ? rand(1.3, 1.9) : c.cold ? rand(.35, .6) : o >= 0 ? rand(.5, .9) : rand(.12, .35));
-    if (adv) { const cap = base * 4 * (1 + (y0 > 1800 ? (y0 - 1800) / 120 : 0)) + 3; S.pop[p.id] = Math.min(cap * .85, S.pop[p.id] * (1 + (y0 - 860) / 450 * (c.main ? 1 : o >= 0 ? .7 : .3))); }   // começo avançado: séculos de crescimento
+    if (adv) { const cap = base * 4 * (1 + (y0 > 1800 ? (capY(y0) - 1800) / 120 : 0)) + 3; S.pop[p.id] = Math.min(cap * .85, S.pop[p.id] * (1 + (y0 - 860) / 450 * (c.main ? 1 : o >= 0 ? .7 : .3))); }   // começo avançado: séculos de crescimento
   });
   // prédios iniciais, exércitos e frotas
   S.nations.forEach(n => {
@@ -103,7 +104,7 @@ function initCul() {
     ps.forEach((p, i) => { S.culg[p] = i < cut ? n.cul : others[Math.min(k - 1, Math.floor((i - cut) / Math.max(1, ps.length - cut) * k))]; });
   }
   // bolsões de povos sem país
-  const caps = new Set(S.nations.map(n => WD.provs[n.capital >= 0 ? n.capital : 0].state)), minors = CULTURES.map((c, i) => i).filter(i => isMinorCul(i)).sort(() => r() - .5).slice(0, 9);
+  const caps = new Set(S.nations.map(n => WD.provs[n.capital >= 0 ? n.capital : 0].state)), minors = shuffleR(CULTURES.map((c, i) => i).filter(i => isMinorCul(i)), r).slice(0, 9);
   for (let i = 0, t = 0; i < minors.length && t < 300; t++) { const st = WD.states[r() * WD.states.length | 0]; if (caps.has(st.id) || WD.conts[st.cont].cold) continue; const c = minors[i++]; st.provs.forEach(p => { if (r() < .7) S.culg[p] = c; }); }
 }
 /* tecnologias da árvore normal até um ano (respeitando pré-requisitos; com vertente, as substituídas ficam de fora) */
@@ -145,7 +146,8 @@ function advanceStart(Y, r) {
     calcMods(n);
     // governo e ideologia da época (só o que a tecnologia já liberou)
     const cat = GOVS[n.gov].cat, opts = [...new Set([...n.fx.g, ...BASE_GOVS])].filter(g => govOk(n, g) && (n.kind === 'main' || GOVS[g].cat === cat || chance(.3)));
-    const sc = g => (GOVS[g].cat === cat ? 120 : 0) + (n.kind === 'main' && Y >= 1100 && GOVS[g].cat === 'Monarquia' ? 140 : 0) - (n.kind === 'main' && GOVS[g].cat === 'Tribal' ? 200 : 0) + govYear(g) * .25 + r() * 160; const g = opts.sort((a, b) => sc(b) - sc(a))[0];
+    const sc = g => (GOVS[g].cat === cat ? 120 : 0) + (n.kind === 'main' && Y >= 1100 && GOVS[g].cat === 'Monarquia' ? 140 : 0) - (n.kind === 'main' && GOVS[g].cat === 'Tribal' ? 200 : 0) + govYear(g) * .25 + r() * 160;
+    const scs = new Map(opts.map(g => [g, sc(g)])), g = opts.slice().sort((a, b) => scs.get(b) - scs.get(a))[0];   // nota sorteada uma vez por opção: comparador com sorteio dava resultado diferente entre motores (navegador × node)
     if (g && g !== n.gov) { const her = GOVS[n.gov].succ === 'hered'; applyGov(n, g); n.govCd = 0; if (her !== (GOVS[g].succ === 'hered')) succeed(n, false); }   // governo de início não conta como reforma recente
     if (Y >= 1453 && chance(.6)) { const io = [...n.fx.i].sort((a, b) => (TECHS.find(t => (t.fx.i || []).includes(b)) || { y: 0 }).y - (TECHS.find(t => (t.fx.i || []).includes(a)) || { y: 0 }).y); if (io.length) n.ideo = io[Math.min(io.length - 1, r() * 3 | 0)]; }
     for (const k in LAWS) if (chance(.4)) { const os = Object.keys(LAWS[k].o).filter(o => lawOk(n, k, o) && !(k === 'slavery' && o === 'legal')); if (os.length) n.laws[k] = os[os.length - 1 - (r() * Math.min(2, os.length) | 0)]; }
@@ -174,7 +176,8 @@ function advanceStart(Y, r) {
   });
   exploreEra(Y);
   { const ai = REL_IDS.indexOf('atheism'), AT = FAITH_RULES.atheism; if (ai >= 0 && Y > RELIGIONS.atheism.y0) S.nations.forEach(n => { const k = Math.min(.25, AT.base * (Y - RELIGIONS.atheism.y0) * (AT.law[n.laws.relig] ?? 1)); provsOf(n.id).forEach(p => { if (chance(k)) S.relg[p] = ai; }); }); }   // ateus de antes do início
-  ownChanged(); S.nations.forEach(n => { if (n.alive) { n.relig = S.relg[n.capital]; calcMods(n); } });
+  ownChanged(); S.nations.forEach(n => { if (!n.alive) return; const fc = S.relg[n.capital]; if (!RELIGIONS[REL_IDS[fc]].atheist) n.relig = fc;   // capital com ateus semeados não torna o Estado ateu
+    [n.ruler, n.spouse, ...(n.kids || [])].forEach(c => { if (c) c.rel = n.relig; }); calcMods(n); });   // a família do governante segue a fé oficial
   const ys = eraScale(); econAll(); S.nations.forEach(n => { if (n.alive) calcMods(n); }); priceTick(true);
   S.nations.forEach(n => { n.money *= S.plv / ys; });   // o tesouro inicial acompanha o nível de preços da época
 }
@@ -187,7 +190,7 @@ const isMinorRel = r => !(S.relMajor || []).includes(+r);
 function initRelig() {
   if (!S.culg) initCul();
   S.relg = new Uint8Array(WD.provs.length); const r = mkRng(S.seed ^ 0x2e1), heresy = i => RELIGIONS[REL_IDS[i]].fict;
-  const pool = REL_IDS.map((k, i) => i).filter(i => !heresy(i) && !RELIGIONS[REL_IDS[i]].atheist).sort(() => r() - .5), core = pool.slice(0, 14), any = () => core[r() * core.length | 0];
+  const pool = shuffleR(REL_IDS.map((k, i) => i).filter(i => !heresy(i) && !RELIGIONS[REL_IDS[i]].atheist), r), core = pool.slice(0, 14), any = () => core[r() * core.length | 0];
   const regRel = WD.regions.map(() => any()); WD.provs.forEach(p => { S.relg[p.id] = regRel[p.region]; });
   for (const n of S.nations) {
     const nb = [...neighbors(n)].map(nat).filter(x => x.majRel != null), main = nb.length && r() < .4 ? nb[r() * nb.length | 0].majRel : any(); n.majRel = main;

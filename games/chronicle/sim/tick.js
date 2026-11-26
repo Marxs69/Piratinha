@@ -26,7 +26,9 @@ function worksTick(n) {                                         // obras conclu�
 }
 function mpStabTick(n) {                                        // contingente, cansaço de guerra e estabilidade
   const mpMax = Math.max(0, (n.popT || 0) - (n.cls ? n.cls.slave : 0)) * .03 * (1 + n.m.manpower); n.mpMax = mpMax; n.manpower = Math.min(mpMax, n.manpower + (n.popT || 0) * .00025 * (1 + n.m.manpower));
-  const war = warsOf(n.id).length; n.wex = war ? Math.min(30, n.wex + .4) : Math.max(0, n.wex - .6);
+  const war = warsOf(n.id).length;   // cansaço: um pouco pelo tempo, o resto por terra ocupada e homens perdidos (WEX)
+  if (war) { const ps = provsOf(n.id), occ = ps.length ? ps.filter(p => S.ctrl[p] !== n.id).length / ps.length : 0; n.wex = Math.min(WEX.cap, n.wex + WEX.time + occ * WEX.occ + (n._lossM || 0) / Math.max(2, mpMax) * WEX.loss); }
+  else n.wex = Math.max(0, n.wex - WEX.rec); n._lossM = 0;
   const target = stabParts(n).reduce((a, x) => a + x[1], 0);
   n.stab = clamp(n.stab + clamp(target - n.stab, -2, 2), 0, 100);
 }
@@ -38,8 +40,8 @@ function projTick(n) {                                          // reivindicaç�
 const aiTick = n => { if (!isHuman(n.id)) ai(n); };
 const aliveEvents = n => { if (n.alive) eventsTick(n); };
 /* por país vivo, todo mês */
-const tidyNation = n => { if (n.ae) n.ae = n.ae < .5 ? 0 : n.ae * (1 - PEACE.aeDecay); n.stab = clamp(n.stab, 0, 100); n.pres = clamp(n.pres ?? 50, 0, 100); if (n.manpower < 0) n.manpower = 0; };   // limites depois de tudo o que mexeu no mês
-const NATION_MONTH = [calcMods, researchTick, worksTick, enactTick, mpStabTick, projTick, supportTick, slaveTick, unrestTick, pressTick, charMonthly, courtTick, tmodTick, aliveEvents, aiTick, tidyNation];
+const tidyNation = n => { if (n.ae) n.ae = Math.max(0, n.ae - n.ae * PEACE.aeDecay - PEACE.aeDecayMin); n.stab = clamp(n.stab, 0, 100); n.pres = clamp(n.pres ?? 50, 0, 100); if (n.manpower < 0) n.manpower = 0; };   // limites depois de tudo o que mexeu no mês
+const NATION_MONTH = [calcMods, researchTick, worksTick, enactTick, mpStabTick, projTick, supportTick, slaveTick, unrestTick, pressTick, charMonthly, crisisTick, courtTick, tmodTick, aliveEvents, aiTick, tidyNation];
 
 function nanGuard() { if (S.nations.some(n => n.alive && !Number.isFinite(n.money + n.stab + n.manpower + (n.income || 0)))) repairGame(false); }   // nunca deixa um −NaN se espalhar
 function mineStates() { S._mine = S.nations.map(() => []); WD.states.forEach(st => { const o = S.own[st.cap]; if (o >= 0 && S.ctrl[st.cap] === o) S._mine[o].push(st); }); }
@@ -47,7 +49,7 @@ function mineStates() { S._mine = S.nations.map(() => []); WD.states.forEach(st 
    A economia do país roda antes do resto do mês dele; os preços mundiais fecham na virada com o que todos somaram (econClose). */
 const NATION_SLOTS = 30;
 function nationsDay() {
-  const slot = S.t % NATION_SLOTS; if (!S._mine) mineStates(); econSetup(); if (!S.wacc) S.wacc = econAcc();
+  const slot = S.t % NATION_SLOTS; if (!S._mine) mineStates(); econSetup(); if (!S.wacc || !S.wacc.ev) S.wacc = econAcc();
   for (const n of S.nations) if (n.alive && n.id % NATION_SLOTS === slot) { econNation(n, S.wacc); for (const f of NATION_MONTH) { if (!n.alive) break; f(n); } }
 }
 function econClose() { if (S.wacc) econFinish(S.wacc); S.wacc = econAcc(); priceTick(false); }
@@ -67,7 +69,7 @@ function capitalOccupied() {
 }
 function popTick() {
   const y = curYear();
-  S.nations.forEach(n => { n._fs = n.foodSat == null ? 1 : n.foodSat; n._gm = 1 + (n.m ? n.m.growth : 0); n._cap = (1 + (n.fx ? (n.fx.bo.farm || 0) : 0) + (y > 1800 ? (y - 1800) / 120 : 0)) * (1 + ((n.cov || {}).health || 0) * .2); });
+  S.nations.forEach(n => { n._fs = n.foodSat == null ? 1 : n.foodSat; n._gm = 1 + (n.m ? n.m.growth : 0); n._cap = (1 + (n.fx ? (n.fx.bo.farm || 0) : 0) + (y > 1800 ? (capY(y) - 1800) / 120 : 0)) * (1 + ((n.cov || {}).health || 0) * .2); });
   for (let p = 0; p < S.pop.length; p++) {
     const o = S.own[p], pr = WD.provs[p], fs = o >= 0 ? nat(o)._fs : 1, gm = o >= 0 ? nat(o)._gm : 1, capM = o >= 0 ? nat(o)._cap : 1;
     const cap = pr.size * TERRAIN[pr.terr].pop * 4 * capM + 3, base = (y < 1750 ? .00035 : y < 1950 ? .0008 : .0005) * gm;
@@ -82,9 +84,10 @@ function colonyTick() {
 }
 function warsTick() { S.wars.slice().forEach(w => { w.score = warScore(w); aiPeace(w); }); }
 function yearTick() { if (S.t % 360 === 0) { relDrift(); religTick(); } }
-function endCheck() { if (curYear() >= END_YEAR && !S.over) { S.over = 'end'; log('O ano ' + END_YEAR + ' chegou. A crônica termina.', 'world'); } }
+function endCheck() { const E = S.endY ?? END_YEAR; if (curYear() >= E && !S.over) { S.over = 'end'; log('O ano ' + E + ' chegou. A crônica termina.', 'world'); } }
 /* o mundo, todo mês */
-const WORLD_MONTH = [plagueTick, alienTick, nanGuard, econClose, reparationsTick, subjectsTick, faithTick, histTick, mineStates, rebelTick, generalsDie, attritionTick, reinforce, capitalOccupied, popTick, colonyTick, warsTick, yearTick, endCheck];
+const clearMoved = () => { if (S.moved) delete S.moved; };   // trocas de país já avisadas à rede no mês
+const WORLD_MONTH = [clearMoved, plagueTick, alienTick, nanGuard, econClose, reparationsTick, subjectsTick, faithTick, histTick, mineStates, rebelTick, separatismTick, coalitionTick, generalsDie, attritionTick, reinforce, capitalOccupied, popTick, colonyTick, warsTick, yearTick, endCheck];
 function monthTick() { for (const f of WORLD_MONTH) f(); }
 
 /* fatores da estabilidade (alvo para onde ela anda até 2 pontos por mês) */
@@ -92,9 +95,11 @@ const VOTE_W = { nobles: [.7, .2, .1], census: [.45, .35, .2], universal: [.25, 
 function stabParts(n) {
   const cs = n.csat || {}, w = VOTE_W[n.laws.vote] || VOTE_W.nobles, g = k => cs[k] == null ? 1 : cs[k], ws = g('high') * w[0] + g('mid') * w[1] + g('low') * w[2], sl = slaveShare(n);
   const rebels = Object.values(S.rebels || {}).filter(r => r.o === n.id).length, ruler = demandsOf(n).filter(d => d.slot === 'ruler').length;
-  return [['Base', 36], ['Governo, ideologia, leis e tecnologia', n.m.stab * 100], ['Comida', (n.foodSat - 1) * 60], ['Satisfação das classes (pelo peso do sufrágio)', (ws - .7) * 25], ['Cansaço de guerra', -n.wex],
+  const P = [['Base', 36], ['Governo, ideologia, leis e tecnologia', n.m.stab * 100], ['Comida', (n.foodSat - 1) * 60], ['Satisfação das classes (pelo peso do sufrágio)', (ws - .7) * 25], ['Cansaço de guerra', -n.wex],
     ['Templos', ((n.bsum || {}).stab || 0) * (n.laws.relig === 'secular' ? .5 : 1)], ['Segurança', ((n.cov || {}).sec || 0) * 12], ['Dívida', n.money < 0 ? -15 : 0], ['Acima do limite de domínio', -overCap(n) * 3],
     ['Escravos', -(sl * 50 + Math.max(0, sl - .15) * 150)], ['Minorias culturais e religiosas', -((n.minC || 0) + (n.minR || 0)) * 8], ['Vontades do governante não atendidas', -ruler * 2], ['Províncias rebeladas', -rebels * 1.5]].filter(x => Math.abs(x[1]) >= .5);
+  const raw = P.reduce((a, x) => a + x[1], 0); if (raw > STAB_SOFT.at) { let e = STAB_SOFT.at + (raw - STAB_SOFT.at) * STAB_SOFT.k; if (e > STAB_SOFT.at2) e = STAB_SOFT.at2 + (e - STAB_SOFT.at2) * STAB_SOFT.k2; P.push(['Retorno decrescente acima de ' + STAB_SOFT.at, e - raw]); }   // o topo custa cada vez mais
+  return P;
 }
 
 /* ---------- reparo (botão de debug e checagem mensal): números inválidos, caches, exércitos picados e travados ---------- */
@@ -117,15 +122,17 @@ function repairGame(full) {
   S.fleets.forEach(f => { fin(f, 'ships', 0); fin(f, 'prog', 0); });
   S.armies = S.armies.filter(a => regs(a) > .08); S.fleets = S.fleets.filter(f => f.ships > .2);
   if (full) S.nations.forEach(n => { if (n.alive && !isHuman(n.id)) { merged += mergeIdle(n.id); S.armies.forEach(a => { if (a.o === n.id && a.path.length && !a.exp && !a.retreat) { a.path = []; a.need = 0; a.prog = 0; } }); } });   // IA: replaneja os caminhos
-  ownChanged(); warsChanged(); enterC = null; strC = null; nbC.clear(); S._threat = null; if (full) { S.stS = null; S.stD = null; S.stHas = null; }
-  S.nations.forEach(n => { if (n.alive) calcMods(n); }); econAll(); S.nations.forEach(n => { if (n.alive) calcMods(n); }); S.mapDirty = true;
+  warsChanged(); fixCtrl(); ownChanged(); enterC = null; strC = null; nbC.clear(); S._threat = null; if (full) { S.stS = null; S.stD = null; S.stHas = null; }
+  S.nations.forEach(n => { if (n.alive) calcMods(n); }); econAll(true); S.nations.forEach(n => { if (n.alive) calcMods(n); }); S.mapDirty = true;
   return { fixed, merged };
 }
 
 /* ---------- avanço do tempo ---------- */
+/* caches preguiçosos zerados a cada dia: o estado depois de carregar um save é idêntico ao da partida que continuou (sem cache aquecido antes) */
+function dayCaches() { strC = null; supC = null; nbC.clear(); difC = null; enterC = null; mpC = null; S._threat = null; epC = null; }
 function advanceDay() {
   if (S.over) return;
-  S.t++; dayTick(); invasionTick(); frontsTick(); frontPlace(); frontBattleTick();
+  S.t++; dayCaches(); dayTick(); invasionTick(); frontsTick(); frontPlace(); frontBattleTick();
   if (S.t % 30 === 0) monthTick();
   nationsDay();
 }

@@ -226,6 +226,13 @@ CONTENT.NEEDS = { wild: { n: 'selva ou pântano (biodiversidade)', terr: ['jungl
    é trocada por uma versão da vertente (vr_x_id: mesmos requisitos e efeitos, nome do tema); a área do ponto inicial fica "trancada" nessa versão.
    As melhorias próprias (v.tree → v_x_k, área 'vert') ficam na aba da vertente; completar todas libera a tropa e a frota especiais.
    v.rep = técnicas comuns substituídas; v.len = melhorias próprias */
+// técnicas comuns que levam o sufixo da vertente (decisão 16: só armas, navios, transporte e indústria; o resto mantém o nome comum)
+CONTENT.VERT_SUF_TECHS = [
+  'mil_bombard', 'mil_arquebus', 'mil_musket', 'mil_bayonet', 'mil_fieldart', 'mil_rifle', 'mil_breech', 'mil_machinegun', 'mil_aircraft', 'mil_tank', 'mil_jet', 'mil_missile', 'mil_drones', 'mil_exo', 'mil_railgun', 'mil_swarm',
+  'nav_caravel', 'nav_galleon', 'nav_lineship', 'nav_steamship', 'nav_ironclad', 'nav_dreadnought', 'nav_submarine', 'nav_carrier', 'nav_nuclearsub', 'nav_container', 'nav_aegis', 'nav_autonomous',
+  'eco_railways', 'eco_highways', 'eco_hsr', 'eco_maglev', 'eco_tubes',
+  'eco_foundry', 'eco_manufactory', 'eco_blastfurnace', 'eco_textile', 'eco_factory', 'eco_mechanization', 'eco_interchangeable', 'eco_bessemer', 'eco_assembly',
+];
 CONTENT.VERT_SUF = { clock: 'de relojoaria', steam: 'a vapor', tesla: 'de bobina', diesel: 'a diesel', atom: 'nuclear', bio: 'de bioengenharia', cyber: 'em rede', solar: 'solar', nano: 'de nanomáquinas', space: 'orbital' };
 
 CONTENT.VERT_UPFX = { mil: { u: { inf: .1, cav: .1, art: .1 } }, nav: { ship: .3 }, eco: { m: { prod: .03 } }, soc: { m: { stab: .02 } } };

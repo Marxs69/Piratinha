@@ -18,15 +18,29 @@ const seaRoute = (n, a, b) => a === b ? [] : seaPath(n, a, b) || (seaExploreOk(n
 const canFerry = (n, z) => n.fx.sea >= 1 && n.exZ[z] && seaOk(n, z) && !zoneHostile(n.id, z);
 
 /* ---------- invasão naval: a.inv = { to, port, z0, z1, f, st, t } ---------- */
-function planInvasion(n, a, to) {
+/* portos de embarque (R1b, critico-c passo 2): todas as costas próprias que o exército alcança por terra, da mais perto à mais longe (dias de
+   marcha, um Dijkstra só; sort estável) — não só as 8 mais perto em linha reta. invPorts(n, a) serve a várias chamadas de planInvasion. */
+function invPorts(n, a) {
+  const P = WD.provs.length; if (a.p >= P) return { ports: [], sea: new Map() };
+  const d = pathDist(n, a.p, a), ports = provsOf(n.id).filter(p => WD.provs[p].coast && S.ctrl[p] === n.id && d[p] < 1e9).sort((x, y) => d[x] - d[y]);
+  return { ports, sea: new Map() };
+}
+/* mares que a frota alcança saindo de z0 (as mesmas regras de seaRoute: mares conhecidos navegáveis; com Bússola, também os desconhecidos) */
+function seaReach(n, z0, memo) {
+  let r = memo && memo.get(z0); if (r) return r;
+  const Z = WD.seas.length, blind = seaExploreOk(n); r = new Uint8Array(Z); r[z0] = 1; const q = [z0];
+  for (let h = 0; h < q.length; h++) for (const w of WD.seas[q[h]].adj) if (!r[w] && (n.exZ[w] || blind) && seaOk(n, w)) { r[w] = 1; q.push(w); }
+  if (memo) memo.set(z0, r); return r;
+}
+function planInvasion(n, a, to, pre) {
   const P = WD.provs.length; if (a.p >= P || a.inv) return 'Já em operação';
   if (!n.fx.sea) return 'Exige Barcos longos';
   const tz = WD.provs[to].seas.filter(z => n.exZ[z] && seaOk(n, z)); if (!WD.provs[to].coast || !tz.length) return 'O destino não tem costa navegável';
-  // porto de embarque: a costa própria mais perto que alcança o destino por mar
-  const pa = WD.provs[a.p], ports = provsOf(n.id).filter(p => WD.provs[p].coast && S.ctrl[p] === n.id).sort((x, y) => Math.hypot(WD.provs[x].cx - pa.cx, WD.provs[x].cy - pa.cy) - Math.hypot(WD.provs[y].cx - pa.cx, WD.provs[y].cy - pa.cy)).slice(0, 8);
+  // porto de embarque: a costa própria mais perto (por terra) que alcança o destino por mar
+  const pp = pre || invPorts(n, a); if (!pp.ports.length) return 'Nenhum porto próprio ao alcance por terra';
   let plan = null;
-  for (const port of ports) { if (port !== a.p && !findPath(n, a.p, port, a)) continue;
-    for (const z0 of WD.provs[port].seas) { if (!seaOk(n, z0)) continue; const z1 = tz.find(z => seaRoute(n, z0, z)); if (z1 != null) { plan = { port, z0, z1 }; break; } }
+  for (const port of pp.ports) {
+    for (const z0 of WD.provs[port].seas) { if (!seaOk(n, z0)) continue; const rz = seaReach(n, z0, pp.sea), z1 = tz.find(z => rz[z]); if (z1 != null) { plan = { port, z0, z1 }; break; } }
     if (plan) break; }
   if (!plan) return 'Nenhum porto alcança o destino por mar';
   // frota: a mais perto com capacidade; as outras se juntam a ela

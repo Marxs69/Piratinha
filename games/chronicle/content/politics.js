@@ -8,7 +8,7 @@
 /* árvore de governos: to = reformas possíveis a partir deste (id, ou [id, condição COND]); ev = só por evento ou revolução (aparece na árvore, não se escolhe).
    Golpes levam aos de COUP_GOVS. A tecnologia (fx.g), o título e a época continuam valendo para todos. */
 CONTENT.GOVS = {
-  tribal:        { n: 'Chefatura tribal', cat: 'Tribal', succ: 'elect', t: 'Chefe', fmt: 'Tribo de {}', m: { tax: -.3, manpower: .3, research: -.2 }, coup: .6 , to: ['tribal_conf', 'horde', 'feudal', 'elective', 'principality'], ev: ['theocracy'] },
+  tribal:        { n: 'Chefatura tribal', until: 1200, next: 'feudal', cat: 'Tribal', succ: 'elect', t: 'Chefe', fmt: 'Tribo de {}', m: { tax: -.3, manpower: .3, research: -.2 }, coup: .6 , to: ['tribal_conf', 'horde', 'feudal', 'elective', 'principality'], ev: ['theocracy'] },
   tribal_conf:   { n: 'Confederação tribal', until: 1750, next: 'feudal', cat: 'Tribal', succ: 'council', term: 8, t: 'Chefe supremo', fmt: 'Confederação de {}', m: { tax: -.2, stab: .1, research: -.15 }, coup: .4 , to: ['tribal', 'feudal', 'elective', 'khanate'] },
   horde:         { n: 'Horda nômade', until: 1500, next: 'khanate', cat: 'Tribal', succ: 'elect', t: 'Cã', fmt: 'Horda de {}', m: { tax: -.4, army: .2, manpower: .4, prod: -.2, speed: .3 }, coup: 1.2 , to: ['khanate', 'tribal', 'tribal_conf'] },
   feudal:        { n: 'Monarquia feudal', until: 1800, next: 'absolute', cat: 'Monarquia', succ: 'hered', t: 'Rei', fmt: 'Reino de {}', m: { tax: -.1, manpower: .2 }, coup: .5 , to: ['absolute', 'elective', 'principality', 'empire', 'sultanate'], ev: ['theocracy', 'military_order', 'merchant', 'oligarchic'] },
@@ -67,9 +67,19 @@ CONTENT.ELECT_FORMS = {
 
 /* paz e expansão (vale para a IA e para o jogador)
    maxShare = no máximo esta parte do país derrotado (pela população) por tratado · annexProvs = países deste tamanho ou menores podem ser anexados inteiros
-   truce = anos de trégua · ae = expansão agressiva ganha por ponto de parte tomada · aeDecay = quanto some por mês · aeBlock = acima disto a IA não declara guerra nem integra
-   aeStab = estabilidade perdida por ponto · aeRel = relação dos vizinhos perdida por ponto ganho · integK = velocidade da integração de súditos */
-CONTENT.PEACE = { maxShare: 40, annexProvs: 3, truce: 10, ae: .6, aeDecay: .025, aeBlock: 20, aeStab: .0025, aeRel: .8, integK: .5 };
+   truce = anos de trégua · ae = expansão agressiva por província tomada (tamanho absoluto, não a parte do derrotado) · aeDecay/aeDecayMin = some por mês 0,5% + 0,15 fixo
+   aeBlock = acima disto a IA não declara guerra nem integra · aeStab = estabilidade perdida por ponto (teto aeStabMax) · aeRel = relação dos vizinhos perdida por ponto ganho
+   coal = com EA a partir disto, vizinhos com relação ≤ coalRel entram na guerra contra o agressor (coalizão); e, se somam ≥ coalPow × a força dele, declaram por conta própria (coalChance por mês) · integAe = EA da integração de súdito, por província · integK = velocidade da integração */
+CONTENT.PEACE = { maxShare: 40, annexProvs: 3, truce: 10, ae: 1, aeDecay: .005, aeDecayMin: .15, aeBlock: 20, aeStab: .0025, aeStabMax: .15, aeRel: .8, coal: 25, coalRel: -30, coalPow: .8, coalChance: .03, integAe: .5, integK: .5 };
+/* fim de guerra (R1a, critico-m Revisão 9; critico-d "R1 — decisão"). Rendição = occ × ocupada (pop.) + loss × perdas ÷ (perdas + tropas) + cap (capital) + T/100;
+   tudo ocupado = 1. T (objetivo): só no país-alvo, +tUp/mês com o atacante controlando ≥ tGoal da pop. do estado reivindicado, −tDown/mês sem, 0..tMax.
+   Paz branca do lado L (whiteOk): gatilho + L não mais de tol à frente + não [força de L ≥ strong × a do outro, L não atrás e o outro ≥ strongMin].
+   Gatilhos: cansaço (wexM meses e os dois líderes ≥ wexMin, wexRate/mês), parada (do stopFrom, stopM meses sem mudança de controle, stopRate/mês),
+   sem contato (do ncFrom, ncM meses sem contato, mesma taxa), longa (longM: obrigatório; aviso ao jogador do warnM). Sem branca: imposta pelo placar com max(Δ × 100; minPts).
+   Ceder cedo: do cedeFrom, rendição ≥ cedeSur e força ≤ cedeMil × a do outro, cedeRate/mês. Capitulação: do capFrom, rendição ≥ capSur, capRate/mês (1 = na hora). */
+CONTENT.WAR_END = { occ: .6, loss: .25, cap: .15, tMax: 20, tUp: 2, tDown: 1, tGoal: .5, tol: .1, strong: 1.5, strongMin: .2, minPts: 10,
+  wexM: 24, wexMin: 20, wexRate: .06, stopFrom: 36, stopM: 12, stopRate: .05, ncFrom: 12, ncM: 12, longM: 84, warnM: 72,
+  cedeFrom: 3, cedeSur: .4, cedeMil: .5, cedeRate: .15, capFrom: 4, capSur: .6, capRate: .12 };
 
 /* golpe militar: para qual governo o país pode cair, pelo tipo de governo atual (chance de mudar a forma: chance) */
 CONTENT.COUP_GOVS = { chance: .45, Monarquia: ['junta', 'caudillo', 'mil_regime', 'protectorate'], República: ['junta', 'caudillo', 'mil_regime'], Tribal: ['junta', 'caudillo'],
@@ -113,9 +123,9 @@ CONTENT.GOV_TR = [
    DOMAIN: o limite cresce com as eras (até +era, de y0 a y0+span) e com a cobertura administrativa (até +adm) */
 CONTENT.RANK_N = ['Baronia', 'Condado', 'Ducado', 'Reino', 'Império'];
 
-CONTENT.RANK_CAP = [2, 5, 12, 30, 60];
-CONTENT.RANK_REQ = [0, 2, 4, 8, 24];
-CONTENT.DOMAIN = { era: .6, y0: 860, span: 1000, adm: .3 };
+CONTENT.RANK_CAP = [2, 5, 10, 18, 30];
+CONTENT.RANK_REQ = [0, 2, 4, 8, 18];
+CONTENT.DOMAIN = { era: .5, y0: 860, span: 1000, adm: .3 };
 
 CONTENT.RANK_SLOTS = [3, 5, 8, 12, 18];// teto de canteiros de obra pelo título
 
@@ -163,7 +173,7 @@ CONTENT.IDEOS = {
   cosmism:    { n: 'Cosmismo', col: '#3949ab', m: { research: .1, prod: .1, trade: .1, army: .1 }, war: 1.4, y0: 2150, y1: 2200, ax: 0, govs: ['hegemony', 'star_empire'], laws: { subsidy: 'total' }, gen: .03 },
 };
 
-CONTENT.MODS = { tax: 'Impostos', prod: 'Produção', research: 'Pesquisa', stab: 'Estabilidade', army: 'Força militar', manpower: 'Contingente', trade: 'Comércio', colon: 'Colonização', food: 'Alimentos', speed: 'Movimento', admin: 'Custo de obras', growth: 'Crescimento' };
+CONTENT.MODS = { tax: 'Impostos', prod: 'Produção', research: 'Pesquisa', stab: 'Estabilidade', army: 'Força militar', manpower: 'Contingente', trade: 'Comércio', colon: 'Colonização', food: 'Alimentos', speed: 'Movimento', admin: 'Desconto em obras', growth: 'Crescimento' };
 
 /* ---------- leis (cada uma tem opções com modificadores; trocar custa estabilidade) ---------- */
 /* leis. Cada opção: n, m (modificadores), when (condição para adotar), until = ano em que fica ultrapassada (não se adota mais; quem a mantém perde estabilidade) */
@@ -211,7 +221,7 @@ CONTENT.REL_SLOTS = { state: 0, tolerant: 1, free: 3, secular: 8 };
 
 /* ---------- súditos ----------
    base = liberdade de partida (0% integrado, 100% livre); tri = parte dos impostos paga ao suserano; war = entra nas guerras do suserano;
-   dip = diplomacia própria; int = velocidade de integração; cost = preço na paz (fração do valor do país; null = não se impõe) */
+   dip = diplomacia própria (sem ela: nenhuma aliança, casamento ou comércio além do suserano — noDip; com ela: nenhuma aliança com quem está em guerra com o suserano — foeSr); int = velocidade de integração; cost = preço na paz (fração do valor do país; null = não se impõe) */
 /* ---------- ações diplomáticas ----------
    cost = ducados (× era) · cd = dias de espera por alvo · pay = o custo vai para o alvo · rel = [mudança na relação deles, na nossa] · stab = estabilidade de quem faz
    unlink = desfaz esse laço dos dois lados · toggle = liga/desliga a lista só de quem faz · ties = rompe todos os laços (breakTies)
@@ -226,11 +236,13 @@ CONTENT.DIPLO = {
   untrade:  { unlink: 'trade', rel: [-10, 0] },
   embargo:  { toggle: 'emb', unlink: 'trade', rel: [-25, 0] },
   integrate:{ cost: 200, block: 'Use a aba Súditos na diplomacia' },
-  ally:     { cost: 0, link: 'allies', bonus: 25, log: 'Aliança', deny: [['linked', 'Já são aliados']],
-              acc: [['trait', -20, 'governante paranoico', 'paranoid'], ['one', -15, 'base'], ['count', -6, 'já tem aliados', 'allies'], ['common', 20, 'inimigo em comum'], ['stronger', 10, 'você é forte'], ['linked', 15, 'casamento real', 'marr']] },
-  marr:     { cost: 20, link: 'marr', bonus: 25, log: 'Casamento real', deny: [['notHered', 'Exige duas monarquias hereditárias'], ['linked', 'Já há casamento']],
+  ally:     { cost: 0, link: 'allies', bonus: 25, log: 'Aliança', max: [[860, 2], [1900, 4]],   // max: [a partir do ano, alianças] (laços de súdito não contam)
+              deny: [['noDip', 'Súdito sem diplomacia própria'], ['noDipT', 'Eles são súditos sem diplomacia própria'], ['foeSr', 'Em guerra com seu suserano'], ['foeSrT', 'Em guerra com o suserano deles'], ['linked', 'Já são aliados'], ['allyFull', 'Limite de alianças'], ['allyFullT', 'Eles estão no limite de alianças']],
+              acc: [['trait', -20, 'governante paranoico', 'paranoid'], ['one', -15, 'base'], ['allyN', -6, 'já tem aliados'], ['common', 20, 'inimigo em comum'], ['stronger', 10, 'você é forte'], ['linked', 15, 'casamento real', 'marr']] },
+  marr:     { cost: 20, link: 'marr', bonus: 25, log: 'Casamento real', wed: 1,   // wed: casa um solteiro (governante ou herdeiro) de cada casa
+              deny: [['noDip', 'Súdito sem diplomacia própria'], ['noDipT', 'Eles são súditos sem diplomacia própria'], ['notHered', 'Exige duas monarquias hereditárias'], ['linked', 'Já há casamento'], ['noSingle', 'Ninguém solteiro na sua casa'], ['noSingleT', 'Ninguém solteiro na casa deles']],
               acc: [['one', -10, 'base'], ['linked', 10, 'aliados', 'allies']] },
-  trade:    { cost: 10, link: 'trade', bonus: 10, log: 'Acordo comercial', deny: [['linked', 'Já há acordo'], ['embargo', 'Há embargo']],
+  trade:    { cost: 10, link: 'trade', bonus: 10, log: 'Acordo comercial', deny: [['noDip', 'Súdito sem diplomacia própria'], ['noDipT', 'Eles são súditos sem diplomacia própria'], ['linked', 'Já há acordo'], ['embargo', 'Há embargo']],
               acc: [['one', -5, 'base'], ['trait', 10, 'governante ganancioso', 'greedy'], ['count', -4, 'já tem acordos', 'trade']] },
 };
 
@@ -240,16 +252,17 @@ CONTENT.DIP_ACC = [['rel', .5, 'relação'], ['sameIdeo', 12, 'mesma ideologia']
 /* para onde a relação anda a cada ano (soma dos termos verdadeiros) */
 CONTENT.DIP_DRIFT = [['linked', 50, 'allies'], ['linked', 30, 'marr'], ['linked', 15, 'trade'], ['sameIdeo', 10], ['neighbor', -10], ['embargo', -40], ['war', -100], ['overlord', 40]];
 
+/* dom = quanto cada estado do súdito pesa no limite de domínio do suserano (governar por intermediários custa menos, mas não é de graça) */
 CONTENT.SUBJECTS = {
-  protect:  { n: 'Protetorado', e: '☂️', base: 28, tri: .05, war: 0, dip: 1, int: .8, next: 'puppet', cost: .5, d: 'Diplomacia própria, defendido pelo suserano; paga pouco.' },
-  dominion: { n: 'Domínio', e: '🏛️', base: 32, tri: .05, war: 0, dip: 1, int: .7, next: 'vassal', cost: .35, d: 'Quase independente: governo e diplomacia próprios.' },
-  puppet:   { n: 'Fantoche', e: '🎭', base: 20, tri: .3, war: 1, dip: 0, int: 1.2, next: 'vassal', cost: .9, d: 'Governo imposto: paga muito e segue o suserano.' },
-  vassal:   { n: 'Vassalo', e: '🛡️', base: 12, tri: .15, war: 1, dip: 0, int: 1, next: 'int', cost: .7, d: 'Paga tributo e luta nas guerras do suserano.' },
-  union:    { n: 'União pessoal', e: '👑', base: 15, tri: 0, war: 1, dip: 0, int: .8, next: 'int', cost: null, d: 'O mesmo monarca nas duas coroas; nasce de casamentos reais.' },
+  protect:  { n: 'Protetorado', e: '☂️', dom: .25, base: 28, tri: .05, war: 0, dip: 1, int: .8, next: 'puppet', cost: .5, d: 'Diplomacia própria, defendido pelo suserano; paga pouco.' },
+  dominion: { n: 'Domínio', e: '🏛️', dom: .25, base: 32, tri: .05, war: 0, dip: 1, int: .7, next: 'vassal', cost: .35, d: 'Quase independente: governo e diplomacia próprios.' },
+  puppet:   { n: 'Fantoche', e: '🎭', dom: .75, base: 20, tri: .3, war: 1, dip: 0, int: 1.2, next: 'vassal', cost: .9, d: 'Governo imposto: paga muito e segue o suserano.' },
+  vassal:   { n: 'Vassalo', e: '🛡️', dom: .75, base: 12, tri: .15, war: 1, dip: 0, int: 1, next: 'int', cost: .7, d: 'Paga tributo e luta nas guerras do suserano.' },
+  union:    { n: 'União pessoal', e: '👑', dom: .5, base: 15, tri: 0, war: 1, dip: 0, int: .8, next: 'int', cost: null, d: 'O mesmo monarca nas duas coroas; nasce de casamentos reais.' },
 };
 /* progresso dos súditos: os níveis não se escolhem, sobem sozinhos (next) enquanto o súdito está satisfeito (liberdade abaixo de 50%)
    k = pontos por mês com liberdade 0% (× int do nível) · back = quanto volta por mês com liberdade 100% · rel = relação mínima do súdito com o suserano para a integração final */
-CONTENT.SUBJ_PROG = { k: .35, back: .5, rel: 50, cost: 25 };   // cost = 💰 por província do súdito (× era), pago pelo suserano na integração, que também exige paz
+CONTENT.SUBJ_PROG = { k: .35, back: .5, rel: 50, cost: 25, cap: 2, capRank: 1 };   // cap + capRank × título = máximo de súditos impostos na paz   // cost = 💰 por província do súdito (× era), pago pelo suserano na integração, que também exige paz
 
 /* ações do país súdito (aba Súditos da diplomacia): g = loyal (lealdade) ou rebel (rebelião) · cost = 💰 (× era) · cd = anos até repetir
    when = condições (COND) · fx = efeitos (EFF): lib = barra agora · libPush = empurra o alvo por um tempo · relSenior = relação com o suserano

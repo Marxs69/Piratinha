@@ -19,11 +19,11 @@ function buildInfo() {
 }
 const laborShare = n => LAWS.women.o[(n.laws || LAW_DEF).women].lab;
 /* teto do tesouro: acima dele, parte do excesso some em corrupção todo mês (proporcional aos impostos do país, nunca abaixo do mínimo da era) */
-const hoardCap = (n, tax) => Math.max(HOARD_MIN * eraScale(), HOARD_MONTHS * Math.max(0, tax ?? (n.inc && n.inc.tax) ?? 0));
+const hoardCap = (n, rev) => Math.max(HOARD_MIN * eraScale(), HOARD_MONTHS * Math.max(0, rev ?? (n.inc ? (n.inc.tax || 0) + (n.inc.trade || 0) : 0)));   // receita bruta = impostos + exportações
 const IMP_ORDER = {};                                        // ordem de importação por vertente (comida, bem da vertente, ip, resto)
 /* economia: econNation faz o mês de um país (produção, comércio, classes, receitas); econFinish fecha os preços mundiais com o que foi somado.
    econAll = todos os países de uma vez (início, carga e reparo); no jogo, cada país faz o seu mês num dia diferente (sim/tick.js). */
-const econAcc = () => { const a = { sup: {}, dem: {}, exp: {}, k: 0 }; GOOD_IDS.forEach(g => { a.sup[g] = 0; a.dem[g] = 0; }); return a; };
+const econAcc = () => { const a = { sup: {}, dem: {}, exp: {}, ev: {}, iv: {}, k: 0 }; GOOD_IDS.forEach(g => { a.sup[g] = 0; a.dem[g] = 0; a.ev[g] = 0; a.iv[g] = 0; }); return a; };
 let cnC = null;                                              // necessidades das classes no ano (cache)
 function econSetup() {
   if (!BI) buildInfo();
@@ -33,16 +33,20 @@ function econSetup() {
   if (!WD.states[0].fert) WD.states.forEach(st => { st.fert = st.provs.reduce((a, p) => a + TERRAIN[WD.provs[p].terr].food, 0) / st.provs.length; st.capK = st.provs.reduce((a, p) => a + WD.provs[p].size * TERRAIN[WD.provs[p].terr].pop * 4, 0) + 3; });
   const year = curYear(); if (!cnC || cnC.y !== year) { cnC = { y: year, v: {} }; CLASS_IDS.forEach(k => cnC.v[k] = classNeeds(year, k)); }
 }
-function econAll() {
+/* dry = só recalcula o derivado (mercado, satisfações, renda mostrada) sem mexer em dinheiro, falência nem vendas a súditos: usado ao carregar/reparar,
+   para que salvar e carregar não mude a partida */
+function econAll(dry) {
   econSetup(); const acc = econAcc();
-  for (const n of S.nations) if (n.alive) econNation(n, acc);
-  econFinish(acc);
+  for (const n of S.nations) if (n.alive) econNation(n, acc, dry);
+  if (!dry) econFinish(acc);
 }
 function econFinish(acc) {
   if (acc.k) GOOD_IDS.forEach(g => { const ratio = (acc.dem[g] + 1) / (acc.sup[g] + 1); S.wp[g] = GOODS[g].p * clamp(Math.pow(ratio, .6), .3, 3.5); });
   S.expBy = acc.exp;
+  /* parte vendida (S.sell): a exportação só rende o que o resto do mundo de fato compra; o dinheiro troca de mãos, não nasce do nada */
+  if (acc.k && acc.ev) { S.sell = {}; GOOD_IDS.forEach(g => { S.sell[g] = acc.ev[g] > .01 ? Math.min(1, (acc.iv[g] || 0) / acc.ev[g]) : 1; }); }
 }
-function econNation(n, acc) {
+function econNation(n, acc, dry) {
   econSetup();
   const year = curYear(), CN = cnC.v, NG = GOOD_IDS.length, stS = S.stS, stD = S.stD, gGrain = GI.grain;
   const myStates = new Map(); for (const p of provsOf(n.id)) if (S.ctrl[p] === n.id) { const st = WD.provs[p].state; myStates.set(st, (myStates.get(st) || 0) + S.pop[p]); }
@@ -115,20 +119,20 @@ function econNation(n, acc) {
     const embs = S.nations.filter(o => o.alive && (o.emb || []).includes(n.id)).length;
     const eff = clamp(.35 - (n.quar > S.t ? .3 : 0) + (bs.trade || 0) + n.m.trade + Math.min(.3, (n.trade || []).length * .07) - Math.min(.4, embs * .08), .1, 1.4);
     let tradeInc = 0, tradeCost = 0;
-    GOOD_IDS.forEach(g => { const net = sup[g] - dem[g]; n.mk.imp[g] = 0; n.mk.exp[g] = 0; if (net > 0) { const exp = net * Math.min(1, eff); n.mk.exp[g] = exp; tradeInc += exp * S.wp[g] * .55; } gdp += sup[g] * S.wp[g]; acc.sup[g] += sup[g]; acc.dem[g] += dem[g]; }); acc.k++;
+    GOOD_IDS.forEach(g => { const net = sup[g] - dem[g]; n.mk.imp[g] = 0; n.mk.exp[g] = 0; if (net > 0) { const exp = net * Math.min(1, eff), wexp = Math.max(0, exp - ((n.mk.subT || {})[g] || 0)); n.mk.exp[g] = exp; acc.ev[g] += wexp; tradeInc += wexp * ((S.sell || {})[g] ?? 1) * S.wp[g] * .55; } /* o que os súditos compraram (mês anterior) não vai ao mundo: o suserano recebe uma vez só */ gdp += sup[g] * S.wp[g]; acc.sup[g] += sup[g]; acc.dem[g] += dem[g]; }); acc.k++;
     let budget = Math.max(0, gdp * ECON.taxBase * .35 + tradeInc * .8 + Math.max(0, n.money) * .03);
     const prio = g => GOODS[g].c === 'food' ? 0 : n.vert && VERT[n.vert].good === g ? 1 : GOODS[g].ip ?? 3;
     const ok = n.vert || '', order = IMP_ORDER[ok] || (IMP_ORDER[ok] = GOOD_IDS.slice().sort((a, b) => prio(a) - prio(b)));   // só depende da vertente
-    n.coastal = coastal; n.mk.src = {}; n.mk.impS = {}; n.mk.subT = {};   // impS = comprado do suserano · subT = o que os súditos levaram deste país no mês
+    n.coastal = coastal; n.mk.src = {}; n.mk.impS = {}; if (!dry) n.mk.subT = {};   // impS = comprado do suserano · subT = o que os súditos levaram deste país no mês
     // súdito: depois da própria produção, compra o excedente do suserano (preço mundial, sem frete) antes de ir ao mercado mundial (n.impPref = 'world' inverte)
     const sen = isSubj(n) && n.impPref !== 'world' ? nat(n.senior) : null, sm = sen && sen.alive && sen.mk && sen.mk.exp ? sen.mk : null;
     for (const g of order) {
       const need = dem[g] - sup[g]; if (need <= 0 || budget <= 0 || (GOODS[g].c === 'lux' && S.wp[g] > GOODS[g].p * 3)) continue;
       const cap = need * Math.min(1, eff * 1.2); let q1 = 0;
-      if (sm) { const p0 = S.wp[g], left = (sm.exp[g] || 0) - ((sm.subT || {})[g] || 0); q1 = Math.max(0, Math.min(cap, left, budget / p0));
+      if (sm && !dry) { const p0 = S.wp[g], left = (sm.exp[g] || 0) - ((sm.subT || {})[g] || 0); q1 = Math.max(0, Math.min(cap, left, budget / p0));
         if (q1 > .001) { sm.subT = sm.subT || {}; sm.subT[g] = (sm.subT[g] || 0) + q1; const v = q1 * p0; tradeCost += v; budget -= v; n.mk.impS[g] = q1;
           const gain = v * .45; sen.money += gain; if (sen.inc) { sen.inc.subjSales = (sen.inc.subjSales || 0) + gain; sen.income += gain; } } else q1 = 0; }
-      let q2 = 0, src = null; if (cap - q1 > .001 && budget > 0) { src = importSrc(n, g); const price = S.wp[g] * 1.05 * src.m; q2 = Math.min(cap - q1, budget / price); tradeCost += q2 * price; budget -= q2 * price; }
+      let q2 = 0, src = null; if (cap - q1 > .001 && budget > 0) { src = importSrc(n, g); const price = S.wp[g] * 1.05 * src.m; q2 = Math.min(cap - q1, budget / price); tradeCost += q2 * price; budget -= q2 * price; acc.iv[g] += q2; }
       n.mk.imp[g] = q1 + q2; n.mk.src[g] = src || { m: 1, o: n.senior, sea: false, sen: 1 };
     }
     GOOD_IDS.forEach(g => { if (n.mk.exp[g] > .05) (acc.exp[g] = acc.exp[g] || []).push(n.id); });
@@ -154,12 +158,12 @@ function econNation(n, acc) {
     let upk = 0; for (const a of S.armies) if (a.o === n.id) upk += armyUpkeep(a);
     upk *= yearScale() * .5;   // manutenção mensal anda com a era; os gastos pontuais, com o nível de preços
     let navy = 0; for (const f of S.fleets) if (f.o === n.id) navy += f.ships * .6 * yearScale();
-    const admin = (popT * .01 + provsOf(n.id).length * .05) * (1 - .3 * cov.adm), interest = n.money < 0 ? -n.money * .01 : 0, hoard = hoardCap(n, tax), corrupt = n.money > hoard ? (n.money - hoard) * HOARD_LEAK * (1 - .6 * cov.adm) : 0;
+    const admin = (popT * .01 + provsOf(n.id).length * .05) * (1 - .3 * cov.adm), interest = n.money < 0 ? -n.money * .01 : 0, hoard = hoardCap(n, tax + tradeInc), corrupt = n.money > hoard ? (n.money - hoard) * HOARD_LEAK * (1 - .6 * cov.adm) : 0;
     const svcUp = svcLv * .5 * yearScale() * svcMul;
     n.inc = { tax, trade: tradeInc, imports: -tradeCost, transport: -frT, army: -upk, navy: -navy, admin: -admin, svc: -svcUp, interest: -interest, corrupt: -corrupt };
     n.income = tax + tradeInc - tradeCost - frT - upk - navy - admin - svcUp - interest - corrupt;
-    n.money += n.income; n.gdp = gdp;
-    if (n.money < -Math.max(400, gdp * 2)) {                   // falência: dívida perdoada, estabilidade despenca, metade do exército debanda
+    if (!dry) n.money += n.income; n.gdp = gdp;
+    if (!dry && n.money < -Math.max(HOARD_MIN * eraScale(), gdp * 2)) {                   // falência: dívida perdoada, estabilidade despenca, metade do exército debanda
       n.money = 0; n.stab = Math.max(0, n.stab - 30); S.armies.forEach(a => { if (a.o === n.id) { a.inf /= 2; a.cav /= 2; a.art /= 2; a.vrt /= 2; } });
       log(natName(n) + ' declarou falência!', isHuman(n.id) ? 'bad' : 'world', [n.id]);
     } n.popT = popT; n.employed = employedT;
@@ -241,7 +245,10 @@ const domainMul = n => 1 + DOMAIN.era * clamp((curYear() - DOMAIN.y0) / DOMAIN.s
 const rankCap = (n, r) => Math.round(RANK_CAP[r] * domainMul(n));
 const rankReqTxt = (n, r) => RANK_REQ[r] + ' estados';
 const domCap = n => rankCap(n, n.rank || 0);
-const overCap = n => Math.max(0, statesOf(n) - domCap(n));
+const startRank = n => { const ns = statesOf(n); const r = [0, 1, 2, 3, 4].find(r => rankCap(n, r) >= ns); return r == null ? 4 : r; };   // título de quem nasce: o menor que sustenta os estados (início e países novos)
+/* domínio ocupado = estados próprios + estados dos súditos × peso do nível (SUBJECTS.dom); extra = províncias a somar, sub = súdito novo (nível) */
+const domUsed = (n, extra, sub) => { let u = statesOf(n, extra); for (const j of S.nations) if (j.alive && j.senior === n.id && j.subj) u += statesOf(j) * (SUBJECTS[j.subj.tier].dom || 0); if (sub) u += statesOf(sub.n) * (SUBJECTS[sub.tier].dom || 0); return u; };
+const overCap = n => Math.max(0, Math.floor(domUsed(n) - domCap(n)));
 function rankUp(n) {                                          // proclama o próximo nível de título
   const r = (n.rank || 0) + 1; if (r > 4) return 'Já está no nível máximo';
   if (statesOf(n) < RANK_REQ[r]) return 'Exige ' + RANK_REQ[r] + ' estados';
@@ -263,7 +270,7 @@ function setCapital(n, p) {
   if (n.money < capCost()) return 'Sem dinheiro'; n.money -= capCost(); n.capital = p; n.capCd = S.t + 360 * 10; n.stab = Math.max(0, n.stab - 5); S.mapDirty = true;
   log('A capital de ' + natName(n) + ' agora é ' + WD.provs[p].n + '.', isHuman(n.id) ? 'good' : 'none', [n.id]); return '';
 }
-const slotsRaw = n => n.fx.slots + Math.floor((n.popT || 0) / 1000) + Math.floor(Math.max(0, n.money) / (2500 * eraScale())) + (n.xslots || 0);
+const slotsRaw = n => n.fx.slots + Math.floor((n.popT || 0) / 1000) + Math.floor(Math.sqrt(Math.max(0, n.money) / (2500 * eraScale()))) + (n.xslots || 0);
 const slotCap = n => Math.min(RANK_SLOTS[n.rank || 0], eraLim(n, 'slots')) + (n.xslots || 0);   // o título e a era limitam os canteiros (comprados somam ao teto)
 const consSlots = n => Math.min(slotsRaw(n), slotCap(n));
 const slotCost = n => Math.round(150 * eraScale() * (1 + (n.xslots || 0) * .5));
@@ -271,8 +278,8 @@ function buySlot(n) { const c = slotCost(n); if (n.money < c) return 'Sem dinhei
 function build(n, s, b) { const e = canBuild(n, s, b); if (e) return e; n.money -= bCost(n, b); n.cons.push({ s, b, m: bMonths(b), tot: bMonths(b) }); return ''; }
 
 /* manutenção mensal de um exército: regimentos, companhias de apoio e treinamento */
-const armyUpkeep = a => (nat(a.o).horde && curYear() <= nat(a.o).horde ? .15 : 1) * (   // hordas vivem de pilhagem
-  UT.reduce((s, t) => s + a[t] * UNIT_BASE[t].c, 0) * ECON.upkeep + Object.keys(a.sup || {}).reduce((s, k) => s + SUPPORT[k].up * yearScale(), 0)) * (drillOk(a) ? 1.5 : 1);
+const armyUpkeep = a => (isHorde(nat(a.o)) ? .15 : 1) * (   // hordas vivem de pilhagem
+  UT.reduce((s, t) => s + a[t] * UNIT_BASE[t].c, 0) * ECON.upkeep + Object.keys(a.sup || {}).reduce((s, k) => s + SUPPORT[k].up, 0)) * (drillOk(a) ? 1.5 : 1);
 const recCost = (n, type, k = 1) => Math.round(UNIT_BASE[type].c * 3 * eraScale() * k);
 function canRecruit(n, type, k = 1) {
   if (type === 'art' && !canArt(n)) return 'Exige Trabuco';
@@ -320,11 +327,32 @@ function addArmy(o, p, u, xp = .1) { const a = { id: S.id++, o, p, inf: u.inf ||
 function addFleet(o, z, ships) { const f = { id: S.id++, o, z, ships, path: [], prog: 0, need: 0, auto: false }; S.fleets.push(f); return f; }
 
 /* ---------- pesquisa ---------- */
-const techBase = y => 140 * Math.exp((y - 860) / 250);
-const aheadMul = t => { const a = Math.max(0, t.y - curYear()); return a <= 60 ? 1 + a * .03 : Math.min(200, 2.8 * Math.pow(1 + (a - 60) / 25, 2)); };   // até 60 anos adiantada: +3%/ano; depois cresce rápido (até ×200)
+const techBase = y => TECH_BASE * Math.exp((capY(y) - 860) / TECH_TAU);
+const aheadMul = t => 1 + Math.max(0, t.y - curYear()) * .03;   // adiantada: +3%/ano (no máximo TECH_AHEAD anos, ver techState)
+/* difusão (TECH_DIFF): o que o mundo e os vizinhos já sabem fica mais barato, e o atraso também barateia — quem está atrás alcança.
+   Cache por mês: parte dos países vivos que tem cada técnica e vizinhos de cada país. */
+let difC = null;
+function difCache() {
+  const m = Math.floor(S.t / 30); if (difC && difC.s === S && difC.m === m) return difC;
+  const al = S.nations.filter(x => x.alive), share = {};
+  for (const x of al) for (const id in x.techs) share[id] = (share[id] || 0) + 1;
+  for (const id in share) share[id] /= Math.max(1, al.length);
+  return difC = { s: S, m, share, nb: new Map() };
+}
+function diffParts(n, t) {
+  if (!n || n.techs[t.id]) return [];
+  const D = TECH_DIFF, C = difCache(), out = [], due = t.y <= curYear(), w = due ? (C.share[t.id] || 0) * D.world : 0;   // difusão só vale para técnicas cujo ano já chegou: adiantar continua caro
+  if (w >= .005) out.push(['Já conhecida no mundo', w]);
+  let nb = C.nb.get(n.id); if (!nb) { nb = [...neighbors0(n)]; C.nb.set(n.id, nb); }
+  if (due && nb.length) { const k = nb.filter(id => nat(id).techs[t.id]).length / nb.length * D.nb; if (k >= .005) out.push(['Vizinhos que já a têm', k]); }
+  const old = Math.min(D.oldMax, Math.max(0, curYear() - t.y) * D.old); if (old >= .005) out.push(['Atraso (' + Math.round(curYear() - t.y) + ' anos)', old]);
+  const st = (n.tdisc || {})[t.id]; if (st) out.push(['Planos roubados', st]);   // tdisc: operação de inteligência
+  return out;
+}
+const diffMul = (n, t) => Math.max(TECH_DIFF.floor, 1 - diffParts(n, t).reduce((a, x) => a + x[1], 0));
 function techCost(n, t) {
   if (t.cb == null) t.cb = t.vt && t.src.length ? t.src.reduce((a, x) => a + techBase(TECH[x].y), 0) * .8 + techBase(t.y) * .3 : techBase(t.y) * (t.entry ? 1.2 : 1);
-  return Math.round(t.cb * aheadMul(t) * (1 - ((((n && n.tdisc) || {})[t.id]) || 0)));   // tdisc: planos roubados (operação de inteligência)
+  return Math.round(t.cb * aheadMul(t) * diffMul(n, t));
 }
 function vertNeedOk(n, v) {                                  // recurso ou terreno exigido no território ou numa província vizinha
   const need = VERT[v].need, test = NEEDS[need] ? p => needOk(NEEDS[need], p) : p => provRes(p.id) === need && resVisible(p.id);
@@ -340,7 +368,7 @@ function techState(n, t) {                                  // '' = pode pesquis
   if (t.entry && n.vpend) return 'Decida antes a vertente pendente';
   if (!t.v && n.vert && VERT[n.vert].rep.has(t.id)) return 'Substituída por ' + VERT[n.vert].n;
   if (!t.req.every(q => hasT(n, q))) return 'Exige tecnologias anteriores';
-  const ahead = t.y - curYear();
+  const ahead = t.y - curYear(); if (ahead > TECH_AHEAD) return 'Cedo demais: só a partir de ' + Math.ceil(t.y - TECH_AHEAD);
   if (t.entry && !vertNeedOk(n, t.v)) return 'Exige ' + needName(t.v) + ' no território ou numa província vizinha';
   return '';
 }
@@ -385,10 +413,10 @@ function canColonize(n, p) {
   if (S.own[p] !== -1) return 'Já tem dono'; if (!n.exP[p]) return 'Inexplorada';
   if (S.cols.some(c => c.p === p)) return 'Já em colonização';
   const adj = WD.provs[p].adj.some(o => S.own[o] === n.id), near = !adj && nearSea(n, p);
-  if (!adj && !near) { if (n.fx.col < 1) return 'Exige Colonização (ou uma costa sua no mesmo mar ou no vizinho)'; if (!WD.provs[p].coast || n.fx.sea < 1) return 'Fora de alcance'; }
+  if (!adj && !near) { if (n.fx.col < 1) return 'Exige Astrolábio náutico ou Colonização (ou uma costa sua no mesmo mar ou no vizinho)'; if (!WD.provs[p].coast || n.fx.sea < 1) return 'Fora de alcance'; }
   if (near && n.fx.sea < 1) return 'Exige navios (Barcos longos)';
   if (n.fx.col < 1 && S.pop[p] > (adj || near ? 9 : 4)) return 'Nativos numerosos: exige Colonização';
-  if (statesOf(n, [p]) > domCap(n)) return 'Limite de domínio (' + domCap(n) + ' estados)';
+  if (domUsed(n, [p]) > domCap(n)) return 'Limite de domínio (' + domCap(n) + ' estados)';
   const slots = 1 + n.fx.col; if (S.cols.filter(c => c.o === n.id).length >= slots) return 'Sem colonos livres';
   if (n.money < colCost(n, p)) return 'Sem dinheiro';
   return '';

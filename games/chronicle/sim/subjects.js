@@ -6,11 +6,22 @@
 'use strict';
 
 const isSubj = n => n.senior != null && !!n.subj;
+/* súdito sem diplomacia própria (SUBJECTS[nível].dip = 0: fantoche, vassalo, união): só os laços com o suserano */
+const subjNoDip = n => isSubj(n) && !SUBJECTS[n.subj.tier].dip;
+/* desfaz o que o nível não permite (§22): sem diplomacia própria, alianças, casamentos e acordos com outros que não o suserano;
+   com ela (protetorado, domínio), alianças com quem está em guerra com o suserano. Os laços de súdito (com o suserano e com os próprios súditos) ficam.
+   Ao virar súdito, ao subir de nível e todo mês. */
+function subjDipClean(t) {
+  if (!isSubj(t)) return; const o = t.senior;
+  const cut = (k, x) => unlink(t, x, k), other = id => { const x = nat(id); return x && !subjFixed(t, x) ? x : null; };
+  if (subjNoDip(t)) { for (const k of ['allies', 'marr', 'trade']) (t[k] || []).map(other).filter(Boolean).forEach(x => cut(k, x)); return; }
+  (t.allies || []).map(other).filter(x => x && atWar(x.id, o)).forEach(x => cut('allies', x));
+}
 const subjectsOf = id => S.nations.filter(j => j.alive && j.senior === id && j.subj);
 function makeSubject(t, o, tier, skipW) {
   if (t.senior != null) freeSubject(t, false);
   t.senior = o.id; t.subj = { tier, lib: SUBJECTS[tier].base, laws: Object.assign({}, SUBJ_LAW_DEF), prog: 0, t: S.t };
-  subjTies(t, o); t.rel[o.id] = Math.max(t.rel[o.id] || 0, -20);
+  subjTies(t, o); subjDipClean(t); t.rel[o.id] = Math.max(t.rel[o.id] || 0, -20);
   S.wars.filter(w => w !== skipW && sideOf(w, t.id) && sideOf(w, o.id) && sideOf(w, t.id) !== sideOf(w, o.id)).forEach(w => separatePeace(w, t.id, null, null));
 }
 function freeSubject(t, why) {
@@ -18,13 +29,14 @@ function freeSubject(t, why) {
   if (o) { breakTies(t, o); if (why) log(natName(t) + ' ' + why + ' ' + natName(o) + '.', 'world', [t.id, o.id]); }
 }
 /* o que move a barra (positivo = quer liberdade); devolve [alvo, [rótulo, valor]...] */
+const SUBSTAT = { blocked: 0 };                              // medição (fora do save)
 function libParts(t) {
   const s = t.subj, o = nat(t.senior), T = SUBJECTS[s.tier], out = [['Nível: ' + T.n, T.base]];
   for (const k in SUBJ_LAWS) { const d = SUBJ_LAWS[k].o[s.laws[k]]; if (d && d.lib) out.push([SUBJ_LAWS[k].n + ': ' + d.n, d.lib]); }
   const st = strength(t), so = strength(o); out.push(['Força comparada', Math.round(40 * st / Math.max(1, st + so) - 15)]);
   out.push(['Relação com o suserano', -Math.round((t.rel[o.id] || 0) / 8)]);
   if (t.cul !== o.cul) out.push(['Cultura diferente', 8]); if (t.relig !== o.relig) out.push(['Fé diferente', 8]);
-  if (o.stab < 30) out.push(['Suserano instável', 10]); if (warsOf(o.id).some(w => surrender(w, sideOf(w, o.id)) > .5)) out.push(['Suserano perdendo uma guerra', 10]);
+  if (o.stab < 30) out.push(['Suserano instável', 10]); { const ov = overCap(o); if (ov) out.push(['Suserano acima do limite de domínio', Math.min(30, ov * SEPAR.lib)]); } if (warsOf(o.id).some(w => surrender(w, sideOf(w, o.id)) > .5)) out.push(['Suserano perdendo uma guerra', 10]);
   if (S.t - s.t < 360 * 10) out.push(['Laço recente', 8]);
   for (const x of s.push || []) if (x.u > S.t) out.push([x.l, x.v]);
   const b = backerOf(t); if (b) out.push(['Apoio de ' + b.name, SUBJ_BACK.lib]);
@@ -39,15 +51,19 @@ const nextTier = t => SUBJECTS[t.subj.tier].next;
 /* integração (último passo): exige boa relação do súdito com o suserano e espaço no limite de domínio */
 function integWhy(t) {
   const o = nat(t.senior); if ((t.rel[o.id] || 0) < SUBJ_PROG.rel) return 'Relação de ' + t.name + ' com o suserano abaixo de ' + SUBJ_PROG.rel + ' (está em ' + Math.round(t.rel[o.id] || 0) + ')';
-  if (statesOf(o) + statesOf(t) > domCap(o) * 1.1 + 1) return 'Sem espaço no limite de domínio do suserano';
+  if (domUsed(o) + statesOf(t) * (1 - (SUBJECTS[t.subj.tier].dom || 0)) > domCap(o) * 1.1 + 1) return 'Sem espaço no limite de domínio do suserano';
   if (warsOf(o.id).length) return 'O suserano está em guerra';
   if (o.money < integPrice(t)) return 'O suserano precisa de 💰' + integPrice(t); return '';
 }
+const subjCap = n => SUBJ_PROG.cap + SUBJ_PROG.capRank * (n.rank || 0);
 const integPrice = t => Math.round(SUBJ_PROG.cost * provsOf(t.id).length * eraScale());
 function setSubjLaw(o, t, k, v) { if (t.senior !== o.id || !SUBJ_LAWS[k] || !SUBJ_LAWS[k].o[v]) return 'Inválido'; if (t.subj.lawCd > S.t) return 'Mudança recente'; t.subj.laws[k] = v; t.subj.lawCd = S.t + 360; t.rel[o.id] = (t.rel[o.id] || 0) - 5; return ''; }
 function integrate(o, t) {                                     // fim da barra: anexação pacífica
+  o.ae = (o.ae || 0) + provsOf(t.id).length * PEACE.integAe;   // integrar também assusta os vizinhos
   provsOf(t.id).forEach(p => { S.own[p] = o.id; S.ctrl[p] = o.id; }); S.armies.forEach(a => { if (a.o === t.id) a.o = o.id; }); abC = null; S.fleets.forEach(f => { if (f.o === t.id) f.o = o.id; });
-  o.money += Math.max(0, t.money); log(natName(t) + ' foi integrado a ' + natName(o) + '.', 'world', [t.id, o.id]); freeSubject(t, null); ownChanged(); checkDead();
+  o.money += Math.max(0, t.money); log(natName(t) + ' foi integrado a ' + natName(o) + '.', 'world', [t.id, o.id]);
+  t.endBy = { k: t.subj ? t.subj.tier : 'union', by: o.id };   // como acabou (união ou vassalagem): o jogador pode continuar com quem o integrou
+  freeSubject(t, null); ownChanged(); checkDead();
 }
 function independence(t) {
   const o = nat(t.senior), tier = t.subj.tier, b = backerOf(t);   // apoio estrangeiro: lido antes de freeSubject apagar o laço
@@ -99,11 +115,12 @@ function subjectsTick() {
     const mp = SUBJ_LAWS.army.o[L.army].mp || 0; if (mp && t.manpower > 1) { const k = t.manpower * mp * .1; t.manpower -= k; o.manpower += k; }
     if (s.push && s.push.some(x => x.u <= S.t)) s.push = s.push.filter(x => x.u > S.t);
     const tg = libTarget(t); s.tg = tg; s.lib = clamp(s.lib + clamp(tg - s.lib, -1.5, 1.5), 0, 100);
-    subjTies(t, o);
+    subjTies(t, o); subjDipClean(t);
     s.prog = clamp((s.prog || 0) + progRate(t), 0, 100);
     if (s.prog >= 100) { const nx = nextTier(t);
       if (nx === 'int') { if (!integWhy(t)) { o.money -= integPrice(t); integrate(o, t); continue; } }
-      else { s.tier = nx; s.prog = 0; log(natName(t) + ' passou a ' + SUBJECTS[nx].n.toLowerCase() + ' de ' + natName(o) + '.', isHuman(t.id) || isHuman(o.id) ? 'info' : 'none', [t.id, o.id]);
+      else if (domUsed(o) + statesOf(t) * ((SUBJECTS[nx].dom || 0) - (SUBJECTS[s.tier].dom || 0)) > domCap(o) * 1.1 + 1) { s.prog = 100; SUBSTAT.blocked++; }   // sem espaço no domínio do suserano: o nível espera
+      else { s.tier = nx; s.prog = 0; subjDipClean(t); log(natName(t) + ' passou a ' + SUBJECTS[nx].n.toLowerCase() + ' de ' + natName(o) + '.', isHuman(t.id) || isHuman(o.id) ? 'info' : 'none', [t.id, o.id]);
         if (isHuman(t.id) || isHuman(o.id)) [t.id, o.id].filter(isHuman).forEach(id => notify(id, SUBJECTS[nx].e + ' ' + SUBJECTS[nx].n, natName(t) + ' passou a ' + SUBJECTS[nx].n.toLowerCase() + ' de ' + natName(o) + '.')); } }
     if (s.lib >= 100 && chance(.3)) independence(t);
   }

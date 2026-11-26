@@ -96,13 +96,13 @@ const inSupply = a => { if (a.p >= WD.provs.length) return true; const c = S.ctr
 function provSupply(p, o) {
   const pr = WD.provs[p], n = nat(o), fr = friendsOf(o), ct = S.ctrl[p];
   const rel = S.own[p] === -1 ? .35 : fr.has(ct) ? (fr.has(S.own[p]) ? 1.5 : 1) : .6;   // em casa há depósitos; em terra ocupada, pilhagem; em terra sem dono, quase nada
-  return (n.horde && curYear() <= n.horde ? 2 : 1) * (6 + S.pop[p] / 6) * TERRAIN[pr.terr].sup * (1 + (S.stSpd ? S.stSpd[pr.state] : 0) * .5) * (1 + .15 * (n.fx ? n.fx.logi : 0)) * rel;
+  return (isHorde(n) ? 2 : 1) * (6 + S.pop[p] / 6) * TERRAIN[pr.terr].sup * (1 + (S.stSpd ? S.stSpd[pr.state] : 0) * .5) * (1 + .15 * (n.fx ? n.fx.logi : 0)) * rel;
 }
 /* atrito mensal de um exército (fração dos homens) e o porquê */
 function attritionOf(a) {
   const P = WD.provs.length; if (a.p >= P) return [0, []];
   const n = nat(a.o), fr = friendsOf(a.o), pr = WD.provs[a.p], why = [];
-  const f = a.front != null && !(a.fready > S.t) && typeof frontById === 'function' ? frontById(a.front) : null;
+  const f = a.front != null && a.fp === a.front && !(a.fready > S.t) && typeof frontById === 'function' ? frontById(a.front) : null;
   let tot = 0, cap; if (f) { for (const b of S.armies) if (b.front === a.front && b.o === a.o) tot += regs(b); cap = WD.states[f.st].provs.filter(p => fr.has(S.ctrl[p])).reduce((s, p) => s + provSupply(p, a.o), 0); }   // no front o estado inteiro abastece
   else { for (const b of S.armies) if (b.p === a.p && fr.has(b.o)) tot += regs(b); cap = provSupply(a.p, a.o); } a.cap = cap;
   const home = fr.has(S.ctrl[a.p]) && fr.has(S.own[a.p]);
@@ -112,7 +112,7 @@ function attritionOf(a) {
   if (!a.exp && S.own[a.p] === -1) { x += .005; why.push('Terra sem dono'); }
   const le = diseaseLe(a.p); if (le) { x += le * 1.5 * (a.sup && a.sup.med ? .5 : 1); why.push('Doença'); }
   const s = a.sup || {}; x *= (s.med ? .7 : 1) * (s.recon ? .9 : 1) * (s.eng ? .9 : 1);
-  if (n.horde && curYear() <= n.horde) { x *= .25; if (x) why.push('Horda: vive da terra (atrito ×0,25)'); }
+  if (isHorde(n)) { x *= .25; if (x) why.push('Horda: vive da terra (atrito ×0,25)'); }
   return [x, why];
 }
 function attritionTick() {
@@ -160,7 +160,7 @@ function applyLoss(s, loss, w) {
   for (const a of s.list) {
     const la = loss * wt(a) / W, front = a.inf + a.cav + a.vrt, artW = a.art * (front > 0 ? .2 : 1), den = Math.max(.01, front + artW);
     for (const t of UT) { const share = (t === 'art' ? artW : a[t]) / den; a[t] = Math.max(0, a[t] - la * share); }
-    if (w) { w.loss = w.loss || {}; w.loss[a.o] = (w.loss[a.o] || 0) + la; }
+    if (w) { w.loss = w.loss || {}; w.loss[a.o] = (w.loss[a.o] || 0) + la; } const ln = nat(a.o); ln._lossM = (ln._lossM || 0) + la;
   }
 }
 const warOfPair = (x, y) => S.wars.find(w => (w.A.includes(x) && w.D.includes(y)) || (w.A.includes(y) && w.D.includes(x)));

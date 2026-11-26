@@ -15,14 +15,16 @@
   <div class="mbox">
     <div id="mflags" class="mflags"></div>
     <h1>Grand Chronicle</h1>
-    <div class="mbtns"><button id="m-cont" class="btn big" hidden>▶ Continuar</button><button id="m-new" class="btn big">⚜ Nova crônica</button><button id="m-join" class="btn big">🌐 Entrar numa sala</button></div>
+    <div class="mbtns"><button id="m-cont" class="btn big" hidden>▶ Continuar</button><button id="m-new" class="btn big">⚜ Nova crônica</button><button id="m-join" class="btn big">🌐 Entrar numa sala</button><button id="m-cfg" class="btn big">⚙ Configurações</button></div>
   </div>
 </section>
 
 <!-- Escolha do mundo e da nação -->
 <section id="setup" class="screen">
-  <header class="bar"><button id="s-back" class="btn">← Voltar</button><label class="seed">Semente <input id="s-seed" maxlength="9" spellcheck="false"></label><label class="seed">Início <select id="s-era"><option value="860">860 · Alta Idade Média</option><option value="1100">1100 · Idade Média</option><option value="1453">1453 · Renascimento</option><option value="1680">1680 · Era Moderna</option><option value="1789">1789 · Era das Revoluções</option><option value="1900">1900 · Era Industrial</option></select></label><button id="s-gen" class="btn">🎲 Novo mundo</button><span class="grow"></span><nav class="modes" id="s-modes"></nav></header>
+  <header class="bar"><button id="s-back" class="btn">← Voltar</button><label class="seed">Semente <input id="s-seed" maxlength="9" spellcheck="false"></label><label class="seed">Início <select id="s-era"><option value="860">860 · Alta Idade Média</option><option value="1100">1100 · Idade Média</option><option value="1453">1453 · Renascimento</option><option value="1680">1680 · Era Moderna</option><option value="1789">1789 · Era das Revoluções</option><option value="1900">1900 · Era Industrial</option><option value="2100">2100 · Futuro (teste)</option></select></label><button id="s-gen" class="btn">🎲 Novo mundo</button><span class="grow"></span><nav class="modes" id="s-modes"></nav></header>
   <aside id="s-card" class="panel"></aside>
+  <aside id="s-mode" class="panel"></aside>
+  <div id="s-legend" class="panel"></div>
   <div id="s-load" class="loading" hidden><b>Gerando o mundo…</b></div>
 </section>
 
@@ -43,7 +45,7 @@
 <div id="hint" hidden></div>
 
 <div id="tip" hidden></div>
-<div id="wm">build 0.2.5 · Governos (MP 0.2)</div>
+<div id="wm">build 0.2.9 · Governos (MP 0.3)</div>
 
 <script src="content/defines.js"></script>
 <script src="content/economy.js"></script>

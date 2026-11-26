@@ -17,7 +17,21 @@ const DIP_TEST = {
   common: (t, n) => enemiesOf(t.id).some(e => atWar(n.id, e)) || [...neighbors(t)].some(x => atWar(x, n.id)),
   embargo: (t, n) => has(t, 'emb', n.id) || has(n, 'emb', t.id), notHered: (t, n) => GOVS[t.gov].succ !== 'hered' || GOVS[n.gov].succ !== 'hered',
   neighbor: (t, n) => neighbors(t).has(n.id), war: (t, n) => atWar(t.id, n.id), overlord: (t, n) => n.senior === t.id || t.senior === n.id,
+  allyN: t => allyCount(t), noDip: (t, n) => subjNoDip(t) && !subjFixed(t, n), noDipT: (t, n) => subjNoDip(n) && !subjFixed(t, n),
+  foeSr: (t, n) => t.senior != null && atWar(n.id, t.senior), foeSrT: (t, n) => n.senior != null && atWar(t.id, n.senior),
+  allyFull: t => allyCount(t) >= allyMax(), allyFullT: (t, n) => allyCount(n) >= allyMax(), noSingle: t => !singles(t).length, noSingleT: (t, n) => !singles(n).length,
 };
+/* alianças: o teto sobe com o ano (DIPLO.ally.max); laços de súdito não contam */
+const allyMax = () => { let m = 0; for (const [y, k] of DIPLO.ally.max) if (curYear() >= y) m = k; return m; };
+const allyCount = n => (n.allies || []).filter(id => { const o = nat(id); return o && o.alive && o.senior !== n.id && n.senior !== id; }).length;
+/* casamento real: governante sem cônjuge ou herdeiro não prometido (k.sp = casa com quem casou) */
+const singles = n => GOVS[n.gov].succ !== 'hered' ? [] : [...(!n.spouse && ageOf(n.ruler) >= 16 ? [n.ruler] : []), ...(n.kids || []).filter(k => k.sp == null)];
+function wedOne(n, t) {
+  const c = singles(n).sort((a, b) => (b === n.ruler) - (a === n.ruler) || a.born - b.born)[0]; if (!c) return null;
+  if (c === n.ruler) n.spouse = mkChar(n, { f: !c.f, dyn: t.dyn, age: Math.max(16, ageOf(c) - 2) }); else c.sp = t.id;
+  return c;
+}
+function wed(n, t) { const a = wedOne(n, t), b = wedOne(t, n); return [a, b].filter(Boolean).map(charName).join(' e '); }
 const dipTerm = (k, v, t, n, a) => +DIP_TEST[k](t, n, a) * v;
 function accept(t, n, kind) {                                 // quanto t topa a proposta de n (≥ 0 aceita); devolve [valor, motivos]
   const why = []; let v = 0; const add = (x, txt) => { if (x) { v += x; why.push((x > 0 ? '+' : '') + Math.round(x) + ' ' + txt); } };
@@ -48,9 +62,9 @@ function dipAct(n, t, kind) {                                 // '' = feito/acei
   for (const [k, why] of D.deny || []) if (DIP_TEST[k](n, t, D.link)) return why;
   if (atWar(n.id, t.id)) return 'Em guerra';
   if (!isHuman(t.id)) { const [v] = accept(t, n, kind); if (v < 0) return 'Recusado'; }
-  n.money -= c; link(n, t, D.link);
+  n.money -= c; link(n, t, D.link); const who = D.wed ? wed(n, t) : '';
   relAdd(t, n, D.bonus); relAdd(n, t, D.bonus);
-  log(D.log + ' entre ' + natName(n) + ' e ' + natName(t) + '.', isHuman(n.id) || isHuman(t.id) ? 'good' : 'none', [n.id, t.id]);
+  log(D.log + ' entre ' + natName(n) + ' e ' + natName(t) + (who ? ' (' + who + ')' : '') + '.', isHuman(n.id) || isHuman(t.id) ? 'good' : 'none', [n.id, t.id]);
   return '';
 }
 function aiPropose(n, t, kind) {                              // IA propõe; para o jogador vira uma janela
@@ -75,16 +89,17 @@ function personality(n) {                                     // traços do gove
 function aiDiplomacy(n) {
   const P = personality(n), nb = [...neighbors(n)].map(nat).filter(t => t.alive);
   const known = S.nations.filter(t => t.alive && t !== n && n.exP[t.capital]);
-  if ((n.allies || []).length < 3 && chance(.04 * P.ally)) {
-    const c = known.filter(t => !has(n, 'allies', t.id) && !atWar(n.id, t.id)).map(t => [t, accept(t, n, 'ally')[0]]).sort((a, b) => b[1] - a[1])[0];
+  const denied = (t, kind) => (DIPLO[kind].deny || []).some(([k]) => DIP_TEST[k](n, t, DIPLO[kind].link));
+  if (allyCount(n) < allyMax() && chance(.04 * P.ally)) {
+    const c = known.filter(t => !denied(t, 'ally') && !atWar(n.id, t.id)).map(t => [t, accept(t, n, 'ally')[0]]).sort((a, b) => b[1] - a[1])[0];
     if (c && c[1] >= 0) aiPropose(n, c[0], 'ally');
   }
-  if (GOVS[n.gov].succ === 'hered' && (n.marr || []).length < 3 && chance(.04 * P.ally)) {
-    const c = known.filter(t => GOVS[t.gov].succ === 'hered' && !has(n, 'marr', t.id)).map(t => [t, accept(t, n, 'marr')[0]]).sort((a, b) => b[1] - a[1])[0];
+  if (singles(n).length && chance(.04 * P.ally)) {
+    const c = known.filter(t => !denied(t, 'marr')).map(t => [t, accept(t, n, 'marr')[0]]).sort((a, b) => b[1] - a[1])[0];
     if (c && c[1] >= 0) aiPropose(n, c[0], 'marr');
   }
   if ((n.trade || []).length < 4 && chance(.05)) {
-    const c = known.filter(t => !has(n, 'trade', t.id) && !has(n, 'emb', t.id) && !has(t, 'emb', n.id)).map(t => [t, accept(t, n, 'trade')[0]]).sort((a, b) => b[1] - a[1])[0];
+    const c = known.filter(t => !denied(t, 'trade')).map(t => [t, accept(t, n, 'trade')[0]]).sort((a, b) => b[1] - a[1])[0];
     if (c && c[1] >= 0) aiPropose(n, c[0], 'trade');
   }
   if (chance(.05) && nb.length) { const t = pickR(nb); if (strength(t) > strength(n) && (n.rel[t.id] || 0) < 30) dipAct(n, t, n.ruler.tr.includes('generous') ? 'gift' : 'improve'); }
@@ -93,11 +108,12 @@ function aiDiplomacy(n) {
   aiSubjects(n);
 }
 function tryUnion(n) {                                        // sem herdeiros: um parceiro de casamento pode herdar (união pessoal)
-  if (isHuman(n.id) || GOVS[n.gov].succ !== 'hered') return false;
+  if (GOVS[n.gov].succ !== 'hered') return false;   // vale também para o jogador (mesmas regras)
   const cands = (n.marr || []).map(nat).filter(t => t.alive && t.senior == null && GOVS[t.gov].succ === 'hered' && t.id !== n.id);
   if (!cands.length || !chance(.6)) return false;
   const s = cands.sort((a, b) => strength(b) - strength(a))[0];
   makeSubject(n, s, 'union'); n.unionT = S.t; n.ruler = s.ruler; n.dyn = s.dyn; n.kids = []; n.spouse = null;
   log('União pessoal: ' + natName(s) + ' herdou a coroa de ' + natName(n) + '.', 'world', [n.id, s.id]);
+  [n.id, s.id].filter(isHuman).forEach(id => notify(id, '👑 União pessoal', natName(s) + ' herdou a coroa de ' + natName(n) + ': as duas coroas têm agora o mesmo monarca.'));
   return true;
 }

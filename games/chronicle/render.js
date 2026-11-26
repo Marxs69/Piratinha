@@ -47,9 +47,9 @@ function provColors() {
     else if (mode === 'pop') { const v = Math.pow(S.pop[p] / WD.provs[p].size / maxPop, .5); c = [40 + v * 215, 40 + v * 170, 90 - v * 60]; }
     else if (mode === 'reg') c = regCol[WD.provs[p].region].map((v, i) => v * (.85 + (WD.provs[p].state % 3) * .08));
     else if (mode === 'cont') c = contCol[WD.provs[p].cont];
-    else if (mode.startsWith('svc:')) { const st = WD.provs[p].state, cv = S.scov && S.scov[st] && stateOwnerOf(st) === o ? S.scov[st][mode.slice(4)] : 0; c = o < 0 ? null : [200 - cv * 160, 70 + cv * 150, 70 + cv * 40]; }
+    else if (mode.startsWith('svc:')) { const st = WD.provs[p].state, cv = S.scov && S.scov[st] && stateOwnerOf(st) === o ? S.scov[st][mode.slice(4)] : 0, h = SVC_HUE[mode.slice(4)] || [120, 200, 120]; c = o < 0 ? null : [70 + (h[0] - 70) * cv, 66 + (h[1] - 66) * cv, 60 + (h[2] - 60) * cv]; }   /* um tom por serviço */
     else if (mode === 'plague') { const PS = S.pands || []; c = PS.some(P => P.inf[p] != null) ? [30, 70, 20] : (S.epis || []).some(E => E.inf[p] != null) ? [120, 150, 40] : PS.some(P => P.done[p]) ? [150, 150, 140] : o >= 0 ? [205, 200, 180] : null; }
-    else if (mode === 'res') c = stateTone(WD.provs[p].state);   // todas as províncias do estado com a mesma cor
+    else if (mode === 'res') { c = resVisible(p) && RES_OF[provRes(p)] ? RES_CAT[RES_OF[provRes(p)]][1] : null; }   // uma cor por categoria do recurso visível; sem recurso, o terreno esmaecido
     else if (mode === 'cul') c = hsl(((S.culg ? S.culg[p] : WD.provs[p].cul) * .17) % 1, .45, .55);
     else if (mode === 'rel') { const R0 = RELIGIONS[REL_IDS[S.relg ? S.relg[p] : 0]]; c = R0 ? hexRGB(R0.col) : null; }
     if (c) { col[p * 3] = c[0]; col[p * 3 + 1] = c[1]; col[p * 3 + 2] = c[2]; } else { col[p * 3] = 255; col[p * 3 + 1] = 0; col[p * 3 + 2] = 255; }   // magenta = sem cor (mostra terreno)
@@ -57,6 +57,9 @@ function provColors() {
   return col;
 }
 
+/* modo recursos: até 6 categorias (ferro e cobre = metais) */
+const RES_CAT = { met: ['Metais', [120, 150, 205]], coal: ['Carvão', [30, 30, 34]], gold: ['Ouro', [250, 205, 40]], oil: ['Petróleo', [120, 40, 150]], uranium: ['Urânio', [110, 235, 60]], rare: ['Terras raras', [225, 70, 200]] };
+const RES_OF = { iron: 'met', copper: 'met', coal: 'coal', gold: 'gold', oil: 'oil', uranium: 'uranium', rare: 'rare' };
 const RES_COL = { iron: [120, 140, 190], coal: [40, 40, 44], gold: [250, 205, 40], oil: [70, 20, 90], copper: [214, 110, 40], uranium: [110, 235, 60], rare: [225, 70, 200] };
 const hexRGB = h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
 /* mapa de recursos: cada estado tem um tom próprio tirado da cor do país dono (estados vizinhos variam o tom) */
@@ -80,6 +83,7 @@ function rebuildMap() {
       }
     } else if (sea[i] >= 0 && exZ && !exZ[sea[i]]) fog = true;
     else if (WD.water[i] === 2 && exP) { const nb = prov[i + 1] >= 0 ? prov[i + 1] : prov[i - 1] >= 0 ? prov[i - 1] : prov[i + W] >= 0 ? prov[i + W] : prov[i - W]; if (nb >= 0 && !exP[nb]) fog = true; }
+    else if (p >= 0 && R.mode === 'res' && pc[p * 3] === 255 && pc[p * 3 + 1] === 0 && pc[p * 3 + 2] === 255) { const m = (r + g + b) / 3; r = r * .45 + m * .2 + 60; g = g * .45 + m * .2 + 60; b = b * .45 + m * .2 + 60; }   // recursos: terreno esmaecido por baixo
     if (fog) { const n = ((x * 7 + y * 13) % 11) * 2; r = 196 - n; g = 178 - n; b = 136 - n; }
     // bordas: província, estado, nação e costa
     const right = x < W - 1 ? i + 1 : i, down = y < H - 1 ? i + W : i;
@@ -106,6 +110,14 @@ function rebuildMap() {
     if (q >= 0 && own[q] !== own[p]) { const o = ((y * K) * BW + (x + 1) * K) * 4; for (let dy = 0; dy < K; dy++) { const oo = o + dy * BW * 4; d[oo] *= .35; d[oo + 1] *= .35; d[oo + 2] *= .35; } }
     if (s >= 0 && own[s] !== own[p]) { const o = (((y + 1) * K) * BW + x * K) * 4; for (let dx = 0; dx < K; dx++) { const oo = o + dx * 4; d[oo] *= .35; d[oo + 1] *= .35; d[oo + 2] *= .35; } }
   }
+  // tela de escolha: contorno dourado do país escolhido
+  const pick = typeof UI !== 'undefined' && UI.scr === 'setup' && UI.pick != null ? UI.pick : -1;
+  if (pick >= 0) for (let y = 0; y < H - 1; y++) for (let x = 0; x < W - 1; x++) {
+    const i = y * W + x, a = prov[i] >= 0 && own[prov[i]] === pick;
+    for (const [j, hz] of [[i + 1, 1], [i + W, 0]]) { const b = prov[j] >= 0 && own[prov[j]] === pick; if (a === b) continue;
+      const bx = hz ? x + (a ? 0 : 1) : x, by = hz ? y : y + (a ? 0 : 1), o0 = ((by * K) * BW + bx * K) * 4;   // pinta o pixel de dentro
+      for (let k = 0; k < K; k++) { const oo = hz ? o0 + ((a ? K - 1 : 0) * 4) + k * BW * 4 : o0 + ((a ? K - 1 : 0) * BW * 4) + k * 4; d[oo] = 240; d[oo + 1] = 200; d[oo + 2] = 70; } }
+  }
   R.bctx.putImageData(R.img, 0, 0);
   computeLabels(); computeLinks();
   S.mapDirty = false; R.dirty = true;
@@ -124,8 +136,9 @@ function computeLinks() {
   }));
 }
 /* estradas (infra: estrada, rodovia, portal) e trilhos (rail: ferrovia, alta velocidade, maglev, tubos) são redes separadas, desenhadas lado a lado */
-const LINK_STYLE = { 1: ['#8b6b3a', 1.2, [4, 3]], 2: ['#d9d9d9', 2.6, []], 3: ['#fff6b0', 3, [1, 4]] };
-const RAIL_STYLE = { 1: ['#2a2a2a', 2.2], 2: ['#ffffff', 2.2], 3: ['#5ff2ff', 2.4], 4: ['#d38cff', 2.6] };
+const NET_Z = 5;   // estradas, trilhos e oleodutos só a partir deste zoom (de perto; decisão 14)
+const LINK_STYLE = { 1: ['#8b6b3a', .7, []], 2: ['#d9d9d9', 1.5, []], 3: ['#fff6b0', 1.8, []] };
+const RAIL_STYLE = { 1: ['#2a2a2a', 1.3], 2: ['#ffffff', 1.3], 3: ['#5ff2ff', 1.4], 4: ['#d38cff', 1.6] };
 /* rótulos das nações: um por bloco contínuo de território (o maior sempre; os outros se forem grandes), num ponto bem dentro dele
    (a província mais longe da fronteira, perto do centro) e com a largura disponível naquela altura para caber o nome */
 function computeLabels() {
@@ -205,14 +218,14 @@ function drawFrame() {
     for (const zz of WD.seas) { if (me && !me.exZ[zz.id]) continue; if (!vis(zz.cx * K, zz.cy * K)) continue; const [sx, sy] = toScreen(zz.cx * K, zz.cy * K); c.fillStyle = 'rgba(200,225,255,.55)'; c.fillText(zz.n, sx, sy); }
   }
   // obras e oleodutos
-  if (R.links && z >= .9) {
+  if (R.links && z >= NET_Z && R.mode === 'pol') {   // estradas, trilhos e oleodutos: só no político, de perto
     const line = (a, b, off = 0) => { const pa = WD.provs[a], pb = WD.provs[b]; let [x0, y0] = toScreen(pa.cx * K + K / 2, pa.cy * K + K / 2), [x1, y1] = toScreen(pb.cx * K + K / 2, pb.cy * K + K / 2);
       if (off) { const L = Math.hypot(x1 - x0, y1 - y0) || 1, ox = -(y1 - y0) / L * off, oy = (x1 - x0) / L * off; x0 += ox; x1 += ox; y0 += oy; y1 += oy; } c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1); c.stroke(); };
     c.lineCap = 'round';
     for (const [a, b, t] of R.links) { const [col, w, dash] = LINK_STYLE[t] || LINK_STYLE[1]; c.strokeStyle = col; c.lineWidth = w * Math.min(1.6, z / 1.5); c.setLineDash(dash); line(a, b); }
-    const ro = 3 * Math.min(1.6, z / 1.5);   // trilhos: linha cheia com dormentes claros, ao lado da estrada
-    for (const [a, b, t] of R.rails || []) { const [col, w] = RAIL_STYLE[t] || RAIL_STYLE[1]; c.strokeStyle = col; c.lineWidth = w * Math.min(1.6, z / 1.5); c.setLineDash([]); line(a, b, ro); c.strokeStyle = t === 1 ? 'rgba(255,255,255,.6)' : 'rgba(0,0,0,.45)'; c.lineWidth = 1; c.setLineDash([2, 5]); line(a, b, ro); }
-    c.strokeStyle = 'rgba(255,140,0,.85)'; c.lineWidth = 1.6; c.setLineDash([7, 4]); for (const [a, b] of R.pipes) line(a, b);
+    const ro = 2 * Math.min(1.6, z / 1.5);   // trilhos: linha cheia fina, ao lado da estrada
+    for (const [a, b, t] of R.rails || []) { const [col, w] = RAIL_STYLE[t] || RAIL_STYLE[1]; c.strokeStyle = col; c.lineWidth = w * Math.min(1.6, z / 1.5); c.setLineDash([]); line(a, b, ro); }   // uma linha cheia, sem dormentes tracejados
+    c.strokeStyle = 'rgba(255,140,0,.85)'; c.lineWidth = 1; c.setLineDash([]); for (const [a, b] of R.pipes) line(a, b);
     c.setLineDash([]);
   }
   // capitais dos países: estrela amarela
@@ -240,7 +253,9 @@ function drawFrame() {
   }
   // exércitos (agrupados por província)
   const slot = new Map();
+  const tokens = R.mode === 'pol' || R.mode === 'dip' || R.mode === 'ter';   // modos temáticos sem fichas de exército
   for (const a of S.armies) {
+    if (!tokens && !(me && a.o === me.id)) continue;
     if (!me || (a.o !== me.id && (far || !(a.p < P ? me.exP[a.p] : me.exZ[a.p - P])))) continue;
     const [wx, wy] = armyXY(a); if (!vis(wx, wy)) continue;
     const k = Math.round(wx) + ',' + Math.round(wy), i = slot.get(k) || 0; slot.set(k, i + 1);

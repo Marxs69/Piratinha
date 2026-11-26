@@ -75,7 +75,21 @@ const CMDS = {
   peace: (n, wid, L, winner, t) => { const w = S.wars.find(x => x.id === wid); if (!w) return 'Guerra inválida'; if (winner !== n.id && L !== n.id) return 'Não é sua paz'; separatePeace(w, L, winner, t); return ''; },
 };
 /* executa um comando como o país pid; devolve '' (feito) ou o motivo da recusa */
+/* troca de país depois do game over: aceitar (yes) ou recusar a oferta; observador do multiplayer assume um país livre da IA */
+function takeOver(pid, yes) {
+  const to = S.swapOffer[pid]; delete S.swapOffer[pid]; if (!Object.keys(S.swapOffer).length) delete S.swapOffer; (S.swapUsed = S.swapUsed || {})[pid] = 1;
+  const t = nat(to); if (!yes || !t || !t.alive || isHuman(to)) { humanOut(pid); return ''; }
+  S.swapUsed[to] = 1; return movePlayer(pid, to);   // a troca vale 1× por jogador: a marca acompanha o país novo
+}
+function movePlayer(pid, to) {
+  if (!S.humans) S.player = to;
+  else { S.humans = S.humans.map(x => x === pid ? to : x); if (S.mpNames) { S.mpNames[to] = S.mpNames[pid]; delete S.mpNames[pid]; } (S.moved = S.moved || {})[pid] = to; if (S.obs) { delete S.obs[pid]; if (!Object.keys(S.obs).length) delete S.obs; } }
+  log('A crônica continua com ' + natName(nat(to)) + '.', 'world', [to]); calcMods(nat(to)); return '';
+}
+function pickFree(pid, to) { const t = nat(to); if (!(S.obs && S.obs[pid]) || !t || !t.alive || isHuman(to) || t.senior != null) return 'País indisponível'; return movePlayer(pid, to); }
 function runCmd(pid, c, args) {
+  if (c === 'takeOver' && S.swapOffer && S.swapOffer[pid] != null) return takeOver(pid, !!(args || [])[0]);
+  if (c === 'pickFree') return pickFree(pid, +(args || [])[0]);
   const n = nat(pid); if (!n || !n.alive) return 'País inválido'; if (!isHuman(pid)) return 'Esse país não é de um jogador';
   const f = CMDS[c]; if (!f) return 'Comando desconhecido: ' + c;
   try { return f(n, ...(args || [])) || ''; } catch (e) { console.error('comando', c, e); return 'Erro no comando'; }

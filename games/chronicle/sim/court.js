@@ -19,19 +19,20 @@ function spawnNation(provs, o = {}) {
   const cul = o.cul ?? (src ? src.cul : S.culg[provs[0]]);
   const name = o.name || nameGen(CULTURES[cul], rnd, new Set(S.nations.map(x => x.name)));
   const n = { id, name, cul, home: WD.provs[provs[0]].cont, kind: o.kind || (src ? src.kind : 'main'), col: hsl(rnd(), .4 + rnd() * .3, .42 + rnd() * .16), flag: flagRandom(rnd),
-    gov: o.gov || (src ? src.gov : 'feudal'), ideo: o.ideo || (src ? src.ideo : 'trad'), money: o.money ?? 100, stab: 55, manpower: 0, techs: src ? Object.assign({}, src.techs) : {}, res: null, rp: 0,
+    gov: o.gov || (src ? src.gov : 'feudal'), ideo: o.ideo || (src ? src.ideo : 'trad'), money: o.money ?? Math.round(NEW_NATION.money * eraScale()), stab: NEW_NATION.stab, manpower: 0, techs: src ? Object.assign({}, src.techs) : {}, res: null, rp: 0,
     vert: src ? src.vert : null, vlv: 0, alive: true, claims: {}, truce: {}, rel: {}, allies: [], marr: [], trade: [], emb: [], cd: {}, cons: [], rec: [], fab: null, wex: 0,
     mk: { sup: {}, dem: {}, sat: {}, imp: {}, exp: {} }, inc: {}, exP: new Uint8Array(P), exZ: new Uint8Array(WD.seas.length), capital: -1,
     laws: src ? Object.assign({}, src.laws) : Object.assign({}, LAW_DEF), relig: o.relig ?? (src ? src.relig : S.relg[provs[0]]), ferv: 60, fav: 50, pres: 50 };
   S.nations.push(n); S.nations.forEach(x => { if (x !== n) { x.rel[id] = 0; n.rel[x.id] = 0; } });
   provs.forEach(p => { S.own[p] = id; S.ctrl[p] = id; delete S.sieges[p]; });
-  n.capital = provs.reduce((a, b) => S.pop[a] >= S.pop[b] ? a : b);
+  n.capital = provs.reduce((a, b) => S.pop[a] >= S.pop[b] ? a : b); ownChanged(); n.rank = startRank(n);
+  if (src) { n.cpol = Object.assign({}, src.cpol || {}); n.rpol = Object.assign({}, src.rpol || {}); delete n.cpol[n.cul]; delete n.rpol[n.relig]; }   // políticas de minorias do país de origem (menos a cultura e a fé do próprio país novo)
   n.dyn = o.dyn || newDynasty(n); calcMods(n);
   n.ruler = o.ruler || mkChar(n, { ruler: true }); n.council = {}; COUNCIL.forEach(([k]) => n.council[k] = councilChar(n, k));
   if (GOVS[n.gov].succ === 'hered') { n.spouse = mkChar(n, { f: !n.ruler.f, dyn: newDynasty(n), age: Math.max(16, ageOf(n.ruler) - 3) }); n.kids = []; }
   if (src) for (let p = 0; p < P; p++) n.exP[p] = src.exP[p]; initExplore(n);
   if (S._mine) S._mine[id] = []; ownChanged(); warsChanged(); strC = null; enterC = null; checkDead();   // quem perdeu a capital para o país novo muda de capital (ou some)
-  calcMods(n); n.mpMax = provs.reduce((s, p) => s + S.pop[p], 0) * .03; n.manpower = n.mpMax * .3;
+  calcMods(n); n.mpMax = provs.reduce((s, p) => s + S.pop[p], 0) * .03; n.manpower = n.mpMax * NEW_NATION.mp; mpC = null;
   return n;
 }
 
@@ -210,7 +211,7 @@ function lawSuccession(n) {
     n.spouse = mkChar(n, { f: !h.f, dyn: newDynasty(n), age: ageOf(h) }); return true;
   }
   if (!kids.length) return false;
-  const h = kids[0]; n.ruler = h; n.kids = kids.slice(1); n.spouse = ageOf(h) >= 16 ? mkChar(n, { f: !h.f, dyn: newDynasty(n), age: ageOf(h) }) : null;
+  const h = kids[0]; n.ruler = h; n.kids = kids.slice(1); const sp = h.sp != null && nat(h.sp) ? nat(h.sp) : null; n.spouse = ageOf(h) >= 16 || sp ? mkChar(n, { f: !h.f, dyn: sp ? sp.dyn : newDynasty(n), age: Math.max(16, ageOf(h)) }) : null;
   if (law === 'primo') n.kids.forEach(k => k.res = 1);
   if (law === 'partition' && adults.length >= 2 && statesOf(n) >= 4 && n.senior == null) partition(n, adults.find(k => k !== h));
   if (ageOf(h) < 16) { n.regent = n.council.chancellor || null; n.stab -= 8; log('Regência em ' + natName(n) + ': ' + charName(h) + ' tem só ' + ageOf(h) + ' anos.', 'info', [n.id]); }
@@ -227,7 +228,7 @@ function partition(n, heir) {
   if (!take.length) return;
   S.armies.forEach(a => { if (a.o === n.id && take.includes(a.p)) a.p = n.capital; });
   const m = spawnNation(take, { from: n.id, dyn: n.dyn, ruler: heir, gov: n.gov, money: Math.round(n.money * .2) }); n.money *= .8;
-  n.kids = n.kids.filter(x => x !== heir); link(n, m, 'allies'); link(n, m, 'marr'); n.rel[m.id] = 60; m.rel[n.id] = 60;
+  n.kids = n.kids.filter(x => x !== heir); if (!subjNoDip(n)) { if (allyCount(n) < allyMax()) link(n, m, 'allies'); link(n, m, 'marr'); } n.rel[m.id] = 60; m.rel[n.id] = 60;   // súdito sem diplomacia própria (§22) não ganha laços com o país novo
   log('Partilha: ' + charName(heir) + ' herdou parte do reino e fundou ' + natName(m) + '.', isHuman(n.id) ? 'bad' : 'world', [n.id, m.id]);
   notify(n.id, '👑 Partilha', 'Pela lei de partilha, ' + charName(heir) + ' levou ' + take.length + ' províncias e fundou ' + natName(m) + ', aliado da dinastia.');
 }
