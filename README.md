@@ -1,8 +1,5 @@
 # 🏴‍☠️ PIRATINHA
 
-Página inicial com cara de sistema operacional, em HTML, CSS e JavaScript puros (sem build nem servidor).
-Tudo o que o usuário muda fica só no navegador (`localStorage`).
-
 ## O que tem
 
 - **Modo OS**: área de trabalho, janelas, taskbar, dock, menu Iniciar e apps.
@@ -21,15 +18,6 @@ Tudo o que o usuário muda fica só no navegador (`localStorage`).
 | Zombie Fortress | `games/bastiao/` | Defesa de castelo em 3D contra zumbis. |
 | RPG Adventure | `games/adventure/` | RPG de ação, sozinho ou em coop (até 4). |
 | Grand Chronicle | `games/chronicle/` | Grande estratégia de 860 a 2200 em mundo aleatório. |
-
-Equilíbrio: topo de `game.js` (no RPG Adventure, `data.js`).
-
-### RPG Adventure
-
-- **Coop**: P2P pelo código da sala (`lib/trystero.js`).
-- **Dados**: mapas em `regions.js`; o resto em `data.js`.
-- **Editor**: `index.html#dev`, só local e com senha (`adventure-devkey`).
-- **Salvar no projeto**: grava `regions.js` (no Brave, ligue `brave://flags/#file-system-access-api`).
 
 ## Estrutura
 
