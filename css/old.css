@@ -2,7 +2,7 @@
 
 #old {
   position: fixed; inset: 0; overflow: auto; padding: 0 16px 90px; text-align: center; color: #ece8ee;
-  font-family: "Futura", system-ui, sans-serif;
+  font-family: "Barlow Condensed", system-ui, sans-serif;
   background:
     radial-gradient(900px 520px at 50% -8%, color-mix(in srgb, var(--accent) 26%, transparent), transparent 70%),
     radial-gradient(700px 500px at 100% 100%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 70%),

@@ -18,7 +18,7 @@ function openPad() {
     const circ = (x, y, r, fill, stroke) => { g.beginPath(); g.arc(x, y, r, 0, 7); if (fill) { g.fillStyle = fill; g.fill(); } if (stroke) { g.strokeStyle = stroke; g.lineWidth = 1.5; g.stroke(); } };
     const rr = (x, y, w, h, r, fill, stroke) => { g.beginPath(); g.roundRect(x, y, w, h, r); if (fill) { g.fillStyle = fill; g.fill(); } if (stroke) { g.strokeStyle = stroke; g.lineWidth = 1.5; g.stroke(); } };
     const lit = (val, a) => val > .05 ? `color-mix(in srgb, ${a} ${Math.round(40 + val * 60)}%, rgba(255,255,255,.08))` : 'rgba(255,255,255,.08)';
-    const txt = (t, x, y, size = 12, col = '#f0f2f4') => { g.fillStyle = col; g.font = size + 'px Futura, system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(t, x, y); };
+    const txt = (t, x, y, size = 12, col = '#f0f2f4') => { g.fillStyle = col; g.font = size + 'px "Barlow Condensed", system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(t, x, y); };
     function stick(x, y, ax, ay, pressed, tr, a) {
       circ(x, y, 34, pressed ? lit(1, a) : 'rgba(0,0,0,.25)', 'rgba(255,255,255,.25)');
       g.setLineDash([3, 4]); circ(x, y, 3.4, null, 'rgba(255,255,255,.35)'); g.setLineDash([]);
@@ -161,7 +161,7 @@ function laneLoop(c, host) {   // três faixas com blocos andando a 240, 480 e 9
       g.strokeStyle = 'rgba(255,255,255,.06)'; for (let gx = 0; gx < W; gx += 32) { g.beginPath(); g.moveTo(gx, y); g.lineTo(gx, y + lh); g.stroke(); }
       g.fillStyle = ac; g.beginPath(); g.roundRect(px, y + (lh - sz) / 2, sz, sz, sz * .22); g.fill();
       g.fillStyle = '#fff'; g.fillRect(px + sz * .2, y + (lh - sz) / 2 + sz * .3, sz * .18, sz * .18); g.fillRect(px + sz * .62, y + (lh - sz) / 2 + sz * .3, sz * .18, sz * .18);
-      g.fillStyle = 'rgba(255,255,255,.55)'; g.font = '12px Futura, system-ui, sans-serif'; g.textBaseline = 'top'; g.fillText(sp + ' px/s', 10, y + 8);
+      g.fillStyle = 'rgba(255,255,255,.55)'; g.font = '12px "Barlow Condensed", system-ui, sans-serif'; g.textBaseline = 'top'; g.fillText(sp + ' px/s', 10, y + 8);
     });
     requestAnimationFrame(f);
   })(performance.now());

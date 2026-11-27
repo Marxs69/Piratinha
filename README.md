@@ -45,5 +45,5 @@ python3 -m http.server 8000   # abra http://localhost:8000
 ## Licenças
 
 - Freedoom: BSD. Dwasm: GPL v2 (`games/doom/`).
-- Fontes: OFL 1.1 (`games/<jogo>/fonts/`).
-- Trystero: MIT (`games/adventure/lib/`).
+- Fontes: OFL 1.1 (`assets/fonts/` e `games/<jogo>/fonts/`).
+- Trystero: MIT (`games/adventure/lib/` e `games/chronicle/lib/`).

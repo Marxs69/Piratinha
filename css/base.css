@@ -1,6 +1,6 @@
 /* Base: fonte, variáveis de tema, reset, barras de rolagem e troca de modo */
 
-@font-face { font-family: "Futura"; src: url('../assets/fonts/futura-medium-condensed-bt.ttf') format('truetype'); }
+@font-face { font-family: "Barlow Condensed"; src: url('../assets/fonts/BarlowCondensed-Medium.ttf') format('truetype'); }
 
 :root {
   --wallpaper: #87ceeb;                 /* azul celeste — cor de fundo padrão */
@@ -24,7 +24,7 @@ html { color-scheme: dark; }
 ::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.26); border: 2px solid transparent; border-radius: 10px; background-clip: padding-box; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,.4); background-clip: padding-box; }
-body { font-family: "Futura", system-ui, sans-serif; overflow: hidden; background: var(--wallpaper); }
+body { font-family: "Barlow Condensed", system-ui, sans-serif; overflow: hidden; background: var(--wallpaper); }
 
 [data-mode="old"] #os { display: none; }
 [data-mode="os"] #old { display: none; }
